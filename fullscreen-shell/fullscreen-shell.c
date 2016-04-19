@@ -48,6 +48,8 @@ struct fullscreen_shell {
 	struct weston_layer layer;
 	struct wl_list output_list;
 	struct wl_listener output_created_listener;
+	struct wl_listener output_resized_listener;
+	struct wl_listener output_moved_listener;
 
 	struct wl_listener seat_created_listener;
 
@@ -815,6 +817,16 @@ struct zwp_fullscreen_shell_v1_interface fullscreen_shell_implementation = {
 };
 
 static void
+output_geometry_changed(struct wl_listener *listener, void *data)
+{
+	struct fs_output *fsout;
+
+	fsout = fs_output_for_output(data);
+	if (fsout && fsout->surface)
+		fs_output_configure(fsout, fsout->surface);
+}
+
+static void
 output_created(struct wl_listener *listener, void *data)
 {
 	struct fullscreen_shell *shell;
@@ -877,6 +889,8 @@ fullscreen_shell_destroy(struct wl_listener *listener, void *data)
 		fs_output_destroy(fs_output);
 
 	wl_list_remove(&shell->output_created_listener.link);
+	wl_list_remove(&shell->output_moved_listener.link);
+	wl_list_remove(&shell->output_resized_listener.link);
 
 	if (!wl_list_empty(&shell->default_surface_list)) {
 		surf = container_of(shell->default_surface_list.prev,
@@ -924,6 +938,14 @@ wet_shell_init(struct weston_compositor *compositor,
 		      &shell->output_created_listener);
 	wl_list_for_each(output, &compositor->output_list, link)
 		fs_output_create(shell, output);
+
+	shell->output_resized_listener.notify = output_geometry_changed;
+	wl_signal_add(&compositor->output_resized_signal,
+		      &shell->output_resized_listener);
+
+	shell->output_moved_listener.notify = output_geometry_changed;
+	wl_signal_add(&compositor->output_moved_signal,
+		      &shell->output_moved_listener);
 
 	shell->seat_created_listener.notify = seat_created;
 	wl_signal_add(&compositor->seat_created_signal,
