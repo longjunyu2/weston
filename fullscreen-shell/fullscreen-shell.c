@@ -310,6 +310,7 @@ configure_presented_surface_internal(struct weston_surface *surface);
 static struct fs_output *
 fs_output_create(struct fullscreen_shell *shell, struct weston_output *output)
 {
+	struct weston_seat *seat;
 	struct fs_output *fsout;
 	struct fs_client_surface *surf;
 
@@ -339,6 +340,14 @@ fs_output_create(struct fullscreen_shell *shell, struct weston_output *output)
 
 		fs_output_set_surface(fsout, surf->surface, surf->method, 0, 0);
 		configure_presented_surface_internal(surf->surface);
+
+		wl_list_for_each(seat, &shell->compositor->seat_list, link) {
+			struct weston_keyboard *keyboard =
+				weston_seat_get_keyboard(seat);
+
+			if (keyboard && !keyboard->focus)
+				weston_seat_set_keyboard_focus(seat, surf->surface);
+		}
 	}
 
 	return fsout;
