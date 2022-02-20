@@ -980,7 +980,7 @@ triangle_fan_debug(struct gl_renderer *gr,
 	};
 
 	ctransf = output->color_outcome->from_sRGB_to_blend;
-	if (!gl_shader_config_set_color_transform(&alt, ctransf)) {
+	if (!gl_shader_config_set_color_transform(gr, &alt, ctransf)) {
 		weston_log("GL-renderer: %s failed to generate a color transformation.\n",
 			   __func__);
 		return;
@@ -1146,6 +1146,7 @@ censor_override(struct gl_shader_config *sconf,
 		struct weston_output *output)
 {
 	struct weston_color_transform *ctransf;
+	struct gl_renderer *gr = get_renderer(output->compositor);
 	struct gl_shader_config alt = {
 		.req = {
 			.variant = SHADER_VARIANT_SOLID,
@@ -1157,7 +1158,7 @@ censor_override(struct gl_shader_config *sconf,
 	};
 
 	ctransf = output->color_outcome->from_sRGB_to_blend;
-	if (!gl_shader_config_set_color_transform(&alt, ctransf)) {
+	if (!gl_shader_config_set_color_transform(gr, &alt, ctransf)) {
 		weston_log("GL-renderer: %s failed to generate a color transformation.\n",
 			   __func__);
 	}
@@ -1229,6 +1230,7 @@ gl_shader_config_init_for_paint_node(struct gl_shader_config *sconf,
 				     struct weston_paint_node *pnode,
 				     GLint filter)
 {
+	struct gl_renderer *gr = get_renderer(pnode->surface->compositor);
 	struct gl_surface_state *gs = get_surface_state(pnode->surface);
 	struct gl_output_state *go = get_output_state(pnode->output);
 	struct weston_buffer *buffer = gs->buffer_ref.buffer;
@@ -1260,7 +1262,7 @@ gl_shader_config_init_for_paint_node(struct gl_shader_config *sconf,
 
 	gl_shader_config_set_input_textures(sconf, gs);
 
-	if (!gl_shader_config_set_color_transform(sconf, pnode->surf_xform.transform)) {
+	if (!gl_shader_config_set_color_transform(gr, sconf, pnode->surf_xform.transform)) {
 		weston_log("GL-renderer: failed to generate a color transformation.\n");
 		return false;
 	}
@@ -1584,7 +1586,7 @@ draw_output_borders(struct weston_output *output,
 		return; /* Clean. Nothing to do. */
 
 	ctransf = output->color_outcome->from_sRGB_to_output;
-	if (!gl_shader_config_set_color_transform(&sconf, ctransf)) {
+	if (!gl_shader_config_set_color_transform(gr, &sconf, ctransf)) {
 		weston_log("GL-renderer: %s failed to generate a color transformation.\n", __func__);
 		return;
 	}
@@ -1799,7 +1801,7 @@ blit_shadow_to_output(struct weston_output *output,
 	GLfloat verts[4 * 2];
 
 	ctransf = output->color_outcome->from_blend_to_output;
-	if (!gl_shader_config_set_color_transform(&sconf, ctransf)) {
+	if (!gl_shader_config_set_color_transform(gr, &sconf, ctransf)) {
 		weston_log("GL-renderer: %s failed to generate a color transformation.\n", __func__);
 		return;
 	}
@@ -4205,6 +4207,8 @@ gl_renderer_setup(struct weston_compositor *ec)
 	    weston_check_egl_extension(extensions, "GL_EXT_color_buffer_half_float") &&
 		weston_check_egl_extension(extensions, "GL_OES_texture_3D")) {
 		gr->gl_supports_color_transforms = true;
+		gr->tex_image_3d = (void *) eglGetProcAddress("glTexImage3D");
+		assert(gr->tex_image_3d);
 	}
 
 	if (weston_check_egl_extension(extensions, "GL_EXT_disjoint_timer_query")) {

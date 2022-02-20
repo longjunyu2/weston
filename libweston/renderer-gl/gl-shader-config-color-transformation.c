@@ -133,7 +133,8 @@ gl_renderer_color_transform_get(struct weston_color_transform *xform)
 }
 
 static bool
-gl_color_curve_lut_3x1d(struct gl_renderer_color_curve *gl_curve,
+gl_color_curve_lut_3x1d(struct gl_renderer *gr,
+			struct gl_renderer_color_curve *gl_curve,
 			const struct weston_color_curve *curve,
 			struct weston_color_transform *xform)
 {
@@ -180,7 +181,8 @@ gl_color_curve_lut_3x1d(struct gl_renderer_color_curve *gl_curve,
 }
 
 static bool
-gl_3d_lut(struct gl_renderer_color_transform *gl_xform,
+gl_3d_lut(struct gl_renderer *gr,
+	  struct gl_renderer_color_transform *gl_xform,
 	  struct weston_color_transform *xform)
 {
 
@@ -205,8 +207,8 @@ gl_3d_lut(struct gl_renderer_color_transform *gl_xform,
 	glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
 	glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
 	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F, dim_size, dim_size, dim_size, 0,
-		     GL_RGB, GL_FLOAT, lut);
+	gr->tex_image_3d(GL_TEXTURE_3D, 0, GL_RGB32F, dim_size, dim_size, dim_size, 0,
+			 GL_RGB, GL_FLOAT, lut);
 
 	glBindTexture(GL_TEXTURE_3D, 0);
 	gl_xform->mapping.type = SHADER_COLOR_MAPPING_3DLUT;
@@ -221,7 +223,8 @@ gl_3d_lut(struct gl_renderer_color_transform *gl_xform,
 
 
 static const struct gl_renderer_color_transform *
-gl_renderer_color_transform_from(struct weston_color_transform *xform)
+gl_renderer_color_transform_from(struct gl_renderer *gr,
+				 struct weston_color_transform *xform)
 {
 	static const struct gl_renderer_color_transform no_op_gl_xform = {
 		.pre_curve.type = SHADER_COLOR_CURVE_IDENTITY,
@@ -258,7 +261,7 @@ gl_renderer_color_transform_from(struct weston_color_transform *xform)
 		ok = true;
 		break;
 	case WESTON_COLOR_CURVE_TYPE_LUT_3x1D:
-		ok = gl_color_curve_lut_3x1d(&gl_xform->pre_curve,
+		ok = gl_color_curve_lut_3x1d(gr, &gl_xform->pre_curve,
 					     &xform->pre_curve, xform);
 		break;
 	}
@@ -273,7 +276,7 @@ gl_renderer_color_transform_from(struct weston_color_transform *xform)
 		ok = true;
 		break;
 	case WESTON_COLOR_MAPPING_TYPE_3D_LUT:
-		ok = gl_3d_lut(gl_xform, xform);
+		ok = gl_3d_lut(gr, gl_xform, xform);
 		break;
 	case WESTON_COLOR_MAPPING_TYPE_MATRIX:
 		gl_xform->mapping.type = SHADER_COLOR_MAPPING_MATRIX;
@@ -291,7 +294,7 @@ gl_renderer_color_transform_from(struct weston_color_transform *xform)
 		ok = true;
 		break;
 	case WESTON_COLOR_CURVE_TYPE_LUT_3x1D:
-		ok = gl_color_curve_lut_3x1d(&gl_xform->post_curve,
+		ok = gl_color_curve_lut_3x1d(gr, &gl_xform->post_curve,
 					     &xform->post_curve, xform);
 		break;
 	}
@@ -304,13 +307,14 @@ gl_renderer_color_transform_from(struct weston_color_transform *xform)
 }
 
 bool
-gl_shader_config_set_color_transform(struct gl_shader_config *sconf,
+gl_shader_config_set_color_transform(struct gl_renderer *gr,
+				     struct gl_shader_config *sconf,
 				     struct weston_color_transform *xform)
 {
 	const struct gl_renderer_color_transform *gl_xform;
 	bool ret = false;
 
-	gl_xform = gl_renderer_color_transform_from(xform);
+	gl_xform = gl_renderer_color_transform_from(gr, xform);
 	if (!gl_xform)
 		return false;
 

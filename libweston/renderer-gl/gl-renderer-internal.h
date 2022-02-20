@@ -152,6 +152,7 @@ struct gl_renderer {
 	struct weston_drm_format_array supported_formats;
 
 	PFNGLEGLIMAGETARGETTEXTURE2DOESPROC image_target_texture_2d;
+	PFNGLTEXIMAGE3DOESPROC tex_image_3d;
 	PFNEGLCREATEIMAGEKHRPROC create_image;
 	PFNEGLDESTROYIMAGEKHRPROC destroy_image;
 	PFNEGLSWAPBUFFERSWITHDAMAGEEXTPROC swap_buffers_with_damage;
@@ -286,7 +287,8 @@ struct weston_log_scope *
 gl_shader_scope_create(struct gl_renderer *gr);
 
 bool
-gl_shader_config_set_color_transform(struct gl_shader_config *sconf,
+gl_shader_config_set_color_transform(struct gl_renderer *gr,
+				     struct gl_shader_config *sconf,
 				     struct weston_color_transform *xform);
 
 #endif /* GL_RENDERER_INTERNAL_H */
