@@ -99,11 +99,13 @@ struct gl_shader_requirements
 	unsigned color_pre_curve:2; /* enum gl_shader_color_curve */
 	unsigned color_mapping:2; /* enum gl_shader_color_mapping */
 	unsigned color_post_curve:2; /* enum gl_shader_color_curve */
+	unsigned color_channel_order:2; /* enum gl_channel_order */
+
 	/*
 	 * The total size of all bitfields plus pad_bits_ must fill up exactly
 	 * how many bytes the compiler allocates for them together.
 	 */
-	unsigned pad_bits_:18;
+	unsigned pad_bits_:16;
 };
 static_assert(sizeof(struct gl_shader_requirements) ==
 	      4 /* total bitfield size in bytes */,
