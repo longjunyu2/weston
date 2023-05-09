@@ -503,6 +503,7 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 	wl_list_for_each(plane, &device->plane_list, link) {
 		const char *p_name = drm_output_get_plane_type_name(plane);
 		uint64_t zpos;
+		bool mm_has_underlay = false;
 
 		if (possible_plane_mask == 0)
 			break;
@@ -511,6 +512,8 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 			continue;
 
 		possible_plane_mask &= ~(1 << plane->plane_idx);
+		mm_has_underlay =
+			drm_mixed_mode_check_underlay(mode, scanout_state, plane->zpos_max);
 
 		switch (plane->type) {
 		case WDRM_PLANE_TYPE_CURSOR:
@@ -535,6 +538,10 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 			    weston_view_is_opaque(ev, &ev->transform.boundingbox) &&
 			    !scanout_has_view_assigned)
 				continue;
+			/* for alpha views, avoid placing them on the HW planes that
+			 * are below the primary plane. */
+			if (mm_has_underlay && !weston_view_is_opaque(ev, &ev->transform.boundingbox))
+				continue;
 			break;
 		default:
 			assert(false && "unknown plane type");
@@ -558,6 +565,21 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 			continue;
 		}
 
+		/* Pre-judge whether the plane will be set as underlay plane. If so, start
+		 * trying to find underlay plane based on 'current_lowest_zpos_underlay'. */
+		if (!need_underlay) {
+			uint64_t tmp_next_lowest_zpos;
+			if (current_lowest_zpos == DRM_PLANE_ZPOS_INVALID_PLANE)
+				tmp_next_lowest_zpos = plane->zpos_max;
+			else
+				tmp_next_lowest_zpos = current_lowest_zpos - 1;
+			if (drm_mixed_mode_check_underlay(mode, scanout_state, tmp_next_lowest_zpos)) {
+				drm_debug(b, "\t\t\t\t[plane] could not use overlay planes, "
+				             "attempting to find underlay plane\n");
+				current_lowest_zpos = current_lowest_zpos_underlay;
+			}
+		}
+
 		if (plane->zpos_min >= current_lowest_zpos) {
 			drm_debug(b, "\t\t\t\t[plane] not trying plane %d: "
 				     "plane's minimum zpos (%"PRIu64") above "
@@ -576,17 +598,14 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 			return NULL;
 		}
 
-		if (mode == DRM_OUTPUT_PROPOSE_STATE_MIXED) {
-			assert(scanout_state != NULL);
-			if (scanout_state->zpos >= plane->zpos_max) {
-				drm_debug(b, "\t\t\t\t[plane] not adding plane %d to "
-					     "candidate list: primary's zpos "
-					     "value (%"PRIu64") higher than "
-					     "plane's maximum value (%"PRIu64")\n",
-					     plane->plane_id, scanout_state->zpos,
-					     plane->zpos_max);
-				continue;
-			}
+		if (!b->has_underlay && mm_has_underlay) {
+			drm_debug(b, "\t\t\t\t[plane] not adding plane %d to "
+				     "candidate list: plane is below the primary "
+				     "plane and backend format (%s) is opaque, "
+				     "hole on primary plane will not work\n",
+				     plane->plane_id, b->format->drm_format_name);
+
+			continue;
 		}
 
 		if (current_lowest_zpos == DRM_PLANE_ZPOS_INVALID_PLANE)
@@ -607,6 +626,11 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 		}
 
 		if (ps) {
+			/* Check if this ps is underlay plane, if so, the view
+			 * needs through hole on primary plane. */
+			if (drm_mixed_mode_check_underlay(mode, scanout_state, ps->zpos))
+				pnode->need_hole = true;
+
 			drm_debug(b, "\t\t\t\t[view] view %p has been placed to "
 				     "%s plane with computed zpos %"PRIu64"\n",
 				     ev, p_name, zpos);
@@ -1039,13 +1063,14 @@ drm_assign_planes(struct weston_output *output_base)
 
 		if (target_plane) {
 			drm_debug(b, "\t[repaint] view %p on %s plane %lu\n",
-				  ev, plane_type_enums[target_plane->type].name,
+				  ev, drm_output_get_plane_type_name(target_plane),
 				  (unsigned long) target_plane->plane_id);
 			weston_paint_node_move_to_plane(pnode, &target_plane->base);
 		} else {
 			drm_debug(b, "\t[repaint] view %p using renderer "
 				     "composition\n", ev);
 			weston_paint_node_move_to_plane(pnode, primary);
+			pnode->need_hole = false;
 		}
 
 		if (!target_plane ||
