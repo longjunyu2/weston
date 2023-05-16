@@ -12,6 +12,9 @@ dep_libdisplay_info = dependency(
 	required: true,
 	not_found_message: 'Required by DRM-backend.',
 )
+if dep_libdisplay_info.version().version_compare('>= 0.2.0')
+	config_h.set('HAVE_LIBDISPLAY_INFO_HIGH_LEVEL_COLORIMETRY', '1')
+endif
 
 lib_backlight = static_library(
 	'backlight',

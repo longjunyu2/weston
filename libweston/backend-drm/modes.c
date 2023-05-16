@@ -1,7 +1,7 @@
 /*
  * Copyright © 2008-2011 Kristian Høgsberg
  * Copyright © 2011 Intel Corporation
- * Copyright © 2017, 2018 Collabora, Ltd.
+ * Copyright © 2017, 2018, 2024 Collabora, Ltd.
  * Copyright © 2017, 2018 General Electric Company
  * Copyright (c) 2018 DisplayLink (UK) Ltd.
  *
@@ -227,6 +227,43 @@ parse_modeline(const char *s, drmModeModeInfo *mode)
 	return 0;
 }
 
+#ifdef HAVE_LIBDISPLAY_INFO_HIGH_LEVEL_COLORIMETRY
+
+static uint32_t
+get_eotf_mask(const struct di_info *info)
+{
+	const struct di_hdr_static_metadata *hdr_static;
+	uint32_t mask = 0;
+
+	hdr_static = di_info_get_hdr_static_metadata(info);
+	if (!hdr_static->type1)
+		return WESTON_EOTF_MODE_SDR;
+
+	if (hdr_static->traditional_sdr)
+		mask |= WESTON_EOTF_MODE_SDR;
+
+	if (hdr_static->traditional_hdr)
+		mask |= WESTON_EOTF_MODE_TRADITIONAL_HDR;
+
+	if (hdr_static->pq)
+		mask |= WESTON_EOTF_MODE_ST2084;
+
+	if (hdr_static->hlg)
+		mask |= WESTON_EOTF_MODE_HLG;
+
+	return mask;
+}
+
+#else /* HAVE_LIBDISPLAY_INFO_HIGH_LEVEL_COLORIMETRY */
+
+static uint32_t
+get_eotf_mask(const struct di_info *info)
+{
+	return WESTON_EOTF_MODE_SDR;
+}
+
+#endif /* HAVE_LIBDISPLAY_INFO_HIGH_LEVEL_COLORIMETRY */
+
 static void
 drm_head_info_from_edid(struct drm_head_info *dhi,
 			const uint8_t *data,
@@ -250,11 +287,11 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 	dhi->make = di_info_get_make(di_ctx);
 	dhi->model = di_info_get_model(di_ctx);
 	dhi->serial_number = di_info_get_serial(di_ctx);
+	dhi->eotf_mask = get_eotf_mask(di_ctx);
 
 	di_info_destroy(di_ctx);
 
 	/* TODO: parse this from EDID */
-	dhi->eotf_mask = WESTON_EOTF_MODE_ALL_MASK;
 	dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_ALL_MASK;
 }
 
