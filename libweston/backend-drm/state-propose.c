@@ -65,6 +65,20 @@ drm_propose_state_mode_to_string(enum drm_output_propose_state_mode mode)
 }
 
 static bool
+drm_mixed_mode_check_underlay(enum drm_output_propose_state_mode mode,
+                              struct drm_plane_state *scanout_state,
+                              uint64_t zpos)
+{
+	if (mode == DRM_OUTPUT_PROPOSE_STATE_MIXED) {
+		assert(scanout_state != NULL);
+		if (scanout_state->zpos >= zpos)
+			return true;
+	}
+
+	return false;
+}
+
+static bool
 drm_output_check_plane_has_view_assigned(struct drm_plane *plane,
                                          struct drm_output_state *output_state)
 {
@@ -379,7 +393,9 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 			       struct weston_paint_node *pnode,
 			       enum drm_output_propose_state_mode mode,
 			       struct drm_plane_state *scanout_state,
-			       uint64_t current_lowest_zpos)
+			       uint64_t current_lowest_zpos_overlay,
+			       uint64_t current_lowest_zpos_underlay,
+			       bool need_underlay)
 {
 	struct drm_output *output = state->output;
 	struct drm_device *device = output->device;
@@ -391,6 +407,9 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 	struct weston_view *ev = pnode->view;
 	struct weston_buffer *buffer;
 	struct drm_fb *fb = NULL;
+	uint64_t current_lowest_zpos = need_underlay ?
+	                               current_lowest_zpos_underlay :
+	                               current_lowest_zpos_overlay;
 
 	bool view_matches_entire_output, scanout_has_view_assigned;
 	uint32_t possible_plane_mask = 0;
@@ -626,8 +645,12 @@ drm_output_propose_state(struct weston_output *output_base,
 	pixman_region32_t occluded_region;
 
 	bool renderer_ok = (mode != DRM_OUTPUT_PROPOSE_STATE_PLANES_ONLY);
+	bool need_underlay = false;
 	int ret;
-	uint64_t current_lowest_zpos = DRM_PLANE_ZPOS_INVALID_PLANE;
+	/* Record the current lowest zpos of the overlay planes */
+	uint64_t current_lowest_zpos_overlay = DRM_PLANE_ZPOS_INVALID_PLANE;
+	/* Record the current lowest zpos of the underlay plane */
+	uint64_t current_lowest_zpos_underlay = DRM_PLANE_ZPOS_INVALID_PLANE;
 
 	assert(!output->state_last);
 	state = drm_output_state_duplicate(output->state_cur,
@@ -681,6 +704,12 @@ drm_output_propose_state(struct weston_output *output_base,
 							  plane->state_cur);
 		/* assign the primary the lowest zpos value */
 		scanout_state->zpos = plane->zpos_min;
+		/* Set the initial lowest zpos used for the underlay plane
+		 * (asuming capable platform) to the that of the the primary
+		 * plane, matching the lowest possible value. As we parse views
+		 * from top to bottom we also need a start-up point for
+		 * underlays, below this initial lowest zpos value. */
+		current_lowest_zpos_underlay = scanout_state->zpos;
 		drm_debug(b, "\t\t[state] using renderer FB ID %lu for mixed "
 			     "mode for output %s (%lu)\n",
 			  (unsigned long) scanout_fb->fb_id, output->base.name,
@@ -690,7 +719,7 @@ drm_output_propose_state(struct weston_output *output_base,
 	}
 
 	/* - renderer_region contains the total region which which will be
-	 *   covered by the renderer
+	 *   covered by the renderer and underlay region.
 	 * - occluded_region contains the total region which which will be
 	 *   covered by the renderer and hardware planes, where the view's
 	 *   visible-and-opaque region is added in both cases (the view's
@@ -777,13 +806,20 @@ drm_output_propose_state(struct weston_output *output_base,
 
 		/* Since we process views from top to bottom, we know that if
 		 * the view intersects the calculated renderer region, it must
-		 * be part of, or occluded by, it, and cannot go on a plane. */
+		 * be part of, or occluded by, it, and cannot go on an overlay
+		 * plane. */
 		pixman_region32_intersect(&surface_overlap, &renderer_region,
 					  &clipped_view);
 		if (pixman_region32_not_empty(&surface_overlap)) {
-			drm_debug(b, "\t\t\t\t[view] not assigning view %p to plane "
-			             "(occluded by renderer views)\n", ev);
-			force_renderer = true;
+			if (b->has_underlay) {
+				need_underlay = true;
+			} else {
+				force_renderer = true;
+				drm_debug(b, "\t\t\t\t[view] not assigning view %p to a "
+					     "plane (occluded by renderer views), current lowest "
+					     "zpos change to %"PRIu64"\n", ev,
+					     current_lowest_zpos_underlay);
+			}
 		}
 		pixman_region32_fini(&surface_overlap);
 
@@ -805,10 +841,13 @@ drm_output_propose_state(struct weston_output *output_base,
 		/* Now try to place it on a plane if we can. */
 		if (!force_renderer) {
 			drm_debug(b, "\t\t\t[plane] started with zpos %"PRIu64"\n",
-				      current_lowest_zpos);
+				      need_underlay ? current_lowest_zpos_underlay :
+				      current_lowest_zpos_overlay);
 			ps = drm_output_find_plane_for_view(state, pnode, mode,
 							    scanout_state,
-							    current_lowest_zpos);
+							    current_lowest_zpos_overlay,
+							    current_lowest_zpos_underlay,
+							    need_underlay);
 		} else {
 			/* We are forced to place the view in the renderer, set
 			 * the failure reason accordingly. */
@@ -817,9 +856,14 @@ drm_output_propose_state(struct weston_output *output_base,
 		}
 
 		if (ps) {
-			current_lowest_zpos = ps->zpos;
-			drm_debug(b, "\t\t\t[plane] next zpos to use %"PRIu64"\n",
-				      current_lowest_zpos);
+			if (drm_mixed_mode_check_underlay(mode, scanout_state, ps->zpos))
+				current_lowest_zpos_underlay = ps->zpos;
+			else
+				current_lowest_zpos_overlay = ps->zpos;
+			drm_debug(b, "\t\t\t[plane] next overlay zpos to use %"PRIu64","
+			             " next underlay zpos to use %"PRIu64"\n",
+			             current_lowest_zpos_overlay,
+			             current_lowest_zpos_underlay);
 		} else if (!ps && !renderer_ok) {
 			drm_debug(b, "\t\t[view] failing state generation: "
 				      "placing view %p to renderer not allowed\n",
@@ -827,14 +871,16 @@ drm_output_propose_state(struct weston_output *output_base,
 			pixman_region32_fini(&clipped_view);
 			goto err_region;
 		} else if (!ps) {
+			drm_debug(b, "\t\t\t\t[view] view %p will be placed "
+				     "on the renderer\n", ev);
+		}
+
+		if (!ps || drm_mixed_mode_check_underlay(mode, scanout_state, ps->zpos)) {
 			/* clipped_view contains the area that's going to be
 			 * visible on screen; add this to the renderer region */
 			pixman_region32_union(&renderer_region,
 					      &renderer_region,
 					      &clipped_view);
-
-			drm_debug(b, "\t\t\t\t[view] view %p will be placed "
-				     "on the renderer\n", ev);
 		}
 
 		/* Opaque areas of our clipped view occlude areas behind it;
