@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <float.h>
 #include <math.h>
+#include <string.h>
 
 #include "shared/helpers.h"
 #include "vertex-clipping.h"
@@ -194,6 +195,11 @@ clip_polygon_topbottom(struct clip_context *ctx,
 	ctx->prev.y = y;
 }
 
+struct polygon8 {
+	struct clip_vertex pos[8];
+	int n;
+};
+
 static void
 clip_context_prepare(struct clip_context *ctx, const struct polygon8 *src,
 		     struct clip_vertex *dst)
@@ -281,12 +287,18 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
 
 WESTON_EXPORT_FOR_TESTS int
 clip_transformed(struct clip_context *ctx,
-		 const struct polygon8 *surf,
+		 const struct clip_vertex *polygon,
+		 size_t polygon_len,
 		 struct clip_vertex *restrict vertices)
 {
-	struct polygon8 p = *surf, tmp;
+	struct polygon8 p, tmp;
 	int i, n;
 
+	if (polygon_len > 8)
+		return -1;
+
+	memcpy(p.pos, polygon, polygon_len * sizeof *polygon);
+	p.n = polygon_len;
 	tmp.n = clip_polygon_left(ctx, &p, tmp.pos);
 	p.n = clip_polygon_right(ctx, &tmp, p.pos);
 	tmp.n = clip_polygon_top(ctx, &p, tmp.pos);
@@ -327,9 +339,9 @@ clip_quad(struct gl_quad *quad, pixman_box32_t *surf_rect,
 	 */
 	if (quad->axis_aligned) {
 		for (i = 0; i < 4; i++) {
-			vertices[i].x = CLIP(quad->vertices.pos[i].x,
+			vertices[i].x = CLIP(quad->polygon[i].x,
 					     ctx.clip.x1, ctx.clip.x2);
-			vertices[i].y = CLIP(quad->vertices.pos[i].y,
+			vertices[i].y = CLIP(quad->polygon[i].y,
 					     ctx.clip.y1, ctx.clip.y2);
 		}
 		if ((vertices[0].x != vertices[1].x) &&
@@ -352,7 +364,7 @@ clip_quad(struct gl_quad *quad, pixman_box32_t *surf_rect,
 	 * https://www.codeguru.com/cplusplus/polygon-clipping/
 	 * but without looking at any of that code.
 	 */
-	n = clip_transformed(&ctx, &quad->vertices, vertices);
+	n = clip_transformed(&ctx, quad->polygon, 4, vertices);
 
 	if (n < 3)
 		return 0;

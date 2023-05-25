@@ -485,11 +485,10 @@ rect_to_quad(pixman_box32_t *rect, struct weston_view *ev,
 	int i;
 
 	/* Transform rect to surface space. */
-	quad->vertices.n = 4;
-	for (i = 0; i < quad->vertices.n; i++) {
+	for (i = 0; i < 4; i++) {
 		rect_s = weston_coord_global_to_surface(ev, rect_g[i]).c;
-		quad->vertices.pos[i].x = (float)rect_s.x;
-		quad->vertices.pos[i].y = (float)rect_s.y;
+		quad->polygon[i].x = (float)rect_s.x;
+		quad->polygon[i].y = (float)rect_s.y;
 	}
 
 	quad->axis_aligned = !ev->transform.enabled ||
@@ -497,17 +496,13 @@ rect_to_quad(pixman_box32_t *rect, struct weston_view *ev,
 
 	/* Find axis-aligned bounding box. */
 	if (!quad->axis_aligned) {
-		quad->bbox.x1 = quad->bbox.x2 = quad->vertices.pos[0].x;
-		quad->bbox.y1 = quad->bbox.y2 = quad->vertices.pos[0].y;
-		for (i = 1; i < quad->vertices.n; i++) {
-			quad->bbox.x1 = MIN(quad->bbox.x1,
-					    quad->vertices.pos[i].x);
-			quad->bbox.x2 = MAX(quad->bbox.x2,
-					    quad->vertices.pos[i].x);
-			quad->bbox.y1 = MIN(quad->bbox.y1,
-					    quad->vertices.pos[i].y);
-			quad->bbox.y2 = MAX(quad->bbox.y2,
-					    quad->vertices.pos[i].y);
+		quad->bbox.x1 = quad->bbox.x2 = quad->polygon[0].x;
+		quad->bbox.y1 = quad->bbox.y2 = quad->polygon[0].y;
+		for (i = 1; i < 4; i++) {
+			quad->bbox.x1 = MIN(quad->bbox.x1, quad->polygon[i].x);
+			quad->bbox.x2 = MAX(quad->bbox.x2, quad->polygon[i].x);
+			quad->bbox.y1 = MIN(quad->bbox.y1, quad->polygon[i].y);
+			quad->bbox.y2 = MAX(quad->bbox.y2, quad->polygon[i].y);
 		}
 	}
 }

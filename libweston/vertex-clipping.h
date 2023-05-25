@@ -25,6 +25,7 @@
 #ifndef _WESTON_VERTEX_CLIPPING_H
 #define _WESTON_VERTEX_CLIPPING_H
 
+#include <stddef.h>
 #include <stdbool.h>
 #include <pixman.h>
 
@@ -32,13 +33,8 @@ struct clip_vertex {
 	float x, y;
 };
 
-struct polygon8 {
-	struct clip_vertex pos[8];
-	int n;
-};
-
 struct gl_quad {
-	struct polygon8 vertices;
+	struct clip_vertex polygon[4];
 	struct { float x1, y1, x2, y2; } bbox; /* Valid if !axis_aligned. */
 	bool axis_aligned;
 };
@@ -59,7 +55,8 @@ float_difference(float a, float b);
 
 int
 clip_transformed(struct clip_context *ctx,
-		 const struct polygon8 *surf,
+		 const struct clip_vertex *polygon,
+		 size_t polygon_len,
 		 struct clip_vertex *restrict vertices);
 
 /*
