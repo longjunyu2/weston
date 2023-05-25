@@ -23,9 +23,9 @@
  */
 
 /* cliptest:
- *	For debugging the rect_to_quad() and clip_quad() functions. An arbitrary
- *	quad (red) is transformed from global coordinate space to surface
- *	coordinate space and clipped to an axis-aligned rect (blue).
+ *	For debugging the quad clipper. An arbitrary quad (red) is transformed
+ *	from global coordinate space to surface coordinate space and clipped to
+ *	an axis-aligned rect (blue).
  *
  * controls:
  *	surface rect position:  mouse left drag,  keys: w a s d
@@ -111,8 +111,8 @@ weston_coord_global_to_surface(struct weston_view *view, struct weston_coord_glo
 /* Keep this in sync with what is in gl-renderer.c! */
 
 static void
-rect_to_quad(pixman_box32_t *rect, struct weston_view *ev,
-	     struct gl_quad *quad)
+global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
+		  struct clip_vertex polygon[4], bool *axis_aligned)
 {
 	struct weston_coord_global rect_g[4] = {
 		{ .c = weston_coord(rect->x1, rect->y1) },
@@ -123,31 +123,14 @@ rect_to_quad(pixman_box32_t *rect, struct weston_view *ev,
 	struct weston_coord rect_s;
 	int i;
 
-	/* Transform rect to surface space. */
 	for (i = 0; i < 4; i++) {
 		rect_s = weston_coord_global_to_surface(ev, rect_g[i]).c;
-		quad->polygon[i].x = (float)rect_s.x;
-		quad->polygon[i].y = (float)rect_s.y;
+		polygon[i].x = (float)rect_s.x;
+		polygon[i].y = (float)rect_s.y;
 	}
 
-	quad->axis_aligned = !ev->transform.enabled ||
+	*axis_aligned = !ev->transform.enabled ||
 		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
-
-	/* Find axis-aligned bounding box. */
-	if (!quad->axis_aligned) {
-		quad->bbox[0].x = quad->bbox[1].x = quad->polygon[0].x;
-		quad->bbox[0].y = quad->bbox[1].y = quad->polygon[0].y;
-		for (i = 1; i < 4; i++) {
-			quad->bbox[0].x = MIN(quad->bbox[0].x,
-					      quad->polygon[i].x);
-			quad->bbox[1].x = MAX(quad->bbox[1].x,
-					      quad->polygon[i].x);
-			quad->bbox[0].y = MIN(quad->bbox[0].y,
-					      quad->polygon[i].y);
-			quad->bbox[1].y = MAX(quad->bbox[1].y,
-					      quad->polygon[i].y);
-		}
-	}
 }
 
 /* ---------------------- copied ends -----------------------*/
@@ -295,10 +278,13 @@ redraw_handler(struct widget *widget, void *data)
 	cairo_t *cr;
 	cairo_surface_t *surface;
 	struct gl_quad quad;
-	struct clip_vertex v[8];
+	struct clip_vertex transformed_v[4], v[8];
+	bool axis_aligned;
 	int n;
 
-	rect_to_quad(&g->quad, &cliptest->view, &quad);
+	global_to_surface(&g->quad, &cliptest->view, transformed_v,
+			  &axis_aligned);
+	init_quad(&quad, transformed_v, axis_aligned);
 	n = clip_quad_box32(&quad, &g->surf, v);
 
 	widget_get_allocation(cliptest->widget, &allocation);
@@ -567,7 +553,8 @@ benchmark(void)
 	struct weston_view view;
 	struct geometry geom;
 	struct gl_quad quad;
-	struct clip_vertex v[8];
+	struct clip_vertex transformed_v[4], v[8];
+	bool axis_aligned;
 	int i;
 	double t;
 	const int N = 1000000;
@@ -592,7 +579,9 @@ benchmark(void)
 	reset_timer();
 	for (i = 0; i < N; i++) {
 		geometry_set_phi(&geom, (float)i / 360.0f);
-		rect_to_quad(&geom.quad, &view, &quad);
+		global_to_surface(&geom.quad, &view, transformed_v,
+				  &axis_aligned);
+		init_quad(&quad, transformed_v, axis_aligned);
 		clip_quad_box32(&quad, &geom.surf, v);
 	}
 	t = read_timer();

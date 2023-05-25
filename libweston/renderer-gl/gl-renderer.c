@@ -472,8 +472,8 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 }
 
 static void
-rect_to_quad(pixman_box32_t *rect, struct weston_view *ev,
-	     struct gl_quad *quad)
+global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
+		  struct clip_vertex polygon[4], bool *axis_aligned)
 {
 	struct weston_coord_global rect_g[4] = {
 		{ .c = weston_coord(rect->x1, rect->y1) },
@@ -484,31 +484,14 @@ rect_to_quad(pixman_box32_t *rect, struct weston_view *ev,
 	struct weston_coord rect_s;
 	int i;
 
-	/* Transform rect to surface space. */
 	for (i = 0; i < 4; i++) {
 		rect_s = weston_coord_global_to_surface(ev, rect_g[i]).c;
-		quad->polygon[i].x = (float)rect_s.x;
-		quad->polygon[i].y = (float)rect_s.y;
+		polygon[i].x = (float)rect_s.x;
+		polygon[i].y = (float)rect_s.y;
 	}
 
-	quad->axis_aligned = !ev->transform.enabled ||
+	*axis_aligned = !ev->transform.enabled ||
 		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
-
-	/* Find axis-aligned bounding box. */
-	if (!quad->axis_aligned) {
-		quad->bbox[0].x = quad->bbox[1].x = quad->polygon[0].x;
-		quad->bbox[0].y = quad->bbox[1].y = quad->polygon[0].y;
-		for (i = 1; i < 4; i++) {
-			quad->bbox[0].x = MIN(quad->bbox[0].x,
-					      quad->polygon[i].x);
-			quad->bbox[1].x = MAX(quad->bbox[1].x,
-					      quad->polygon[i].x);
-			quad->bbox[0].y = MIN(quad->bbox[0].y,
-					      quad->polygon[i].y);
-			quad->bbox[1].y = MAX(quad->bbox[1].y,
-					      quad->polygon[i].y);
-		}
-	}
 }
 
 static bool
@@ -572,7 +555,8 @@ texture_region(struct weston_paint_node *pnode,
 	pixman_box32_t *rects, *surf_rects;
 	pixman_box32_t *raw_rects;
 	int i, j, nrects, nsurf, raw_nrects;
-	bool used_band_compression;
+	bool used_band_compression, axis_aligned;
+	struct clip_vertex polygon[4];
 	struct gl_quad quad;
 
 	raw_rects = pixman_region32_rectangles(region, &raw_nrects);
@@ -593,7 +577,8 @@ texture_region(struct weston_paint_node *pnode,
 	vtxcnt = wl_array_add(&gr->vtxcnt, nrects * nsurf * sizeof *vtxcnt);
 
 	for (i = 0; i < nrects; i++) {
-		rect_to_quad(&rects[i], ev, &quad);
+		global_to_surface(&rects[i], ev, polygon, &axis_aligned);
+		init_quad(&quad, polygon, axis_aligned);
 		for (j = 0; j < nsurf; j++) {
 			int n;
 

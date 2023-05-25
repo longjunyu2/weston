@@ -49,13 +49,25 @@ clip_transformed(const struct clip_vertex *polygon,
 		 struct clip_vertex *restrict vertices);
 
 /*
- * Compute the boundary vertices of the intersection of an arbitrary
- * quadrilateral stored into a 'quad' clipping context and a clipping
- * 'box'. 'box' points to an array of 2 vertices where the values of the 1st
- * vertex are less than or equal to the values of the 2nd vertex. The vertices
- * are written to 'vertices', and the return value is the number of vertices.
- * Vertices are produced in clockwise winding order. Guarantees to produce
- * either zero vertices, or 3-8 vertices with non-zero polygon area.
+ * Initialize a 'quad' clipping context. 'polygon' points to an array of 4
+ * vertices defining a convex quadrilateral of any winding order. Call
+ * 'clip_quad()' to clip an initialized 'quad' to a clipping box. Clipping is
+ * faster if 'polygon' is an axis-aligned rectangle with edges parallel to the
+ * axes of the coordinate space. 'axis_aligned' indicates whether 'polygon'
+ * respects the conditions above.
+ */
+void
+init_quad(struct gl_quad *quad,
+	  const struct clip_vertex polygon[4],
+	  bool axis_aligned);
+
+/*
+ * Compute the boundary vertices of the intersection of a convex quadrilateral
+ * stored into a 'quad' clipping context and a clipping 'box'. 'box' points to
+ * an array of 2 vertices where the values of the 1st vertex are less than or
+ * equal to the values of the 2nd vertex. Either 0 or [3, 8] resulting vertices,
+ * with the same winding order than the 'polygon' passed to 'init_quad()', are
+ * written to 'vertices'. The return value is the number of vertices created.
  */
 int
 clip_quad(struct gl_quad *quad,

@@ -329,6 +329,30 @@ clip_transformed(const struct clip_vertex *polygon,
 	return n;
 }
 
+void
+init_quad(struct gl_quad *quad,
+	  const struct clip_vertex polygon[4],
+	  bool axis_aligned)
+{
+	int i;
+
+	memcpy(quad->polygon, polygon, 4 * sizeof *polygon);
+	quad->axis_aligned = axis_aligned;
+
+	if (axis_aligned)
+		return;
+
+	/* Find axis-aligned bounding box. */
+	quad->bbox[0].x = quad->bbox[1].x = polygon[0].x;
+	quad->bbox[0].y = quad->bbox[1].y = polygon[0].y;
+	for (i = 1; i < 4; i++) {
+		quad->bbox[0].x = MIN(quad->bbox[0].x, polygon[i].x);
+		quad->bbox[1].x = MAX(quad->bbox[1].x, polygon[i].x);
+		quad->bbox[0].y = MIN(quad->bbox[0].y, polygon[i].y);
+		quad->bbox[1].y = MAX(quad->bbox[1].y, polygon[i].y);
+	}
+}
+
 int
 clip_quad(struct gl_quad *quad,
 	  const struct clip_vertex box[2],
