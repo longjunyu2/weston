@@ -44,9 +44,9 @@
 #define OUTSIDE_Y2 (BOUNDING_BOX_TOP_Y + 1.0f)
 
 struct vertex_clip_test_data {
-	struct clip_vertex box[2];
-	struct clip_vertex polygon[8];
-	struct clip_vertex clipped[8];
+	struct clipper_vertex box[2];
+	struct clipper_vertex polygon[8];
+	struct clipper_vertex clipped[8];
 	int polygon_n;
 	int clipped_n;
 };
@@ -214,11 +214,11 @@ const struct vertex_clip_test_data test_data[] = {
 TEST_P(clip_polygon_n_vertices_emitted, test_data)
 {
 	struct vertex_clip_test_data *tdata = data;
-	struct clip_vertex clipped[8];
+	struct clipper_vertex clipped[8];
 	int clipped_n;
 
-	clipped_n = clip_transformed(tdata->polygon, tdata->polygon_n,
-				     tdata->box, clipped);
+	clipped_n = clipper_clip(tdata->polygon, tdata->polygon_n, tdata->box,
+				 clipped);
 
 	assert(clipped_n == tdata->clipped_n);
 }
@@ -226,11 +226,11 @@ TEST_P(clip_polygon_n_vertices_emitted, test_data)
 TEST_P(clip_polygon_expected_vertices, test_data)
 {
 	struct vertex_clip_test_data *tdata = data;
-	struct clip_vertex clipped[8];
+	struct clipper_vertex clipped[8];
 	int clipped_n, i;
 
-	clipped_n = clip_transformed(tdata->polygon, tdata->polygon_n,
-				     tdata->box, clipped);
+	clipped_n = clipper_clip(tdata->polygon, tdata->polygon_n, tdata->box,
+				 clipped);
 
 	for (i = 0; i < clipped_n; i++) {
 		assert(clipped[i].x == tdata->clipped[i].x);
@@ -238,20 +238,20 @@ TEST_P(clip_polygon_expected_vertices, test_data)
 	}
 }
 
-TEST(clip_transformed_size_too_high)
+TEST(clip_size_too_high)
 {
-	struct clip_vertex polygon[8] = {}, box[2] = {};
+	struct clipper_vertex polygon[8] = {}, box[2] = {};
 
-	assert(clip_transformed(polygon, 9, box, NULL) == -1);
+	assert(clipper_clip(polygon, 9, box, NULL) == -1);
 }
 
 TEST(float_difference_different)
 {
-	assert(float_difference(1.0f, 0.0f) == 1.0f);
+	assert(clipper_float_difference(1.0f, 0.0f) == 1.0f);
 }
 
 TEST(float_difference_same)
 {
-	assert(float_difference(1.0f, 1.0f) == 0.0f);
+	assert(clipper_float_difference(1.0f, 1.0f) == 0.0f);
 }
 

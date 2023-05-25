@@ -473,7 +473,7 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 
 static void
 global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
-		  struct clip_vertex polygon[4], bool *axis_aligned)
+		  struct clipper_vertex polygon[4], bool *axis_aligned)
 {
 	struct weston_coord_global rect_g[4] = {
 		{ .c = weston_coord(rect->x1, rect->y1) },
@@ -550,14 +550,14 @@ texture_region(struct weston_paint_node *pnode,
 	struct weston_compositor *ec = pnode->surface->compositor;
 	struct weston_view *ev = pnode->view;
 	struct gl_renderer *gr = get_renderer(ec);
-	struct clip_vertex *v;
+	struct clipper_vertex *v;
 	unsigned int *vtxcnt, nvtx = 0;
 	pixman_box32_t *rects, *surf_rects;
 	pixman_box32_t *raw_rects;
 	int i, j, nrects, nsurf, raw_nrects;
 	bool used_band_compression, axis_aligned;
-	struct clip_vertex polygon[4];
-	struct gl_quad quad;
+	struct clipper_vertex polygon[4];
+	struct clipper_quad quad;
 
 	raw_rects = pixman_region32_rectangles(region, &raw_nrects);
 	surf_rects = pixman_region32_rectangles(surf_region, &nsurf);
@@ -578,7 +578,7 @@ texture_region(struct weston_paint_node *pnode,
 
 	for (i = 0; i < nrects; i++) {
 		global_to_surface(&rects[i], ev, polygon, &axis_aligned);
-		init_quad(&quad, polygon, axis_aligned);
+		clipper_quad_init(&quad, polygon, axis_aligned);
 		for (j = 0; j < nsurf; j++) {
 			int n;
 
@@ -595,7 +595,7 @@ texture_region(struct weston_paint_node *pnode,
 			 * To do this, we first calculate the (up to eight) points at the
 			 * intersection of the edges of the quad and the surface rect.
 			 */
-			n = clip_quad_box32(&quad, &surf_rects[j], v);
+			n = clipper_quad_clip_box32(&quad, &surf_rects[j], v);
 			if (n >= 3) {
 				v += n;
 				vtxcnt[nvtx++] = n;

@@ -112,7 +112,7 @@ weston_coord_global_to_surface(struct weston_view *view, struct weston_coord_glo
 
 static void
 global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
-		  struct clip_vertex polygon[4], bool *axis_aligned)
+		  struct clipper_vertex polygon[4], bool *axis_aligned)
 {
 	struct weston_coord_global rect_g[4] = {
 		{ .c = weston_coord(rect->x1, rect->y1) },
@@ -181,7 +181,7 @@ struct cliptest {
 };
 
 static void
-draw_polygon_closed(cairo_t *cr, struct clip_vertex *pos, int n)
+draw_polygon_closed(cairo_t *cr, struct clipper_vertex *pos, int n)
 {
 	int i;
 
@@ -192,7 +192,7 @@ draw_polygon_closed(cairo_t *cr, struct clip_vertex *pos, int n)
 }
 
 static void
-draw_polygon_labels(cairo_t *cr, struct clip_vertex *pos, int n)
+draw_polygon_labels(cairo_t *cr, struct clipper_vertex *pos, int n)
 {
 	char str[16];
 	int i;
@@ -205,7 +205,7 @@ draw_polygon_labels(cairo_t *cr, struct clip_vertex *pos, int n)
 }
 
 static void
-draw_coordinates(cairo_t *cr, double ox, double oy, struct clip_vertex *pos, int n)
+draw_coordinates(cairo_t *cr, double ox, double oy, struct clipper_vertex *pos, int n)
 {
 	char str[64];
 	int i;
@@ -222,7 +222,7 @@ draw_coordinates(cairo_t *cr, double ox, double oy, struct clip_vertex *pos, int
 static void
 draw_box(cairo_t *cr, pixman_box32_t *box, struct weston_view *view)
 {
-	struct clip_vertex pos[4];
+	struct clipper_vertex pos[4];
 
 	if (view) {
 		weston_view_from_global_float(view, box->x1, box->y1, &pos[0].x, &pos[0].y);
@@ -241,7 +241,7 @@ draw_box(cairo_t *cr, pixman_box32_t *box, struct weston_view *view)
 
 static void
 draw_geometry(cairo_t *cr, struct weston_view *view,
-	      struct clip_vertex *v, int n)
+	      struct clipper_vertex *v, int n)
 {
 	struct geometry *g = view->geometry;
 	float cx, cy;
@@ -277,15 +277,15 @@ redraw_handler(struct widget *widget, void *data)
 	struct rectangle allocation;
 	cairo_t *cr;
 	cairo_surface_t *surface;
-	struct gl_quad quad;
-	struct clip_vertex transformed_v[4], v[8];
+	struct clipper_quad quad;
+	struct clipper_vertex transformed_v[4], v[8];
 	bool axis_aligned;
 	int n;
 
 	global_to_surface(&g->quad, &cliptest->view, transformed_v,
 			  &axis_aligned);
-	init_quad(&quad, transformed_v, axis_aligned);
-	n = clip_quad_box32(&quad, &g->surf, v);
+	clipper_quad_init(&quad, transformed_v, axis_aligned);
+	n = clipper_quad_clip_box32(&quad, &g->surf, v);
 
 	widget_get_allocation(cliptest->widget, &allocation);
 
@@ -552,8 +552,8 @@ benchmark(void)
 	struct weston_surface surface;
 	struct weston_view view;
 	struct geometry geom;
-	struct gl_quad quad;
-	struct clip_vertex transformed_v[4], v[8];
+	struct clipper_quad quad;
+	struct clipper_vertex transformed_v[4], v[8];
 	bool axis_aligned;
 	int i;
 	double t;
@@ -581,8 +581,8 @@ benchmark(void)
 		geometry_set_phi(&geom, (float)i / 360.0f);
 		global_to_surface(&geom.quad, &view, transformed_v,
 				  &axis_aligned);
-		init_quad(&quad, transformed_v, axis_aligned);
-		clip_quad_box32(&quad, &geom.surf, v);
+		clipper_quad_init(&quad, transformed_v, axis_aligned);
+		clipper_quad_clip_box32(&quad, &geom.surf, v);
 	}
 	t = read_timer();
 

@@ -29,58 +29,59 @@
 #include <stdbool.h>
 #include <pixman.h>
 
-struct clip_vertex {
+struct clipper_vertex {
 	float x, y;
 };
 
-struct gl_quad {
-	struct clip_vertex polygon[4];
-	struct clip_vertex bbox[2];    /* Valid if !axis_aligned. */
+struct clipper_quad {
+	struct clipper_vertex polygon[4];
+	struct clipper_vertex bbox[2];    /* Valid if !axis_aligned. */
 	bool axis_aligned;
 };
 
-float
-float_difference(float a, float b);
-
 int
-clip_transformed(const struct clip_vertex *polygon,
-		 size_t polygon_len,
-		 const struct clip_vertex box[2],
-		 struct clip_vertex *restrict vertices);
+clipper_clip(const struct clipper_vertex *polygon,
+	     size_t polygon_len,
+	     const struct clipper_vertex box[2],
+	     struct clipper_vertex *restrict vertices);
 
 /*
  * Initialize a 'quad' clipping context. 'polygon' points to an array of 4
  * vertices defining a convex quadrilateral of any winding order. Call
- * 'clip_quad()' to clip an initialized 'quad' to a clipping box. Clipping is
- * faster if 'polygon' is an axis-aligned rectangle with edges parallel to the
- * axes of the coordinate space. 'axis_aligned' indicates whether 'polygon'
- * respects the conditions above.
+ * 'clipper_quad_clip()' to clip an initialized 'quad' to a clipping box.
+ * Clipping is faster if 'polygon' is an axis-aligned rectangle with edges
+ * parallel to the axes of the coordinate space. 'axis_aligned' indicates
+ * whether 'polygon' respects the conditions above.
  */
 void
-init_quad(struct gl_quad *quad,
-	  const struct clip_vertex polygon[4],
-	  bool axis_aligned);
+clipper_quad_init(struct clipper_quad *quad,
+		  const struct clipper_vertex polygon[4],
+		  bool axis_aligned);
 
 /*
  * Compute the boundary vertices of the intersection of a convex quadrilateral
  * stored into a 'quad' clipping context and a clipping 'box'. 'box' points to
  * an array of 2 vertices where the values of the 1st vertex are less than or
  * equal to the values of the 2nd vertex. Either 0 or [3, 8] resulting vertices,
- * with the same winding order than the 'polygon' passed to 'init_quad()', are
- * written to 'vertices'. The return value is the number of vertices created.
+ * with the same winding order than the 'polygon' passed to
+ * 'clipper_quad_init()', are written to 'vertices'. The return value is the
+ * number of vertices created.
  */
 int
-clip_quad(struct gl_quad *quad,
-	  const struct clip_vertex box[2],
-	  struct clip_vertex *restrict vertices);
+clipper_quad_clip(struct clipper_quad *quad,
+		  const struct clipper_vertex box[2],
+		  struct clipper_vertex *restrict vertices);
 
 /*
- * Utility function calling 'clip_quad' but taking a pixman_box32 pointer as
- * clipping box.
+ * Utility function calling 'clipper_quad_clip()' but taking a pixman_box32
+ * pointer as clipping box.
  */
 int
-clip_quad_box32(struct gl_quad *quad,
-		const struct pixman_box32* box,
-		struct clip_vertex *restrict vertices);
+clipper_quad_clip_box32(struct clipper_quad *quad,
+			const struct pixman_box32 *box,
+			struct clipper_vertex *restrict vertices);
+
+float
+clipper_float_difference(float a, float b);
 
 #endif

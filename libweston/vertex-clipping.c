@@ -31,13 +31,13 @@
 #include "vertex-clipping.h"
 
 struct clip_context {
-	struct clip_vertex prev;
-	struct clip_vertex box[2];
-	struct clip_vertex *vertices;
+	struct clipper_vertex prev;
+	struct clipper_vertex box[2];
+	struct clipper_vertex *vertices;
 };
 
 WESTON_EXPORT_FOR_TESTS float
-float_difference(float a, float b)
+clipper_float_difference(float a, float b)
 {
 	/* https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/ */
 	static const float max_diff = 4.0f * FLT_MIN;
@@ -64,7 +64,7 @@ clip_intersect_y(float p1x, float p1y, float p2x, float p2y,
 		 float x_arg)
 {
 	float a;
-	float diff = float_difference(p1x, p2x);
+	float diff = clipper_float_difference(p1x, p2x);
 
 	/* Practically vertical line segment, yet the end points have already
 	 * been determined to be on different sides of the line. Therefore
@@ -86,7 +86,7 @@ clip_intersect_x(float p1x, float p1y, float p2x, float p2y,
 		 float y_arg)
 {
 	float a;
-	float diff = float_difference(p1y, p2y);
+	float diff = clipper_float_difference(p1y, p2y);
 
 	/* Practically horizontal line segment, yet the end points have already
 	 * been determined to be on different sides of the line. Therefore
@@ -202,13 +202,13 @@ clip_polygon_topbottom(struct clip_context *ctx,
 }
 
 struct polygon8 {
-	struct clip_vertex pos[8];
+	struct clipper_vertex pos[8];
 	int n;
 };
 
 static void
 clip_context_prepare(struct clip_context *ctx, const struct polygon8 *src,
-		     struct clip_vertex *dst)
+		     struct clipper_vertex *dst)
 {
 	ctx->prev.x = src->pos[src->n - 1].x;
 	ctx->prev.y = src->pos[src->n - 1].y;
@@ -217,7 +217,7 @@ clip_context_prepare(struct clip_context *ctx, const struct polygon8 *src,
 
 static int
 clip_polygon_left(struct clip_context *ctx, const struct polygon8 *src,
-		  struct clip_vertex *dst)
+		  struct clipper_vertex *dst)
 {
 	enum path_transition trans;
 	int i;
@@ -236,7 +236,7 @@ clip_polygon_left(struct clip_context *ctx, const struct polygon8 *src,
 
 static int
 clip_polygon_right(struct clip_context *ctx, const struct polygon8 *src,
-		   struct clip_vertex *dst)
+		   struct clipper_vertex *dst)
 {
 	enum path_transition trans;
 	int i;
@@ -255,7 +255,7 @@ clip_polygon_right(struct clip_context *ctx, const struct polygon8 *src,
 
 static int
 clip_polygon_top(struct clip_context *ctx, const struct polygon8 *src,
-		 struct clip_vertex *dst)
+		 struct clipper_vertex *dst)
 {
 	enum path_transition trans;
 	int i;
@@ -274,7 +274,7 @@ clip_polygon_top(struct clip_context *ctx, const struct polygon8 *src,
 
 static int
 clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
-		    struct clip_vertex *dst)
+		    struct clipper_vertex *dst)
 {
 	enum path_transition trans;
 	int i;
@@ -292,10 +292,10 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
 }
 
 WESTON_EXPORT_FOR_TESTS int
-clip_transformed(const struct clip_vertex *polygon,
-		 size_t polygon_len,
-		 const struct clip_vertex box[2],
-		 struct clip_vertex *restrict vertices)
+clipper_clip(const struct clipper_vertex *polygon,
+	     size_t polygon_len,
+	     const struct clipper_vertex box[2],
+	     struct clipper_vertex *restrict vertices)
 {
 	struct clip_context ctx;
 	struct polygon8 p, tmp;
@@ -316,23 +316,23 @@ clip_transformed(const struct clip_vertex *polygon,
 	vertices[0] = p.pos[0];
 	n = 1;
 	for (i = 1; i < p.n; i++) {
-		if (float_difference(vertices[n - 1].x, p.pos[i].x) == 0.0f &&
-		    float_difference(vertices[n - 1].y, p.pos[i].y) == 0.0f)
+		if (clipper_float_difference(vertices[n - 1].x, p.pos[i].x) == 0.0f &&
+		    clipper_float_difference(vertices[n - 1].y, p.pos[i].y) == 0.0f)
 			continue;
 		vertices[n] = p.pos[i];
 		n++;
 	}
-	if (float_difference(vertices[n - 1].x, p.pos[0].x) == 0.0f &&
-	    float_difference(vertices[n - 1].y, p.pos[0].y) == 0.0f)
+	if (clipper_float_difference(vertices[n - 1].x, p.pos[0].x) == 0.0f &&
+	    clipper_float_difference(vertices[n - 1].y, p.pos[0].y) == 0.0f)
 		n--;
 
 	return n;
 }
 
 void
-init_quad(struct gl_quad *quad,
-	  const struct clip_vertex polygon[4],
-	  bool axis_aligned)
+clipper_quad_init(struct clipper_quad *quad,
+		  const struct clipper_vertex polygon[4],
+		  bool axis_aligned)
 {
 	int i;
 
@@ -354,9 +354,9 @@ init_quad(struct gl_quad *quad,
 }
 
 int
-clip_quad(struct gl_quad *quad,
-	  const struct clip_vertex box[2],
-	  struct clip_vertex *restrict vertices)
+clipper_quad_clip(struct clipper_quad *quad,
+		  const struct clipper_vertex box[2],
+		  struct clipper_vertex *restrict vertices)
 {
 	int i, n;
 
@@ -391,7 +391,7 @@ clip_quad(struct gl_quad *quad,
 	 * https://www.codeguru.com/cplusplus/polygon-clipping/
 	 * but without looking at any of that code.
 	 */
-	n = clip_transformed(quad->polygon, 4, box, vertices);
+	n = clipper_clip(quad->polygon, 4, box, vertices);
 
 	if (n < 3)
 		return 0;
@@ -400,14 +400,14 @@ clip_quad(struct gl_quad *quad,
 }
 
 int
-clip_quad_box32(struct gl_quad *quad,
-		const struct pixman_box32 *box,
-		struct clip_vertex *restrict vertices)
+clipper_quad_clip_box32(struct clipper_quad *quad,
+			const struct pixman_box32 *box,
+			struct clipper_vertex *restrict vertices)
 {
-	struct clip_vertex box_vertices[2] = {
+	struct clipper_vertex box_vertices[2] = {
 		{ box->x1, box->y1 },
 		{ box->x2, box->y2 }
 	};
 
-	return clip_quad(quad, box_vertices, vertices);
+	return clipper_quad_clip(quad, box_vertices, vertices);
 }
