@@ -280,19 +280,6 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
 }
 
 WESTON_EXPORT_FOR_TESTS int
-clip_simple(struct clip_context *ctx,
-	    struct polygon8 *surf,
-	    struct clip_vertex *restrict vertices)
-{
-	int i;
-	for (i = 0; i < surf->n; i++) {
-		vertices[i].x = CLIP(surf->pos[i].x, ctx->clip.x1, ctx->clip.x2);
-		vertices[i].y = CLIP(surf->pos[i].y, ctx->clip.y1, ctx->clip.y2);
-	}
-	return surf->n;
-}
-
-WESTON_EXPORT_FOR_TESTS int
 clip_transformed(struct clip_context *ctx,
 		 const struct polygon8 *surf,
 		 struct clip_vertex *restrict vertices)
@@ -332,14 +319,19 @@ clip_quad(struct gl_quad *quad, pixman_box32_t *surf_rect,
 		.clip.x2 = surf_rect->x2,
 		.clip.y2 = surf_rect->y2,
 	};
-	int n;
+	int i, n;
 
 	/* Simple case: quad edges are parallel to surface rect edges, there
 	 * will be either four or zero edges. We just need to clip the quad to
 	 * the surface rect bounds and test for non-zero area:
 	 */
 	if (quad->axis_aligned) {
-		clip_simple(&ctx, &quad->vertices, vertices);
+		for (i = 0; i < 4; i++) {
+			vertices[i].x = CLIP(quad->vertices.pos[i].x,
+					     ctx.clip.x1, ctx.clip.x2);
+			vertices[i].y = CLIP(quad->vertices.pos[i].y,
+					     ctx.clip.y1, ctx.clip.y2);
+		}
 		if ((vertices[0].x != vertices[1].x) &&
 		    (vertices[0].y != vertices[2].y))
 			return 4;
