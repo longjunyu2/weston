@@ -46,10 +46,10 @@
 static void
 populate_clip_context (struct clip_context *ctx)
 {
-	ctx->clip.x1 = BOUNDING_BOX_LEFT_X;
-	ctx->clip.y1 = BOUNDING_BOX_BOTTOM_Y;
-	ctx->clip.x2 = BOUNDING_BOX_RIGHT_X;
-	ctx->clip.y2 = BOUNDING_BOX_TOP_Y;
+	ctx->box[0].x = BOUNDING_BOX_LEFT_X;
+	ctx->box[0].y = BOUNDING_BOX_BOTTOM_Y;
+	ctx->box[1].x = BOUNDING_BOX_RIGHT_X;
+	ctx->box[1].y = BOUNDING_BOX_TOP_Y;
 }
 
 static int

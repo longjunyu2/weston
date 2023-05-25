@@ -496,13 +496,17 @@ rect_to_quad(pixman_box32_t *rect, struct weston_view *ev,
 
 	/* Find axis-aligned bounding box. */
 	if (!quad->axis_aligned) {
-		quad->bbox.x1 = quad->bbox.x2 = quad->polygon[0].x;
-		quad->bbox.y1 = quad->bbox.y2 = quad->polygon[0].y;
+		quad->bbox[0].x = quad->bbox[1].x = quad->polygon[0].x;
+		quad->bbox[0].y = quad->bbox[1].y = quad->polygon[0].y;
 		for (i = 1; i < 4; i++) {
-			quad->bbox.x1 = MIN(quad->bbox.x1, quad->polygon[i].x);
-			quad->bbox.x2 = MAX(quad->bbox.x2, quad->polygon[i].x);
-			quad->bbox.y1 = MIN(quad->bbox.y1, quad->polygon[i].y);
-			quad->bbox.y2 = MAX(quad->bbox.y2, quad->polygon[i].y);
+			quad->bbox[0].x = MIN(quad->bbox[0].x,
+					      quad->polygon[i].x);
+			quad->bbox[1].x = MAX(quad->bbox[1].x,
+					      quad->polygon[i].x);
+			quad->bbox[0].y = MIN(quad->bbox[0].y,
+					      quad->polygon[i].y);
+			quad->bbox[1].y = MAX(quad->bbox[1].y,
+					      quad->polygon[i].y);
 		}
 	}
 }
@@ -606,7 +610,7 @@ texture_region(struct weston_paint_node *pnode,
 			 * To do this, we first calculate the (up to eight) points at the
 			 * intersection of the edges of the quad and the surface rect.
 			 */
-			n = clip_quad(&quad, &surf_rects[j], v);
+			n = clip_quad_box32(&quad, &surf_rects[j], v);
 			if (n >= 3) {
 				v += n;
 				vtxcnt[nvtx++] = n;

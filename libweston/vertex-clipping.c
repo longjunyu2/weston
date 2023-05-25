@@ -112,25 +112,25 @@ clip_append_vertex(struct clip_context *ctx, float x, float y)
 static enum path_transition
 path_transition_left_edge(struct clip_context *ctx, float x, float y)
 {
-	return ((ctx->prev.x >= ctx->clip.x1) << 1) | (x >= ctx->clip.x1);
+	return ((ctx->prev.x >= ctx->box[0].x) << 1) | (x >= ctx->box[0].x);
 }
 
 static enum path_transition
 path_transition_right_edge(struct clip_context *ctx, float x, float y)
 {
-	return ((ctx->prev.x < ctx->clip.x2) << 1) | (x < ctx->clip.x2);
+	return ((ctx->prev.x < ctx->box[1].x) << 1) | (x < ctx->box[1].x);
 }
 
 static enum path_transition
 path_transition_top_edge(struct clip_context *ctx, float x, float y)
 {
-	return ((ctx->prev.y >= ctx->clip.y1) << 1) | (y >= ctx->clip.y1);
+	return ((ctx->prev.y >= ctx->box[0].y) << 1) | (y >= ctx->box[0].y);
 }
 
 static enum path_transition
 path_transition_bottom_edge(struct clip_context *ctx, float x, float y)
 {
-	return ((ctx->prev.y < ctx->clip.y2) << 1) | (y < ctx->clip.y2);
+	return ((ctx->prev.y < ctx->box[1].y) << 1) | (y < ctx->box[1].y);
 }
 
 static void
@@ -223,7 +223,7 @@ clip_polygon_left(struct clip_context *ctx, const struct polygon8 *src,
 	for (i = 0; i < src->n; i++) {
 		trans = path_transition_left_edge(ctx, src->pos[i].x, src->pos[i].y);
 		clip_polygon_leftright(ctx, trans, src->pos[i].x, src->pos[i].y,
-				       ctx->clip.x1);
+				       ctx->box[0].x);
 	}
 	return ctx->vertices - dst;
 }
@@ -242,7 +242,7 @@ clip_polygon_right(struct clip_context *ctx, const struct polygon8 *src,
 	for (i = 0; i < src->n; i++) {
 		trans = path_transition_right_edge(ctx, src->pos[i].x, src->pos[i].y);
 		clip_polygon_leftright(ctx, trans, src->pos[i].x, src->pos[i].y,
-				       ctx->clip.x2);
+				       ctx->box[1].x);
 	}
 	return ctx->vertices - dst;
 }
@@ -261,7 +261,7 @@ clip_polygon_top(struct clip_context *ctx, const struct polygon8 *src,
 	for (i = 0; i < src->n; i++) {
 		trans = path_transition_top_edge(ctx, src->pos[i].x, src->pos[i].y);
 		clip_polygon_topbottom(ctx, trans, src->pos[i].x, src->pos[i].y,
-				       ctx->clip.y1);
+				       ctx->box[0].y);
 	}
 	return ctx->vertices - dst;
 }
@@ -280,7 +280,7 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
 	for (i = 0; i < src->n; i++) {
 		trans = path_transition_bottom_edge(ctx, src->pos[i].x, src->pos[i].y);
 		clip_polygon_topbottom(ctx, trans, src->pos[i].x, src->pos[i].y,
-				       ctx->clip.y2);
+				       ctx->box[1].y);
 	}
 	return ctx->vertices - dst;
 }
@@ -322,27 +322,23 @@ clip_transformed(struct clip_context *ctx,
 }
 
 int
-clip_quad(struct gl_quad *quad, pixman_box32_t *surf_rect,
-	  struct clip_vertex *vertices)
+clip_quad(struct gl_quad *quad,
+	  const struct clip_vertex box[2],
+	  struct clip_vertex *restrict vertices)
 {
-	struct clip_context ctx = {
-		.clip.x1 = surf_rect->x1,
-		.clip.y1 = surf_rect->y1,
-		.clip.x2 = surf_rect->x2,
-		.clip.y2 = surf_rect->y2,
-	};
+	struct clip_context ctx;
 	int i, n;
 
-	/* Simple case: quad edges are parallel to surface rect edges, there
-	 * will be either four or zero edges. We just need to clip the quad to
-	 * the surface rect bounds and test for non-zero area:
+	/* Simple case: quad edges are parallel to clipping box edges, there
+	 * will be either four or zero edges. We just need to clamp the quad
+	 * edges to the clipping box edges and test for non-zero area:
 	 */
 	if (quad->axis_aligned) {
 		for (i = 0; i < 4; i++) {
 			vertices[i].x = CLIP(quad->polygon[i].x,
-					     ctx.clip.x1, ctx.clip.x2);
+					     box[0].x, box[1].x);
 			vertices[i].y = CLIP(quad->polygon[i].y,
-					     ctx.clip.y1, ctx.clip.y2);
+					     box[0].y, box[1].y);
 		}
 		if ((vertices[0].x != vertices[1].x) &&
 		    (vertices[0].y != vertices[2].y))
@@ -352,10 +348,10 @@ clip_quad(struct gl_quad *quad, pixman_box32_t *surf_rect,
 	}
 
 	/* Transformed case: first, simple bounding box check to discard early a
-	 * quad that does not intersect with the rect:
+	 * quad that does not intersect with the clipping box:
 	 */
-	if ((quad->bbox.x1 >= ctx.clip.x2) || (quad->bbox.x2 <= ctx.clip.x1) ||
-	    (quad->bbox.y1 >= ctx.clip.y2) || (quad->bbox.y2 <= ctx.clip.y1))
+	if ((quad->bbox[0].x >= box[1].x) || (quad->bbox[1].x <= box[0].x) ||
+	    (quad->bbox[0].y >= box[1].y) || (quad->bbox[1].y <= box[0].y))
 		return 0;
 
 	/* Then, use a general polygon clipping algorithm to clip the quad with
@@ -364,10 +360,24 @@ clip_quad(struct gl_quad *quad, pixman_box32_t *surf_rect,
 	 * https://www.codeguru.com/cplusplus/polygon-clipping/
 	 * but without looking at any of that code.
 	 */
+	memcpy(&ctx.box, box, 2 * sizeof *box);
 	n = clip_transformed(&ctx, quad->polygon, 4, vertices);
 
 	if (n < 3)
 		return 0;
 
 	return n;
+}
+
+int
+clip_quad_box32(struct gl_quad *quad,
+		const struct pixman_box32 *box,
+		struct clip_vertex *restrict vertices)
+{
+	struct clip_vertex box_vertices[2] = {
+		{ box->x1, box->y1 },
+		{ box->x2, box->y2 }
+	};
+
+	return clip_quad(quad, box_vertices, vertices);
 }

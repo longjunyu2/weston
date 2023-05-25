@@ -35,18 +35,13 @@ struct clip_vertex {
 
 struct gl_quad {
 	struct clip_vertex polygon[4];
-	struct { float x1, y1, x2, y2; } bbox; /* Valid if !axis_aligned. */
+	struct clip_vertex bbox[2];    /* Valid if !axis_aligned. */
 	bool axis_aligned;
 };
 
 struct clip_context {
 	struct clip_vertex prev;
-
-	struct {
-		float x1, y1;
-		float x2, y2;
-	} clip;
-
+	struct clip_vertex box[2];
 	struct clip_vertex *vertices;
 };
 
@@ -61,14 +56,25 @@ clip_transformed(struct clip_context *ctx,
 
 /*
  * Compute the boundary vertices of the intersection of an arbitrary
- * quadrilateral 'quad' and the axis-aligned rectangle 'surf_rect'. The vertices
+ * quadrilateral stored into a 'quad' clipping context and a clipping
+ * 'box'. 'box' points to an array of 2 vertices where the values of the 1st
+ * vertex are less than or equal to the values of the 2nd vertex. The vertices
  * are written to 'vertices', and the return value is the number of vertices.
  * Vertices are produced in clockwise winding order. Guarantees to produce
  * either zero vertices, or 3-8 vertices with non-zero polygon area.
  */
 int
 clip_quad(struct gl_quad *quad,
-	  pixman_box32_t *surf_rect,
-	  struct clip_vertex *vertices);
+	  const struct clip_vertex box[2],
+	  struct clip_vertex *restrict vertices);
+
+/*
+ * Utility function calling 'clip_quad' but taking a pixman_box32 pointer as
+ * clipping box.
+ */
+int
+clip_quad_box32(struct gl_quad *quad,
+		const struct pixman_box32* box,
+		struct clip_vertex *restrict vertices);
 
 #endif
