@@ -39,6 +39,15 @@ struct clipper_quad {
 	bool axis_aligned;
 };
 
+/*
+ * General purpose clipping function. Compute the boundary vertices of the
+ * intersection of a 'polygon' and a clipping 'box'. 'polygon' points to an
+ * array of 'polygon_len' vertices, less than or equal to 8, defining a convex
+ * polygon of any winding order. 'box' points to an array of 2 vertices where
+ * the values of the 1st vertex are less than or equal to the values of the 2nd
+ * vertex. Up to 16 resulting vertices, using 'polygon' winding order, are
+ * written to 'vertices'. The return value is the number of vertices created.
+ */
 int
 clipper_clip(const struct clipper_vertex *polygon,
 	     size_t polygon_len,

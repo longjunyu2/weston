@@ -291,6 +291,9 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
 	return ctx->vertices - dst;
 }
 
+/* General purpose polygon clipping algorithm based on Sutherland-Hodgman:
+ * https://www.codeguru.com/cplusplus/polygon-clipping/
+ */
 WESTON_EXPORT_FOR_TESTS int
 clipper_clip(const struct clipper_vertex *polygon,
 	     size_t polygon_len,
@@ -360,7 +363,7 @@ clipper_quad_clip(struct clipper_quad *quad,
 {
 	int i, n;
 
-	/* Simple case: quad edges are parallel to clipping box edges, there
+	/* Aligned case: quad edges are parallel to clipping box edges, there
 	 * will be either four or zero edges. We just need to clamp the quad
 	 * edges to the clipping box edges and test for non-zero area:
 	 */
@@ -378,18 +381,14 @@ clipper_quad_clip(struct clipper_quad *quad,
 			return 0;
 	}
 
-	/* Transformed case: first, simple bounding box check to discard early a
+	/* Unaligned case: first, simple bounding box check to discard early a
 	 * quad that does not intersect with the clipping box:
 	 */
 	if ((quad->bbox[0].x >= box[1].x) || (quad->bbox[1].x <= box[0].x) ||
 	    (quad->bbox[0].y >= box[1].y) || (quad->bbox[1].y <= box[0].y))
 		return 0;
 
-	/* Then, use a general polygon clipping algorithm to clip the quad with
-	 * each side of the surface rect. The algorithm is Sutherland-Hodgman,
-	 * as explained in
-	 * https://www.codeguru.com/cplusplus/polygon-clipping/
-	 * but without looking at any of that code.
+	/* Then use our general purpose clipping algorithm:
 	 */
 	n = clipper_clip(quad->polygon, 4, box, vertices);
 
