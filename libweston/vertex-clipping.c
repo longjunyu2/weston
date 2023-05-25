@@ -30,6 +30,12 @@
 #include "shared/helpers.h"
 #include "vertex-clipping.h"
 
+struct clip_context {
+	struct clip_vertex prev;
+	struct clip_vertex box[2];
+	struct clip_vertex *vertices;
+};
+
 WESTON_EXPORT_FOR_TESTS float
 float_difference(float a, float b)
 {
@@ -286,23 +292,25 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
 }
 
 WESTON_EXPORT_FOR_TESTS int
-clip_transformed(struct clip_context *ctx,
-		 const struct clip_vertex *polygon,
+clip_transformed(const struct clip_vertex *polygon,
 		 size_t polygon_len,
+		 const struct clip_vertex box[2],
 		 struct clip_vertex *restrict vertices)
 {
+	struct clip_context ctx;
 	struct polygon8 p, tmp;
 	int i, n;
 
 	if (polygon_len > 8)
 		return -1;
 
+	memcpy(ctx.box, box, 2 * sizeof *box);
 	memcpy(p.pos, polygon, polygon_len * sizeof *polygon);
 	p.n = polygon_len;
-	tmp.n = clip_polygon_left(ctx, &p, tmp.pos);
-	p.n = clip_polygon_right(ctx, &tmp, p.pos);
-	tmp.n = clip_polygon_top(ctx, &p, tmp.pos);
-	p.n = clip_polygon_bottom(ctx, &tmp, p.pos);
+	tmp.n = clip_polygon_left(&ctx, &p, tmp.pos);
+	p.n = clip_polygon_right(&ctx, &tmp, p.pos);
+	tmp.n = clip_polygon_top(&ctx, &p, tmp.pos);
+	p.n = clip_polygon_bottom(&ctx, &tmp, p.pos);
 
 	/* Get rid of duplicate vertices */
 	vertices[0] = p.pos[0];
@@ -326,7 +334,6 @@ clip_quad(struct gl_quad *quad,
 	  const struct clip_vertex box[2],
 	  struct clip_vertex *restrict vertices)
 {
-	struct clip_context ctx;
 	int i, n;
 
 	/* Simple case: quad edges are parallel to clipping box edges, there
@@ -360,8 +367,7 @@ clip_quad(struct gl_quad *quad,
 	 * https://www.codeguru.com/cplusplus/polygon-clipping/
 	 * but without looking at any of that code.
 	 */
-	memcpy(&ctx.box, box, 2 * sizeof *box);
-	n = clip_transformed(&ctx, quad->polygon, 4, vertices);
+	n = clip_transformed(quad->polygon, 4, box, vertices);
 
 	if (n < 3)
 		return 0;

@@ -43,26 +43,8 @@
 #define OUTSIDE_Y1 (BOUNDING_BOX_BOTTOM_Y - 1.0f)
 #define OUTSIDE_Y2 (BOUNDING_BOX_TOP_Y + 1.0f)
 
-static void
-populate_clip_context (struct clip_context *ctx)
-{
-	ctx->box[0].x = BOUNDING_BOX_LEFT_X;
-	ctx->box[0].y = BOUNDING_BOX_BOTTOM_Y;
-	ctx->box[1].x = BOUNDING_BOX_RIGHT_X;
-	ctx->box[1].y = BOUNDING_BOX_TOP_Y;
-}
-
-static int
-clip_polygon (struct clip_context *ctx,
-	      struct clip_vertex *polygon,
-	      int n,
-	      struct clip_vertex *vertices)
-{
-	populate_clip_context(ctx);
-	return clip_transformed(ctx, polygon, n, vertices);
-}
-
 struct vertex_clip_test_data {
+	struct clip_vertex box[2];
 	struct clip_vertex polygon[8];
 	struct clip_vertex clipped[8];
 	int polygon_n;
@@ -72,6 +54,10 @@ struct vertex_clip_test_data {
 const struct vertex_clip_test_data test_data[] = {
 	/* All inside */
 	{
+		.box = {
+			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
+			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
+		},
 		.polygon = {
 			{ INSIDE_X1, INSIDE_Y1 },
 			{ INSIDE_X2, INSIDE_Y1 },
@@ -90,6 +76,10 @@ const struct vertex_clip_test_data test_data[] = {
 
 	/* Top outside */
 	{
+		.box = {
+			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
+			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
+		},
 		.polygon = {
 			{ INSIDE_X1, INSIDE_Y1 },
 			{ INSIDE_X2, INSIDE_Y1 },
@@ -108,6 +98,10 @@ const struct vertex_clip_test_data test_data[] = {
 
 	/* Bottom outside */
 	{
+		.box = {
+			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
+			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
+		},
 		.polygon = {
 			{ INSIDE_X1, OUTSIDE_Y1 },
 			{ INSIDE_X2, OUTSIDE_Y1 },
@@ -126,6 +120,10 @@ const struct vertex_clip_test_data test_data[] = {
 
 	/* Left outside */
 	{
+		.box = {
+			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
+			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y }
+		},
 		.polygon = {
 			{ OUTSIDE_X1, INSIDE_Y1 },
 			{ INSIDE_X2, INSIDE_Y1 },
@@ -144,6 +142,10 @@ const struct vertex_clip_test_data test_data[] = {
 
 	/* Right outside */
 	{
+		.box = {
+			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
+			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
+		},
 		.polygon = {
 			{ INSIDE_X1, INSIDE_Y1 },
 			{ OUTSIDE_X2, INSIDE_Y1 },
@@ -162,6 +164,10 @@ const struct vertex_clip_test_data test_data[] = {
 
 	/* Diamond extending from bounding box edges */
 	{
+		.box = {
+			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
+			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
+		},
 		.polygon = {
 			{ BOUNDING_BOX_LEFT_X - 25, BOUNDING_BOX_BOTTOM_Y + 25 },
 			{ BOUNDING_BOX_LEFT_X + 25, BOUNDING_BOX_TOP_Y + 25 },
@@ -180,6 +186,10 @@ const struct vertex_clip_test_data test_data[] = {
 
 	/* Diamond inside of bounding box edges */
 	{
+		.box = {
+			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
+			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
+		},
 		.polygon = {
 			{ BOUNDING_BOX_LEFT_X - 12.5, BOUNDING_BOX_BOTTOM_Y + 25 },
 			{ BOUNDING_BOX_LEFT_X + 25, BOUNDING_BOX_TOP_Y + 12.5 },
@@ -204,12 +214,11 @@ const struct vertex_clip_test_data test_data[] = {
 TEST_P(clip_polygon_n_vertices_emitted, test_data)
 {
 	struct vertex_clip_test_data *tdata = data;
-	struct clip_context ctx;
 	struct clip_vertex clipped[8];
 	int clipped_n;
 
-	clipped_n = clip_polygon(&ctx, tdata->polygon, tdata->polygon_n,
-				 clipped);
+	clipped_n = clip_transformed(tdata->polygon, tdata->polygon_n,
+				     tdata->box, clipped);
 
 	assert(clipped_n == tdata->clipped_n);
 }
@@ -217,12 +226,11 @@ TEST_P(clip_polygon_n_vertices_emitted, test_data)
 TEST_P(clip_polygon_expected_vertices, test_data)
 {
 	struct vertex_clip_test_data *tdata = data;
-	struct clip_context ctx;
 	struct clip_vertex clipped[8];
 	int clipped_n, i;
 
-	clipped_n = clip_polygon(&ctx, tdata->polygon, tdata->polygon_n,
-				 clipped);
+	clipped_n = clip_transformed(tdata->polygon, tdata->polygon_n,
+				     tdata->box, clipped);
 
 	for (i = 0; i < clipped_n; i++) {
 		assert(clipped[i].x == tdata->clipped[i].x);
@@ -232,10 +240,9 @@ TEST_P(clip_polygon_expected_vertices, test_data)
 
 TEST(clip_transformed_size_too_high)
 {
-	struct clip_context ctx;
-	struct clip_vertex polygon[8] = {};
+	struct clip_vertex polygon[8] = {}, box[2] = {};
 
-	assert(clip_transformed(&ctx, polygon, 9, NULL) == -1);
+	assert(clip_transformed(polygon, 9, box, NULL) == -1);
 }
 
 TEST(float_difference_different)

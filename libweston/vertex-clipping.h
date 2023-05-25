@@ -39,19 +39,13 @@ struct gl_quad {
 	bool axis_aligned;
 };
 
-struct clip_context {
-	struct clip_vertex prev;
-	struct clip_vertex box[2];
-	struct clip_vertex *vertices;
-};
-
 float
 float_difference(float a, float b);
 
 int
-clip_transformed(struct clip_context *ctx,
-		 const struct clip_vertex *polygon,
+clip_transformed(const struct clip_vertex *polygon,
 		 size_t polygon_len,
+		 const struct clip_vertex box[2],
 		 struct clip_vertex *restrict vertices);
 
 /*
