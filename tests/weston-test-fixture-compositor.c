@@ -238,6 +238,7 @@ shell_to_str(enum shell_type t)
 		[SHELL_DESKTOP] = "desktop",
 		[SHELL_FULLSCREEN] = "fullscreen",
 		[SHELL_IVI] = "ivi",
+		[SHELL_KIOSK] = "kiosk",
 	};
 	assert(t >= 0 && t < ARRAY_LENGTH(names));
 	return names[t];

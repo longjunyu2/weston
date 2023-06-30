@@ -39,6 +39,7 @@
 #include "weston-test-client-protocol.h"
 #include "viewporter-client-protocol.h"
 #include "weston-output-capture-client-protocol.h"
+#include "xdg-shell-client-protocol.h"
 #include "weston-testsuite-data.h"
 
 struct client {

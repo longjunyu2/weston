@@ -51,7 +51,9 @@ enum shell_type {
 	/** The ivi-shell. */
 	SHELL_IVI,
 	/** The fullscreen-shell. */
-	SHELL_FULLSCREEN
+	SHELL_FULLSCREEN,
+	/** The kiosk shell */
+	SHELL_KIOSK,
 };
 
 /** Weston compositor configuration
