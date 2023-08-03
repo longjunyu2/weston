@@ -38,7 +38,12 @@ struct weston_compositor;
 struct weston_xwayland;
 
 #define WESTON_XWAYLAND_API_NAME "weston_xwayland_v3"
-#define WESTON_XWAYLAND_SURFACE_API_NAME "weston_xwayland_surface_v1"
+#define WESTON_XWAYLAND_SURFACE_API_NAME "weston_xwayland_surface_v2"
+
+enum window_atom_type {
+	WM_NAME,
+	WM_CLASS,
+};
 
 typedef struct wl_client *
 (*weston_xwayland_spawn_xserver_func_t)(
@@ -146,6 +151,16 @@ struct weston_xwayland_surface_api {
 	 */
 	void
 	(*send_position)(struct weston_surface *surface, int32_t x, int32_t y);
+
+	/** Grab the window's name using enume window_atom_type
+	 *
+	 *
+	 * \param surface The Xwayland surface.
+	 * \param atype the type of the atom, either WM_NAME or WM_CLASS
+	 * \returns the net_wm_name, as a string.
+	 */
+	const char *
+	(*get_xwayland_window_name)(struct weston_surface *surface, enum window_atom_type atype);
 };
 
 /** Retrieve the API object for the libweston Xwayland surface.

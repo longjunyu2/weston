@@ -112,6 +112,25 @@ transform_handler(struct wl_listener *listener, void *data)
 			   shsurf->view->geometry.pos_offset.y);
 }
 
+static const char *
+xwayland_get_xwayland_name(struct kiosk_shell_surface *shsurf, enum window_atom_type type)
+{
+	const struct weston_xwayland_surface_api *api;
+	struct weston_surface *surface;
+
+	api = shsurf->shell->xwayland_surface_api;
+	if (!api) {
+		api = weston_xwayland_surface_get_api(shsurf->shell->compositor);
+		shsurf->shell->xwayland_surface_api = api;
+	}
+
+	surface = weston_desktop_surface_get_surface(shsurf->desktop_surface);
+	if (!api || !api->is_xwayland_surface(surface))
+		return NULL;
+
+	return api->get_xwayland_window_name(surface, type);
+}
+
 /*
  * kiosk_shell_surface
  */
@@ -162,8 +181,7 @@ kiosk_shell_surface_get_parent_root(struct kiosk_shell_surface *shsurf)
 }
 
 static bool
-kiosk_shell_output_has_app_id(struct kiosk_shell_output *shoutput,
-			      const char *app_id);
+kiosk_shell_output_has_app_id(char *config_app_ids, const char *app_id);
 
 static struct weston_output *
 kiosk_shell_surface_find_best_output(struct kiosk_shell_surface *shsurf)
@@ -181,7 +199,27 @@ kiosk_shell_surface_find_best_output(struct kiosk_shell_surface *shsurf)
 	app_id = weston_desktop_surface_get_app_id(shsurf->desktop_surface);
 	if (app_id) {
 		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
-			if (kiosk_shell_output_has_app_id(shoutput, app_id)) {
+			if (kiosk_shell_output_has_app_id(shoutput->app_ids, app_id)) {
+				shsurf->appid_output_assigned = true;
+				return shoutput->output;
+			}
+		}
+	}
+
+	app_id = xwayland_get_xwayland_name(shsurf, WM_NAME);
+	if (app_id) {
+		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
+			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_name_app_ids, app_id)) {
+				shsurf->appid_output_assigned = true;
+				return shoutput->output;
+			}
+		}
+	}
+
+	app_id = xwayland_get_xwayland_name(shsurf, WM_CLASS);
+	if (app_id) {
+		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
+			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_class_app_ids, app_id)) {
 				shsurf->appid_output_assigned = true;
 				return shoutput->output;
 			}
@@ -669,27 +707,28 @@ kiosk_shell_output_destroy(struct kiosk_shell_output *shoutput)
 	wl_list_remove(&shoutput->link);
 
 	free(shoutput->app_ids);
+	free(shoutput->x11_wm_name_app_ids);
+	free(shoutput->x11_wm_class_app_ids);
 
 	free(shoutput);
 }
 
 static bool
-kiosk_shell_output_has_app_id(struct kiosk_shell_output *shoutput,
-			      const char *app_id)
+kiosk_shell_output_has_app_id(char *config_app_ids, const char *app_id)
 {
 	char *cur;
 	size_t app_id_len;
 
-	if (!shoutput->app_ids)
+	if (!config_app_ids)
 		return false;
 
-	cur = shoutput->app_ids;
+	cur = config_app_ids;
 	app_id_len = strlen(app_id);
 
 	while ((cur = strstr(cur, app_id))) {
 		/* Check whether we have found a complete match of app_id. */
 		if ((cur[app_id_len] == ',' || cur[app_id_len] == '\0') &&
-		    (cur == shoutput->app_ids || cur[-1] == ','))
+		    (cur == config_app_ids || cur[-1] == ','))
 			return true;
 		cur++;
 	}
@@ -705,10 +744,16 @@ kiosk_shell_output_configure(struct kiosk_shell_output *shoutput)
 		weston_config_get_section(wc, "output", "name", shoutput->output->name);
 
 	assert(shoutput->app_ids == NULL);
+	assert(shoutput->x11_wm_name_app_ids == NULL);
+	assert(shoutput->x11_wm_class_app_ids == NULL);
 
 	if (section) {
 		weston_config_section_get_string(section, "app-ids",
 						 &shoutput->app_ids, NULL);
+		weston_config_section_get_string(section, "x11-wm-name",
+						 &shoutput->x11_wm_name_app_ids, NULL);
+		weston_config_section_get_string(section, "x11-wm-class",
+						 &shoutput->x11_wm_class_app_ids, NULL);
 	}
 }
 

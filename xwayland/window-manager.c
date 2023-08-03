@@ -2986,6 +2986,25 @@ is_wm_window(struct weston_surface *surface)
 	return get_wm_window(surface) != NULL;
 }
 
+static const char *
+get_xwayland_window_name(struct weston_surface *surface, enum window_atom_type atype)
+{
+	struct weston_wm_window *window = get_wm_window(surface);
+
+	switch (atype) {
+	case WM_NAME:
+		return window->name;
+	break;
+	case WM_CLASS:
+		return window->class;
+	break;
+	default:
+		break;
+	}
+
+	return NULL;
+}
+
 static void
 weston_wm_window_configure(void *data)
 {
@@ -3354,4 +3373,5 @@ xserver_map_shell_surface(struct weston_wm_window *window,
 const struct weston_xwayland_surface_api surface_api = {
 	is_wm_window,
 	send_position,
+	get_xwayland_window_name,
 };

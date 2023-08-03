@@ -98,6 +98,8 @@ struct kiosk_shell_output {
 	struct wl_list link;
 
 	char *app_ids;
+	char *x11_wm_name_app_ids;
+	char *x11_wm_class_app_ids;
 
 	struct wl_list *active_surface_tree;
 };
