@@ -184,6 +184,60 @@ static bool
 kiosk_shell_output_has_app_id(char *config_app_ids, const char *app_id);
 
 static struct weston_output *
+kiosk_shell_surface_find_best_output_for_xwayland(struct kiosk_shell_surface *shsurf)
+{
+	struct kiosk_shell_output *shoutput;
+	const char *wm_name;
+	const char *wm_class;
+
+	wm_name = xwayland_get_xwayland_name(shsurf, WM_NAME);
+	wm_class = xwayland_get_xwayland_name(shsurf, WM_CLASS);
+
+	if (wm_name && wm_class) {
+		bool found_wm_name = false;
+		bool found_wm_class = false;
+
+		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
+			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_name_app_ids,
+							  wm_name))
+				found_wm_name = true;
+
+			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_class_app_ids,
+							  wm_class))
+				found_wm_class = true;
+
+			if (found_wm_name && found_wm_class) {
+				shsurf->appid_output_assigned = true;
+				return shoutput->output;
+			}
+		}
+	}
+
+	/* fallback to search for each entry */
+	if (wm_name) {
+		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
+			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_name_app_ids,
+							  wm_name)) {
+				shsurf->appid_output_assigned = true;
+				return shoutput->output;
+			}
+		}
+	}
+
+	if (wm_class) {
+		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
+			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_class_app_ids,
+							  wm_class)) {
+				shsurf->appid_output_assigned = true;
+				return shoutput->output;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static struct weston_output *
 kiosk_shell_surface_find_best_output(struct kiosk_shell_surface *shsurf)
 {
 	struct weston_output *output;
@@ -206,25 +260,9 @@ kiosk_shell_surface_find_best_output(struct kiosk_shell_surface *shsurf)
 		}
 	}
 
-	app_id = xwayland_get_xwayland_name(shsurf, WM_NAME);
-	if (app_id) {
-		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
-			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_name_app_ids, app_id)) {
-				shsurf->appid_output_assigned = true;
-				return shoutput->output;
-			}
-		}
-	}
-
-	app_id = xwayland_get_xwayland_name(shsurf, WM_CLASS);
-	if (app_id) {
-		wl_list_for_each(shoutput, &shsurf->shell->output_list, link) {
-			if (kiosk_shell_output_has_app_id(shoutput->x11_wm_class_app_ids, app_id)) {
-				shsurf->appid_output_assigned = true;
-				return shoutput->output;
-			}
-		}
-	}
+	output = kiosk_shell_surface_find_best_output_for_xwayland(shsurf);
+	if (output)
+		return output;
 
 	/* Group all related windows in the same output. */
 	root = kiosk_shell_surface_get_parent_root(shsurf);
