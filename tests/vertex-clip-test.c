@@ -34,10 +34,14 @@
 #include "vertex-clipping.h"
 
 #define BOX(x1,y1,x2,y2)    { { x1, y1 }, { x2, y2 } }
+#define BOX32(x1,y1,x2,y2)  { x1, y1, x2, y2 }
 #define QUAD(x1,y1,x2,y2)   { { x1, y1 }, { x2, y1 }, { x2, y2 }, { x1, y2 } }
 
 struct vertex_clip_test_data {
-	struct clipper_vertex box[2];
+	union {
+		struct clipper_vertex box[2]; /* Common clipping API. */
+		struct pixman_box32 box32;    /* Pixman clipping API. */
+	};
 	struct clipper_vertex polygon[8];
 	struct clipper_vertex clipped[8];
 	int polygon_n;
@@ -719,6 +723,59 @@ TEST_P(quad_clip_expected, quad_clip_expected_data)
 
 	clipper_quad_init(&quad, tdata->polygon, tdata->aligned);
 	clipped_n = clipper_quad_clip(&quad, tdata->box, clipped);
+
+	assert_vertices(clipped, clipped_n, tdata->clipped, tdata->clipped_n);
+}
+
+/* clipper_quad_clip_box32() tests: */
+
+static const struct vertex_clip_test_data quad_clip_box32_expected_data[] = {
+	/* Box bottom/right corner intersects polygon top/left corner. */
+	{
+		.aligned   = true,
+		.box32     = BOX32(-3,    -3,    -1,    -1),
+		.polygon   = QUAD (-2.5f, -2.5f,  2.5f,  2.5f),
+		.clipped   = QUAD (-2.5f, -2.5f, -1.0f, -1.0f),
+		.clipped_n = 4,
+	},
+
+	/* Box bottom/left corner intersects polygon top/right corner. */
+	{
+		.aligned   = true,
+		.box32     = BOX32( 1,    -3,     3,    -1),
+		.polygon   = QUAD (-2.5f, -2.5f,  2.5f,  2.5f),
+		.clipped   = QUAD ( 1.0f, -2.5f,  2.5f, -1.0f),
+		.clipped_n = 4,
+	},
+
+	/* Box top/right corner intersects polygon bottom/left corner. */
+	{
+		.aligned   = true,
+		.box32     = BOX32(-3,     1,    -1,     3),
+		.polygon   = QUAD (-2.5f, -2.5f,  2.5f,  2.5f),
+		.clipped   = QUAD (-2.5f,  1.0f, -1.0f,  2.5f),
+		.clipped_n = 4,
+	},
+
+	/* Box top/left corner intersects polygon bottom/right corner. */
+	{
+		.aligned   = true,
+		.box32     = BOX32( 1,     1,     3,     3),
+		.polygon   = QUAD (-2.5f, -2.5f,  2.5f,  2.5f),
+		.clipped   = QUAD ( 1.0f,  1.0f,  2.5f,  2.5f),
+		.clipped_n = 4,
+	},
+};
+
+TEST_P(quad_clip_box32_expected, quad_clip_box32_expected_data)
+{
+	struct vertex_clip_test_data *tdata = data;
+	struct clipper_vertex clipped[8];
+	struct clipper_quad quad;
+	int clipped_n;
+
+	clipper_quad_init(&quad, tdata->polygon, tdata->aligned);
+	clipped_n = clipper_quad_clip_box32(&quad, &tdata->box32, clipped);
 
 	assert_vertices(clipped, clipped_n, tdata->clipped, tdata->clipped_n);
 }

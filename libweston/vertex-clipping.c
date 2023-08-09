@@ -398,7 +398,7 @@ clipper_quad_clip(struct clipper_quad *quad,
 	return n;
 }
 
-int
+WESTON_EXPORT_FOR_TESTS int
 clipper_quad_clip_box32(struct clipper_quad *quad,
 			const struct pixman_box32 *box,
 			struct clipper_vertex *restrict vertices)
