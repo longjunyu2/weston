@@ -23,25 +23,18 @@
  * SOFTWARE.
  */
 
+/*
+ * Each vertex clipping test begins with a brief textual introduction using a
+ * coordinate system with X growing right and Y growing down as a convention.
+ */
+
 #include "config.h"
 
 #include "weston-test-runner.h"
 #include "vertex-clipping.h"
 
-#define BOUNDING_BOX_TOP_Y 100.0f
-#define BOUNDING_BOX_LEFT_X 50.0f
-#define BOUNDING_BOX_RIGHT_X 100.0f
-#define BOUNDING_BOX_BOTTOM_Y 50.0f
-
-#define INSIDE_X1 (BOUNDING_BOX_LEFT_X + 1.0f)
-#define INSIDE_X2 (BOUNDING_BOX_RIGHT_X - 1.0f)
-#define INSIDE_Y1 (BOUNDING_BOX_BOTTOM_Y + 1.0f)
-#define INSIDE_Y2 (BOUNDING_BOX_TOP_Y - 1.0f)
-
-#define OUTSIDE_X1 (BOUNDING_BOX_LEFT_X - 1.0f)
-#define OUTSIDE_X2 (BOUNDING_BOX_RIGHT_X + 1.0f)
-#define OUTSIDE_Y1 (BOUNDING_BOX_BOTTOM_Y - 1.0f)
-#define OUTSIDE_Y2 (BOUNDING_BOX_TOP_Y + 1.0f)
+#define BOX(x1,y1,x2,y2)    { { x1, y1 }, { x2, y2 } }
+#define QUAD(x1,y1,x2,y2)   { { x1, y1 }, { x2, y1 }, { x2, y2 }, { x1, y2 } }
 
 struct vertex_clip_test_data {
 	struct clipper_vertex box[2];
@@ -80,161 +73,86 @@ assert_vertices(const struct clipper_vertex *clipped, int clipped_n,
 	}
 }
 
-const struct vertex_clip_test_data clip_expected_data[] = {
-	/* All inside */
+/* clipper_clip() tests: */
+
+static const struct vertex_clip_test_data clip_expected_data[] = {
+	/* Quad inside box. */
 	{
-		.box = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
-		},
-		.polygon = {
-			{ INSIDE_X1, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y2 },
-			{ INSIDE_X1, INSIDE_Y2 },
-		},
-		.clipped = {
-			{ INSIDE_X1, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y2 },
-			{ INSIDE_X1, INSIDE_Y2 },
-		},
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
+		.clipped   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
 		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
-	/* Top outside */
+	/* Quad bottom edge outside of box. */
 	{
-		.box = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
-		},
-		.polygon = {
-			{ INSIDE_X1, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y1 },
-			{ INSIDE_X2, OUTSIDE_Y2 },
-			{ INSIDE_X1, OUTSIDE_Y2 },
-		},
-		.clipped = {
-			{ INSIDE_X1, BOUNDING_BOX_TOP_Y },
-			{ INSIDE_X1, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y1 },
-			{ INSIDE_X2, BOUNDING_BOX_TOP_Y },
-		},
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 51.0f,  99.0f, 101.0f),
+		.clipped   = QUAD(51.0f, 51.0f,  99.0f, 100.0f),
 		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
-	/* Bottom outside */
+	/* Quad top edge outside of box. */
 	{
-		.box = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
-		},
-		.polygon = {
-			{ INSIDE_X1, OUTSIDE_Y1 },
-			{ INSIDE_X2, OUTSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y2 },
-			{ INSIDE_X1, INSIDE_Y2 },
-		},
-		.clipped = {
-			{ INSIDE_X1, BOUNDING_BOX_BOTTOM_Y },
-			{ INSIDE_X2, BOUNDING_BOX_BOTTOM_Y },
-			{ INSIDE_X2, INSIDE_Y2 },
-			{ INSIDE_X1, INSIDE_Y2 },
-		},
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 49.0f,  99.0f,  99.0f),
+		.clipped   = QUAD(51.0f, 50.0f,  99.0f,  99.0f),
 		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
-	/* Left outside */
+	/* Quad left edge outside of box. */
 	{
-		.box = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y }
-		},
-		.polygon = {
-			{ OUTSIDE_X1, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y2 },
-			{ OUTSIDE_X1, INSIDE_Y2 },
-		},
-		.clipped = {
-			{ BOUNDING_BOX_LEFT_X, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y1 },
-			{ INSIDE_X2, INSIDE_Y2 },
-			{ BOUNDING_BOX_LEFT_X, INSIDE_Y2 },
-		},
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(49.0f, 51.0f,  99.0f,  99.0f),
+		.clipped   = QUAD(50.0f, 51.0f,  99.0f,  99.0f),
 		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
-	/* Right outside */
+	/* Quad right edge outside of box. */
 	{
-		.box = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
-		},
-		.polygon = {
-			{ INSIDE_X1, INSIDE_Y1 },
-			{ OUTSIDE_X2, INSIDE_Y1 },
-			{ OUTSIDE_X2, INSIDE_Y2 },
-			{ INSIDE_X1, INSIDE_Y2 },
-		},
-		.clipped = {
-			{ INSIDE_X1, INSIDE_Y1 },
-			{ BOUNDING_BOX_RIGHT_X, INSIDE_Y1 },
-			{ BOUNDING_BOX_RIGHT_X, INSIDE_Y2 },
-			{ INSIDE_X1, INSIDE_Y2 },
-		},
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 51.0f, 101.0f,  99.0f),
+		.clipped   = QUAD(51.0f, 51.0f, 100.0f,  99.0f),
 		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
-	/* Diamond extending from bounding box edges */
+	/* Rotated quad with edges adjacent to box corners. */
 	{
-		.box = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
-		},
-		.polygon = {
-			{ BOUNDING_BOX_LEFT_X - 25, BOUNDING_BOX_BOTTOM_Y + 25 },
-			{ BOUNDING_BOX_LEFT_X + 25, BOUNDING_BOX_TOP_Y + 25 },
-			{ BOUNDING_BOX_RIGHT_X + 25, BOUNDING_BOX_TOP_Y - 25 },
-			{ BOUNDING_BOX_RIGHT_X - 25, BOUNDING_BOX_BOTTOM_Y - 25 },
-		},
-		.clipped = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_TOP_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_BOTTOM_Y },
-		},
+		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = {{ 25.0f, 75.0f}, {75.0f,  25.0f},
+			      {125.0f, 75.0f}, {75.0f, 125.0f}},
+		.clipped   = QUAD(50.0f, 50.0f, 100.0f, 100.0f),
 		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
-	/* Diamond inside of bounding box edges */
+	/* Rotated quad with edges cutting out box corners. */
 	{
-		.box = {
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y },
-		},
-		.polygon = {
-			{ BOUNDING_BOX_LEFT_X - 12.5, BOUNDING_BOX_BOTTOM_Y + 25 },
-			{ BOUNDING_BOX_LEFT_X + 25, BOUNDING_BOX_TOP_Y + 12.5 },
-			{ BOUNDING_BOX_RIGHT_X + 12.5, BOUNDING_BOX_TOP_Y - 25 },
-			{ BOUNDING_BOX_RIGHT_X - 25, BOUNDING_BOX_BOTTOM_Y - 12.5 },
-		},
-		.clipped = {
-			{ BOUNDING_BOX_LEFT_X + 12.5, BOUNDING_BOX_BOTTOM_Y },
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_BOTTOM_Y + 12.5 },
-			{ BOUNDING_BOX_LEFT_X, BOUNDING_BOX_TOP_Y - 12.5 },
-			{ BOUNDING_BOX_LEFT_X + 12.5, BOUNDING_BOX_TOP_Y },
-			{ BOUNDING_BOX_RIGHT_X - 12.5, BOUNDING_BOX_TOP_Y },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_TOP_Y - 12.5 },
-			{ BOUNDING_BOX_RIGHT_X, BOUNDING_BOX_BOTTOM_Y + 12.5 },
-			{ BOUNDING_BOX_RIGHT_X - 12.5, BOUNDING_BOX_BOTTOM_Y },
-		},
+		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = {{ 37.5f,  75.0f}, { 75.0f,  37.5f},
+			      {112.5f,  75.0f}, { 75.0f, 112.5f}},
+		.clipped   = {{ 62.5f,  50.0f}, { 87.5f,  50.0f},
+			      {100.0f,  62.5f}, {100.0f,  87.5f},
+			      { 87.5f, 100.0f}, { 62.5f, 100.0f},
+			      { 50.0f,  87.5f}, { 50.0f,  62.5f}},
+		.polygon_n = 4,
+		.clipped_n = 8,
+	},
+
+	/* Same as above using counter-clockwise winding. */
+	{
+		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = {{ 37.5f,  75.0f}, { 75.0f, 112.5f},
+			      {112.5f,  75.0f}, { 75.0f,  37.5f}},
+		.clipped   = {{ 62.5f,  50.0f}, { 50.0f,  62.5f},
+			      { 50.0f,  87.5f}, { 62.5f, 100.0f},
+			      { 87.5f, 100.0f}, {100.0f,  87.5f},
+			      {100.0f,  62.5f}, { 87.5f,  50.0f}},
 		.polygon_n = 4,
 		.clipped_n = 8,
 	},
@@ -259,6 +177,8 @@ TEST(clip_size_too_high)
 	assert(clipper_clip(polygon, 9, box, NULL) == -1);
 }
 
+/* clipper_float_difference() tests: */
+
 TEST(float_difference_different)
 {
 	assert(clipper_float_difference(1.0f, 0.0f) == 1.0f);
@@ -268,4 +188,3 @@ TEST(float_difference_same)
 {
 	assert(clipper_float_difference(1.0f, 1.0f) == 0.0f);
 }
-
