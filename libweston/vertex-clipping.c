@@ -332,7 +332,7 @@ clipper_clip(const struct clipper_vertex *polygon,
 	return n;
 }
 
-void
+WESTON_EXPORT_FOR_TESTS void
 clipper_quad_init(struct clipper_quad *quad,
 		  const struct clipper_vertex polygon[4],
 		  bool axis_aligned)
@@ -356,7 +356,7 @@ clipper_quad_init(struct clipper_quad *quad,
 	}
 }
 
-int
+WESTON_EXPORT_FOR_TESTS int
 clipper_quad_clip(struct clipper_quad *quad,
 		  const struct clipper_vertex box[2],
 		  struct clipper_vertex *restrict vertices)

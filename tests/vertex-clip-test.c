@@ -42,6 +42,7 @@ struct vertex_clip_test_data {
 	struct clipper_vertex clipped[8];
 	int polygon_n;
 	int clipped_n;
+	bool aligned;
 };
 
 /* Compare clipped vertices to expected vertices. While the clipper guarantees
@@ -175,6 +176,469 @@ TEST(clip_size_too_high)
 	struct clipper_vertex polygon[8] = {}, box[2] = {};
 
 	assert(clipper_clip(polygon, 9, box, NULL) == -1);
+}
+
+/* clipper_quad_clip() tests: */
+
+static const struct vertex_clip_test_data quad_clip_expected_data[] = {
+	/* Aligned quad clipping with adjacent edges: */
+
+	/* Box top/left corner adjacent to polygon bottom/right corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-1.00f, -1.00f, -0.50f, -0.50f),
+		.clipped_n = 0,
+	},
+
+	/* Box top edge adjacent to polygon bottom edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.25f, -1.00f,  0.25f, -0.50f),
+		.clipped_n = 0,
+	},
+
+	/* Box top/right corner adjacent to polygon bottom/left corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD( 0.50f, -1.00f,  1.00f, -0.50f),
+		.clipped_n = 0,
+	},
+
+	/* Box left edge adjacent to polygon right edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-1.00f, -0.25f, -0.50f,  0.25f),
+		.clipped_n = 0,
+	},
+
+	/* Box right edge adjacent to polygon left edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD( 0.50f, -0.25f,  1.00f,  0.25f),
+		.clipped_n = 0,
+	},
+
+	/* Box bottom/left corner adjacent to polygon top/right corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-1.00f,  0.50f, -0.50f,  1.00f),
+		.clipped_n = 0,
+	},
+
+	/* Box bottom edge adjacent to polygon top edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.25f,  0.50f,  0.25f,  1.00f),
+		.clipped_n = 0,
+	},
+
+	/* Box bottom/right corner adjacent to polygon top/left corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD( 0.50f,  0.50f,  1.00f,  1.00f),
+		.clipped_n = 0,
+	},
+
+	/* Aligned quad clipping with intersecting edges: */
+
+	/* Box top/left corner intersects polygon bottom/right corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.75f, -0.75f, -0.25f, -0.25f),
+		.clipped   = QUAD(-0.50f, -0.50f, -0.25f, -0.25f),
+		.clipped_n = 4,
+	},
+
+	/* Box top edge intersects polygon bottom edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.25f, -0.75f,  0.25f, -0.25f),
+		.clipped   = QUAD(-0.25f, -0.50f,  0.25f, -0.25f),
+		.clipped_n = 4,
+	},
+
+	/* Box top/right corner intersects polygon bottom/left corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD( 0.25f, -0.75f,  0.75f, -0.25f),
+		.clipped   = QUAD( 0.25f, -0.50f,  0.50f, -0.25f),
+		.clipped_n = 4,
+	},
+
+	/* Box left edge intersects polygon right edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.75f, -0.25f, -0.25f,  0.25f),
+		.clipped   = QUAD(-0.50f, -0.25f, -0.25f,  0.25f),
+		.clipped_n = 4,
+	},
+
+	/* Box right edge intersects polygon left edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD( 0.25f, -0.25f,  0.75f,  0.25f),
+		.clipped   = QUAD( 0.25f, -0.25f,  0.50f,  0.25f),
+		.clipped_n = 4,
+	},
+
+	/* Box bottom/left corner intersects polygon top/right corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.75f,  0.25f, -0.25f,  0.75f),
+		.clipped   = QUAD(-0.50f,  0.25f, -0.25f,  0.50f),
+		.clipped_n = 4,
+	},
+
+	/* Box bottom edge intersects polygon top edge. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.25f,  0.25f,  0.25f,  0.75f),
+		.clipped   = QUAD(-0.25f,  0.25f,  0.25f,  0.50f),
+		.clipped_n = 4,
+	},
+
+	/* Box bottom/right corner intersects polygon top/left corner. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD( 0.25f,  0.25f,  0.75f,  0.75f),
+		.clipped   = QUAD( 0.25f,  0.25f,  0.50f,  0.50f),
+		.clipped_n = 4,
+	},
+
+	/* Rotated quad clipping with adjacent edges: */
+
+	/* Box top/left corner adjacent to polygon bottom corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.75f, -0.75f}, {-0.50f, -1.00f},
+			      {-0.25f, -0.75f}, {-0.50f, -0.50f}},
+		.clipped_n = 0,
+	},
+
+	/* Box top edge adjacent to polygon bottom corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.25f, -0.75f}, { 0.00f, -1.00f},
+			      { 0.25f, -0.75f}, { 0.00f, -0.50f}},
+		.clipped_n = 0,
+	},
+
+	/* Box top/right corner adjacent to polygon bottom corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.25f, -0.75f}, { 0.50f, -1.00f},
+			      { 0.75f, -0.75f}, { 0.50f, -0.50f}},
+		.clipped_n = 0,
+	},
+
+	/* Box left edge adjacent to polygon right corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-1.00f,  0.00f}, {-0.75f, -0.25f},
+			      {-0.50f,  0.00f}, {-0.75f,  0.25f}},
+		.clipped_n = 0,
+	},
+
+	/* Box right edge adjacent to polygon left corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.50f,  0.00f}, { 0.75f, -0.25f},
+			      { 1.00f,  0.00f}, { 0.75f,  0.25f}},
+		.clipped_n = 0,
+	},
+
+	/* Box bottom/left corner adjacent to polygon top corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.75f,  0.75f}, {-0.50f,  0.50f},
+			      {-0.25f,  0.75f}, {-0.50f,  1.00f}},
+		.clipped_n = 0,
+	},
+
+	/* Box bottom edge adjacent to polygon top corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.25f,  0.75f}, { 0.00f,  0.50f},
+			      { 0.25f,  0.75f}, { 0.00f,  1.00f}},
+		.clipped_n = 0,
+	},
+
+	/* Box bottom/right corner adjacent to polygon top corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.25f,  0.75f}, { 0.50f,  0.50f},
+			      { 0.75f,  0.75f}, { 0.50f,  1.00f}},
+		.clipped_n = 0,
+	},
+
+	/* Rotated quad clipping with slightly intersecting edges: */
+
+	/* Box top/left corner slightly intersects polygon bottom/right edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.75f, -0.50f}, {-0.50f, -0.75f},
+			      {-0.25f, -0.50f}, {-0.50f, -0.25f}},
+		.clipped   = {{-0.50f, -0.25f}, {-0.50f, -0.50f},
+			      {-0.25f, -0.50f}},
+		.clipped_n = 3,
+	},
+
+	/* Box top edge slightly intersects polygon bottom corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.25f, -0.50f}, { 0.00f, -0.75f},
+			      { 0.25f, -0.50f}, { 0.00f, -0.25f}},
+		.clipped   = {{-0.25f, -0.50f}, { 0.25f, -0.50f},
+			      { 0.00f, -0.25f}},
+		.clipped_n = 3,
+	},
+
+	/* Box top/right corner slightly intersects polygon bottom/left edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.25f, -0.50f}, { 0.50f, -0.75f},
+			      { 0.75f, -0.50f}, { 0.50f, -0.25f}},
+		.clipped   = {{ 0.25f, -0.50f}, { 0.50f, -0.50f},
+			      { 0.50f, -0.25f}},
+		.clipped_n = 3,
+	},
+
+	/* Box left edge slightly intersects polygon right corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.75f,  0.00f}, {-0.50f, -0.25f},
+			      {-0.25f,  0.00f}, {-0.50f,  0.25f}},
+		.clipped   = {{-0.50f, -0.25f}, {-0.25f,  0.00f},
+			      {-0.50f,  0.25f}},
+		.clipped_n = 3,
+	},
+
+	/* Box right edge slightly intersects polygon left corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.25f,  0.00f}, { 0.50f, -0.25f},
+			      { 0.75f,  0.00f}, { 0.50f,  0.25f}},
+		.clipped   = {{ 0.25f,  0.00f}, { 0.50f, -0.25f},
+			      { 0.50f,  0.25f}},
+		.clipped_n = 3,
+	},
+
+	/* Box bottom/left corner slightly intersects polygon top/right edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.75f,  0.50f}, {-0.50f,  0.25f},
+			      {-0.25f,  0.50f}, {-0.50f,  0.75f}},
+		.clipped   = {{-0.50f,  0.25f}, {-0.25f,  0.50f},
+			      {-0.50f,  0.50f}},
+		.clipped_n = 3,
+	},
+
+	/* Box bottom edge slightly intersects polygon top corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.25f,  0.50f}, { 0.00f,  0.25f},
+			      { 0.25f,  0.50f}, { 0.00f,  0.75f}},
+		.clipped   = {{-0.25f,  0.50f}, { 0.00f,  0.25f},
+			      { 0.25f,  0.50f}},
+		.clipped_n = 3,
+	},
+
+	/* Box bottom/right corner slightly intersects polygon top/left edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.25f,  0.50f}, { 0.50f,  0.25f},
+			      { 0.75f,  0.50f}, { 0.50f,  0.75f}},
+		.clipped   = {{ 0.25f,  0.50f}, { 0.50f,  0.25f},
+			      { 0.50f,  0.50f}},
+		.clipped_n = 3,
+	},
+
+	/* Rotated quad clipping with largely intersecting edges: */
+
+	/* Box top/left corner largely intersects polygon bottom/right edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.625f, -0.375f}, {-0.375f, -0.625f},
+			      {-0.125f, -0.375f}, {-0.375f, -0.125f}},
+		.clipped   = {{-0.500f, -0.500f}, {-0.250f, -0.500f},
+			      {-0.125f, -0.375f}, {-0.375f, -0.125f},
+			      {-0.500f, -0.250f}},
+		.clipped_n = 5,
+	},
+
+	/* Box top edge largely intersects polygon bottom corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.250f, -0.375f}, { 0.000f, -0.625f},
+			      { 0.250f, -0.375f}, { 0.000f, -0.125f}},
+		.clipped   = {{-0.125f, -0.500f}, { 0.125f, -0.500f},
+			      { 0.250f, -0.375f}, { 0.000f, -0.125f},
+			      {-0.250f, -0.375f}},
+		.clipped_n = 5,
+	},
+
+	/* Box top/right corner largely intersects polygon bottom/left edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.125f, -0.375f}, { 0.375f, -0.625f},
+			      { 0.625f, -0.375f}, { 0.375f, -0.125f}},
+		.clipped   = {{ 0.125f, -0.375f}, { 0.250f, -0.500f},
+			      { 0.500f, -0.500f}, { 0.500f, -0.250f},
+			      { 0.375f, -0.125f}},
+		.clipped_n = 5,
+	},
+
+	/* Box left edge largely intersects polygon right corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.625f,  0.000f}, {-0.375f, -0.250f},
+			      {-0.125f,  0.000f}, {-0.375f,  0.250f}},
+		.clipped   = {{-0.500f,  0.125f}, {-0.500f, -0.125f},
+			      {-0.375f, -0.250f}, {-0.125f,  0.000f},
+			      {-0.375f,  0.250f}},
+		.clipped_n = 5,
+	},
+
+	/* Box right edge largely intersects polygon left corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.125f,  0.000f}, { 0.375f, -0.250f},
+			      { 0.625f,  0.000f}, { 0.375f,  0.250f}},
+		.clipped   = {{ 0.125f,  0.000f}, { 0.375f, -0.250f},
+			      { 0.500f, -0.125f}, { 0.500f,  0.125f},
+			      { 0.375f,  0.250f}},
+		.clipped_n = 5,
+	},
+
+	/* Box bottom/left corner largely intersects polygon top/right edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.625f,  0.375f}, {-0.375f,  0.125f},
+			      {-0.125f,  0.375f}, {-0.375f,  0.625f}},
+		.clipped   = {{-0.500f,  0.500f}, {-0.500f,  0.250f},
+			      {-0.375f,  0.125f}, {-0.125f,  0.375f},
+			      {-0.250f,  0.500f}},
+		.clipped_n = 5,
+	},
+
+	/* Box bottom edge largely intersects polygon top corner. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.250f,  0.375f}, { 0.000f,  0.125f},
+			      { 0.250f,  0.375f}, { 0.000f,  0.625f}},
+		.clipped   = {{-0.125f,  0.500f}, {-0.250f,  0.375f},
+			      { 0.000f,  0.125f}, { 0.250f,  0.375f},
+			      { 0.125f,  0.500f}},
+		.clipped_n = 5,
+	},
+
+	/* Box bottom/right corner largely intersects polygon top/left edge. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{ 0.125f,  0.375f}, { 0.375f,  0.125f},
+			      { 0.625f,  0.375f}, { 0.375f,  0.625f}},
+		.clipped   = {{ 0.125f,  0.375f}, { 0.375f,  0.125f},
+			      { 0.500f,  0.250f}, { 0.500f,  0.500f},
+			      { 0.250f,  0.500f}},
+		.clipped_n = 5,
+	},
+
+	/* Miscellaneous cases: */
+
+	/* Box intersects entire smaller aligned quad. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = QUAD(-0.25f, -0.25f,  0.25f,  0.25f),
+		.clipped   = QUAD(-0.25f, -0.25f,  0.25f,  0.25f),
+		.clipped_n = 4,
+	},
+
+	/* Box intersects entire same size aligned quad. */
+	{
+		.aligned   = true,
+		.box       = BOX (-0.5f, -0.5f,  0.5f,  0.5f),
+		.polygon   = QUAD(-0.5f, -0.5f,  0.5f,  0.5f),
+		.clipped   = QUAD(-0.5f, -0.5f,  0.5f,  0.5f),
+		.clipped_n = 4,
+	},
+
+	/* Box intersects entire rotated quad. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.5f,  0.0f}, { 0.0f, -0.5f},
+			      { 0.5f,  0.0f}, { 0.0f,  0.5f}},
+		.clipped   = {{-0.5f,  0.0f}, { 0.0f, -0.5f},
+			      { 0.5f,  0.0f}, { 0.0f,  0.5f}},
+		.clipped_n = 4,
+	},
+
+	/* Box intersects rotated quad cutting out the 4 corners. */
+	{
+		.aligned   = false,
+		.box       = BOX(-0.5f, -0.5f, 0.5f, 0.5f),
+		.polygon   = {{-0.75f,  0.00f}, { 0.00f, -0.75f},
+			      { 0.75f,  0.00f}, { 0.00f,  0.75f}},
+		.clipped   = {{-0.50f,  0.25f}, {-0.50f, -0.25f},
+			      {-0.25f, -0.50f}, { 0.25f, -0.50f},
+			      { 0.50f, -0.25f}, { 0.50f,  0.25f},
+			      { 0.25f,  0.50f}, {-0.25f,  0.50f}},
+		.clipped_n = 8,
+	},
+};
+
+TEST_P(quad_clip_expected, quad_clip_expected_data)
+{
+	struct vertex_clip_test_data *tdata = data;
+	struct clipper_vertex clipped[8];
+	struct clipper_quad quad;
+	int clipped_n;
+
+	clipper_quad_init(&quad, tdata->polygon, tdata->aligned);
+	clipped_n = clipper_quad_clip(&quad, tdata->box, clipped);
+
+	assert_vertices(clipped, clipped_n, tdata->clipped, tdata->clipped_n);
 }
 
 /* clipper_float_difference() tests: */
