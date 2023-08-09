@@ -51,7 +51,36 @@ struct vertex_clip_test_data {
 	int clipped_n;
 };
 
-const struct vertex_clip_test_data test_data[] = {
+/* Compare clipped vertices to expected vertices. While the clipper guarantees
+ * correct winding order, it doesn't specify which vertex is emitted first. This
+ * function takes care of finding the first expected vertex in the clipped array
+ * before comparing the entire series. */
+static void
+assert_vertices(const struct clipper_vertex *clipped, int clipped_n,
+		const struct clipper_vertex *expected, int expected_n)
+{
+	int first, i, j;
+
+	/* Is the number of clipped vertices correct? */
+	assert(clipped_n == expected_n);
+
+	for (first = 0; first < clipped_n; first++)
+		if (clipper_float_difference(clipped[first].x, expected[0].x) == 0.0f &&
+		    clipper_float_difference(clipped[first].y, expected[0].y) == 0.0f)
+			break;
+
+	/* Have we found the first expected vertex? */
+	assert(!clipped_n || first != clipped_n);
+
+	/* Do the remaining vertices match? */
+	for (i = 1; i < clipped_n; i++) {
+		j = (i + first) % clipped_n;
+		assert(clipper_float_difference(clipped[j].x, expected[i].x) == 0.0f &&
+		       clipper_float_difference(clipped[j].y, expected[i].y) == 0.0f);
+	}
+}
+
+const struct vertex_clip_test_data clip_expected_data[] = {
 	/* All inside */
 	{
 		.box = {
@@ -211,7 +240,7 @@ const struct vertex_clip_test_data test_data[] = {
 	},
 };
 
-TEST_P(clip_polygon_n_vertices_emitted, test_data)
+TEST_P(clip_expected, clip_expected_data)
 {
 	struct vertex_clip_test_data *tdata = data;
 	struct clipper_vertex clipped[8];
@@ -220,22 +249,7 @@ TEST_P(clip_polygon_n_vertices_emitted, test_data)
 	clipped_n = clipper_clip(tdata->polygon, tdata->polygon_n, tdata->box,
 				 clipped);
 
-	assert(clipped_n == tdata->clipped_n);
-}
-
-TEST_P(clip_polygon_expected_vertices, test_data)
-{
-	struct vertex_clip_test_data *tdata = data;
-	struct clipper_vertex clipped[8];
-	int clipped_n, i;
-
-	clipped_n = clipper_clip(tdata->polygon, tdata->polygon_n, tdata->box,
-				 clipped);
-
-	for (i = 0; i < clipped_n; i++) {
-		assert(clipped[i].x == tdata->clipped[i].x);
-		assert(clipped[i].y == tdata->clipped[i].y);
-	}
+	assert_vertices(clipped, clipped_n, tdata->clipped, tdata->clipped_n);
 }
 
 TEST(clip_size_too_high)
