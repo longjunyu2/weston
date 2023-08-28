@@ -31,6 +31,86 @@
 #include <stdint.h>
 #include <libweston/libweston.h>
 
+enum weston_hdr_metadata_type1_groups {
+	/** weston_hdr_metadata_type1::primary is set */
+	WESTON_HDR_METADATA_TYPE1_GROUP_PRIMARIES	= 0x01,
+
+	/** weston_hdr_metadata_type1::white is set */
+	WESTON_HDR_METADATA_TYPE1_GROUP_WHITE		= 0x02,
+
+	/** weston_hdr_metadata_type1::maxDML is set */
+	WESTON_HDR_METADATA_TYPE1_GROUP_MAXDML		= 0x04,
+
+	/** weston_hdr_metadata_type1::minDML is set */
+	WESTON_HDR_METADATA_TYPE1_GROUP_MINDML		= 0x08,
+
+	/** weston_hdr_metadata_type1::maxCLL is set */
+	WESTON_HDR_METADATA_TYPE1_GROUP_MAXCLL		= 0x10,
+
+	/** weston_hdr_metadata_type1::maxFALL is set */
+	WESTON_HDR_METADATA_TYPE1_GROUP_MAXFALL		= 0x20,
+
+	/** all valid bits */
+	WESTON_HDR_METADATA_TYPE1_GROUP_ALL_MASK	= 0x3f
+};
+
+/** HDR static metadata type 1
+ *
+ * The fields are defined by CTA-861-G except here they use float encoding.
+ *
+ * In Weston used only with HDR display modes.
+ */
+struct weston_hdr_metadata_type1 {
+	/** Which fields are valid
+	 *
+	 * A bitmask of values from enum weston_hdr_metadata_type1_groups.
+	 */
+	uint32_t group_mask;
+
+	/* EOTF is tracked externally with enum weston_eotf_mode */
+
+	/** Chromaticities of the primaries, in any order */
+	struct weston_CIExy primary[3];
+
+	/** White point chromaticity */
+	struct weston_CIExy white;
+
+	/** Maximum display mastering luminance, 1 - 65535 cd/m² */
+	float maxDML;
+
+	/** Minimum display mastering luminance, 0.0001 - 6.5535 cd/m² */
+	float minDML;
+
+	/** Maximum content light level, 1 - 65535 cd/m² */
+	float maxCLL;
+
+	/** Maximum frame-average light level, 1 - 65535 cd/m² */
+	float maxFALL;
+};
+
+/** Output properties derived from its color characteristics and profile
+ *
+ * These are constructed by a color manager.
+ *
+ * A weston_output_color_outcome owns (a reference to) everything it contains.
+ *
+ * \ingroup output
+ * \internal
+ */
+struct weston_output_color_outcome {
+	/** sRGB to output color space transformation */
+	struct weston_color_transform *from_sRGB_to_output;
+
+	/** sRGB to blending color space transformation */
+	struct weston_color_transform *from_sRGB_to_blend;
+
+	/** Blending to output color space transformation */
+	struct weston_color_transform *from_blend_to_output;
+
+	/** HDR Static Metadata Type 1 for WESTON_EOTF_MODE_ST2084 */
+	struct weston_hdr_metadata_type1 hdr_meta;
+};
+
 /**
  * Represents a color profile description (an ICC color profile)
  *

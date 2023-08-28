@@ -31,6 +31,7 @@
 #include "weston-test-client-helper.h"
 #include "weston-test-fixture-compositor.h"
 #include "backend.h"
+#include "color.h"
 
 static enum test_result_code
 fixture_setup(struct weston_test_harness *harness)
