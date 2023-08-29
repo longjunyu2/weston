@@ -6715,6 +6715,8 @@ weston_head_release(struct weston_head *head)
 	free(head->name);
 
 	wl_list_remove(&head->compositor_link);
+
+	assert(head->display_info == NULL);
 }
 
 /** Propagate device information changes
@@ -7140,6 +7142,24 @@ WL_EXPORT uint32_t
 weston_head_get_transform(struct weston_head *head)
 {
 	return head->transform;
+}
+
+/** Get display information (EDID, DisplayID)
+ *
+ * \param head The head to query.
+ * \return libdisplay-info structure, or NULL.
+ *
+ * Hardware heads (monitors, TVs, etc.) driven directly by this compositor may
+ * provide EDID or DisplayID information. If a backend has that information,
+ * it may expose it as a libdisplay-info structure. The caller needs to use
+ * libdisplay-info to extract information from the returned pointer.
+ *
+ * \ingroup head
+ */
+WL_EXPORT const struct di_info *
+weston_head_get_display_info(const struct weston_head *head)
+{
+	return head->display_info;
 }
 
 /** Add destroy callback for a head

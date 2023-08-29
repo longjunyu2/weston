@@ -92,6 +92,7 @@ struct pixel_format_info;
 struct weston_output_capture_info;
 struct weston_output_color_outcome;
 struct weston_tearing_control;
+struct di_info;
 
 enum weston_keyboard_modifier {
 	MODIFIER_CTRL = (1 << 0),
@@ -505,6 +506,7 @@ struct weston_head {
 	bool non_desktop;		/**< non-desktop display, e.g. HMD */
 	uint32_t supported_eotf_mask;	/**< supported weston_eotf_mode bits */
 	uint32_t supported_colorimetry_mask; /**< supported weston_colorimetry_mode bits */
+	struct di_info *display_info;   /**< libdisplay-info, from DRM */
 
 	/** Current content protection status */
 	enum weston_hdcp_protection current_protection;
@@ -2625,6 +2627,9 @@ weston_head_get_output(struct weston_head *head);
 
 uint32_t
 weston_head_get_transform(struct weston_head *head);
+
+const struct di_info *
+weston_head_get_display_info(const struct weston_head *head);
 
 void
 weston_head_detach(struct weston_head *head);
