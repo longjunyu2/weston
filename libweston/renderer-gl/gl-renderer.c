@@ -471,51 +471,41 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 	wl_list_insert(&go->timeline_render_point_list, &trp->link);
 }
 
-static int
-compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects);
-
 static void
 global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
 		  struct clipper_vertex polygon[4], bool *axis_aligned);
 
 static int
 texture_region(struct weston_paint_node *pnode,
-	       pixman_region32_t *region,
-	       pixman_region32_t *surf_region)
+	       pixman_box32_t *damage_rects,
+	       int damage_nrects,
+	       pixman_region32_t *surface_region)
 {
 	struct weston_compositor *ec = pnode->surface->compositor;
 	struct weston_view *ev = pnode->view;
 	struct gl_renderer *gr = get_renderer(ec);
 	struct clipper_vertex *v;
 	unsigned int *vtxcnt, nvtx = 0;
-	pixman_box32_t *rects, *surf_rects;
-	pixman_box32_t *raw_rects;
-	int i, j, nrects, nsurf, raw_nrects;
-	bool used_band_compression, axis_aligned;
+	pixman_box32_t *surface_rects;
+	int i, j, surface_nrects, nfans;
+	bool axis_aligned;
 	struct clipper_vertex polygon[4];
 	struct clipper_quad quad;
 
-	raw_rects = pixman_region32_rectangles(region, &raw_nrects);
-	surf_rects = pixman_region32_rectangles(surf_region, &nsurf);
+	surface_rects = pixman_region32_rectangles(surface_region,
+						   &surface_nrects);
 
-	if (raw_nrects < 4) {
-		used_band_compression = false;
-		nrects = raw_nrects;
-		rects = raw_rects;
-	} else {
-		nrects = compress_bands(raw_rects, raw_nrects, &rects);
-		used_band_compression = true;
-	}
 	/* worst case we can have 8 vertices per rect (ie. clipped into
 	 * an octagon):
 	 */
-	v = wl_array_add(&gr->vertices, nrects * nsurf * 8 * sizeof *v);
-	vtxcnt = wl_array_add(&gr->vtxcnt, nrects * nsurf * sizeof *vtxcnt);
+	nfans = damage_nrects * surface_nrects;
+	v = wl_array_add(&gr->vertices, nfans * 8 * sizeof *v);
+	vtxcnt = wl_array_add(&gr->vtxcnt, nfans * sizeof *vtxcnt);
 
-	for (i = 0; i < nrects; i++) {
-		global_to_surface(&rects[i], ev, polygon, &axis_aligned);
+	for (i = 0; i < damage_nrects; i++) {
+		global_to_surface(&damage_rects[i], ev, polygon, &axis_aligned);
 		clipper_quad_init(&quad, polygon, axis_aligned);
-		for (j = 0; j < nsurf; j++) {
+		for (j = 0; j < surface_nrects; j++) {
 			int n;
 
 			/* The transformed quad, after clipping to the surface rect, can
@@ -531,7 +521,7 @@ texture_region(struct weston_paint_node *pnode,
 			 * To do this, we first calculate the (up to eight) points at the
 			 * intersection of the edges of the quad and the surface rect.
 			 */
-			n = clipper_quad_clip_box32(&quad, &surf_rects[j], v);
+			n = clipper_quad_clip_box32(&quad, &surface_rects[j], v);
 			if (n >= 3) {
 				v += n;
 				vtxcnt[nvtx++] = n;
@@ -539,8 +529,6 @@ texture_region(struct weston_paint_node *pnode,
 		}
 	}
 
-	if (used_band_compression)
-		free(rects);
 	return nvtx;
 }
 
@@ -939,8 +927,9 @@ triangle_fan_debug(struct gl_renderer *gr,
 static void
 repaint_region(struct gl_renderer *gr,
 	       struct weston_paint_node *pnode,
-	       pixman_region32_t *region,
-	       pixman_region32_t *surf_region,
+	       pixman_box32_t *damage_rects,
+	       int damage_nrects,
+	       pixman_region32_t *surface_region,
 	       const struct gl_shader_config *sconf)
 {
 	struct weston_output *output = pnode->output;
@@ -948,15 +937,16 @@ repaint_region(struct gl_renderer *gr,
 	unsigned int *vtxcnt;
 	int i, first, nfans;
 
-	/* The final region to be painted is the intersection of
-	 * 'region' and 'surf_region'. However, 'region' is in the global
-	 * coordinates, and 'surf_region' is in the surface-local
-	 * coordinates. texture_region() will iterate over all pairs of
-	 * rectangles from both regions, compute the intersection
-	 * polygon for each pair, and store it as a triangle fan if
-	 * it has a non-zero area (at least 3 vertices, actually).
+	/* The final region to be painted is the intersection of the damage
+	 * rects and the surface region. However, damage rects are in global
+	 * coordinates and surface region is in surface coordinates.
+	 * texture_region() will iterate over all pairs of rectangles from both
+	 * regions, compute the intersection polygon for each pair, and store it
+	 * as a triangle fan if it has a non-zero area (at least 3 vertices,
+	 * actually).
 	 */
-	nfans = texture_region(pnode, region, surf_region);
+	nfans = texture_region(pnode, damage_rects, damage_nrects,
+			       surface_region);
 
 	v = gr->vertices.data;
 	vtxcnt = gr->vtxcnt.data;
@@ -1269,6 +1259,34 @@ global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
 		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
 }
 
+/* Transform damage rects of 'region'. 'rects', 'nrects' and 'free' are output
+ * arguments set if 'rects' is NULL. Caller must free 'rects' if 'free' is true
+ * on return.
+ */
+static void
+transform_damage(pixman_region32_t *region,
+		 pixman_box32_t **rects,
+		 int *nrects,
+		 bool *free)
+{
+	pixman_box32_t *damage_rects;
+	int damage_nrects;
+
+	if (*rects)
+		return;
+
+	damage_rects = pixman_region32_rectangles(region, &damage_nrects);
+
+	if (damage_nrects < 4) {
+		*rects = damage_rects;
+		*nrects = damage_nrects;
+		*free = false;
+	} else {
+		*nrects = compress_bands(damage_rects, damage_nrects, rects);
+		*free = true;
+	}
+}
+
 static void
 draw_paint_node(struct weston_paint_node *pnode,
 		pixman_region32_t *damage /* in global coordinates */)
@@ -1285,6 +1303,9 @@ draw_paint_node(struct weston_paint_node *pnode,
 	pixman_region32_t surface_blend;
 	GLint filter;
 	struct gl_shader_config sconf;
+	pixman_box32_t *rects = NULL;
+	bool free_rects = false;
+	int nrects;
 
 	if (gb->shader_variant == SHADER_VARIANT_NONE &&
 	    !buffer->direct_display)
@@ -1344,15 +1365,21 @@ draw_paint_node(struct weston_paint_node *pnode,
 		else
 			glDisable(GL_BLEND);
 
-		repaint_region(gr, pnode, &repaint, &surface_opaque, &alt);
+		transform_damage(&repaint, &rects, &nrects, &free_rects);
+		repaint_region(gr, pnode, rects, nrects, &surface_opaque, &alt);
 		gs->used_in_output_repaint = true;
 	}
 
 	if (pixman_region32_not_empty(&surface_blend)) {
 		glEnable(GL_BLEND);
-		repaint_region(gr, pnode, &repaint, &surface_blend, &sconf);
+
+		transform_damage(&repaint, &rects, &nrects, &free_rects);
+		repaint_region(gr, pnode, rects, nrects, &surface_blend, &sconf);
 		gs->used_in_output_repaint = true;
 	}
+
+	if (free_rects)
+		free(rects);
 
 	pixman_region32_fini(&surface_blend);
 	pixman_region32_fini(&surface_opaque);
