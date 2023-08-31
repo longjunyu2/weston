@@ -471,41 +471,29 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 	wl_list_insert(&go->timeline_render_point_list, &trp->link);
 }
 
-static void
-global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
-		  struct clipper_vertex polygon[4], bool *axis_aligned);
-
 static int
 texture_region(struct weston_paint_node *pnode,
-	       pixman_box32_t *damage_rects,
-	       int damage_nrects,
-	       pixman_region32_t *surface_region)
+	       struct clipper_quad *quads,
+	       int nquads,
+	       pixman_region32_t *region)
 {
 	struct weston_compositor *ec = pnode->surface->compositor;
-	struct weston_view *ev = pnode->view;
 	struct gl_renderer *gr = get_renderer(ec);
 	struct clipper_vertex *v;
 	unsigned int *vtxcnt, nvtx = 0;
-	pixman_box32_t *surface_rects;
-	int i, j, surface_nrects, nfans;
-	bool axis_aligned;
-	struct clipper_vertex polygon[4];
-	struct clipper_quad quad;
+	pixman_box32_t *rects;
+	int i, j, nrects;
 
-	surface_rects = pixman_region32_rectangles(surface_region,
-						   &surface_nrects);
+	rects = pixman_region32_rectangles(region, &nrects);
 
 	/* worst case we can have 8 vertices per rect (ie. clipped into
 	 * an octagon):
 	 */
-	nfans = damage_nrects * surface_nrects;
-	v = wl_array_add(&gr->vertices, nfans * 8 * sizeof *v);
-	vtxcnt = wl_array_add(&gr->vtxcnt, nfans * sizeof *vtxcnt);
+	v = wl_array_add(&gr->vertices, nquads * nrects * 8 * sizeof *v);
+	vtxcnt = wl_array_add(&gr->vtxcnt, nquads * nrects * sizeof *vtxcnt);
 
-	for (i = 0; i < damage_nrects; i++) {
-		global_to_surface(&damage_rects[i], ev, polygon, &axis_aligned);
-		clipper_quad_init(&quad, polygon, axis_aligned);
-		for (j = 0; j < surface_nrects; j++) {
+	for (i = 0; i < nquads; i++) {
+		for (j = 0; j < nrects; j++) {
 			int n;
 
 			/* The transformed quad, after clipping to the surface rect, can
@@ -521,7 +509,7 @@ texture_region(struct weston_paint_node *pnode,
 			 * To do this, we first calculate the (up to eight) points at the
 			 * intersection of the edges of the quad and the surface rect.
 			 */
-			n = clipper_quad_clip_box32(&quad, &surface_rects[j], v);
+			n = clipper_quad_clip_box32(&quads[i], &rects[j], v);
 			if (n >= 3) {
 				v += n;
 				vtxcnt[nvtx++] = n;
@@ -927,9 +915,9 @@ triangle_fan_debug(struct gl_renderer *gr,
 static void
 repaint_region(struct gl_renderer *gr,
 	       struct weston_paint_node *pnode,
-	       pixman_box32_t *damage_rects,
-	       int damage_nrects,
-	       pixman_region32_t *surface_region,
+	       struct clipper_quad *quads,
+	       int nquads,
+	       pixman_region32_t *region,
 	       const struct gl_shader_config *sconf)
 {
 	struct weston_output *output = pnode->output;
@@ -945,8 +933,7 @@ repaint_region(struct gl_renderer *gr,
 	 * as a triangle fan if it has a non-zero area (at least 3 vertices,
 	 * actually).
 	 */
-	nfans = texture_region(pnode, damage_rects, damage_nrects,
-			       surface_region);
+	nfans = texture_region(pnode, quads, nquads, region);
 
 	v = gr->vertices.data;
 	vtxcnt = gr->vtxcnt.data;
@@ -1259,32 +1246,43 @@ global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
 		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
 }
 
-/* Transform damage rects of 'region'. 'rects', 'nrects' and 'free' are output
- * arguments set if 'rects' is NULL. Caller must free 'rects' if 'free' is true
- * on return.
+/* Transform damage 'region' in global coordinates to damage 'quads' in surface
+ * coordinates. 'quads' and 'nquads' are output arguments set if 'quads' is
+ * NULL, no transformation happens otherwise. Caller must free 'quads' if
+ * set.
  */
 static void
-transform_damage(pixman_region32_t *region,
-		 pixman_box32_t **rects,
-		 int *nrects,
-		 bool *free)
+transform_damage(const struct weston_paint_node *pnode,
+		 pixman_region32_t *region,
+		 struct clipper_quad **quads,
+		 int *nquads)
 {
-	pixman_box32_t *damage_rects;
-	int damage_nrects;
+	pixman_box32_t *rects;
+	int nrects, i;
+	bool compress, axis_aligned;
+	struct clipper_quad *quads_alloc;
+	struct clipper_vertex polygon[4];
+	struct weston_view *view;
 
-	if (*rects)
+	if (*quads)
 		return;
 
-	damage_rects = pixman_region32_rectangles(region, &damage_nrects);
+	rects = pixman_region32_rectangles(region, &nrects);
+	compress = nrects >= 4;
+	if (compress)
+		nrects = compress_bands(rects, nrects, &rects);
 
-	if (damage_nrects < 4) {
-		*rects = damage_rects;
-		*nrects = damage_nrects;
-		*free = false;
-	} else {
-		*nrects = compress_bands(damage_rects, damage_nrects, rects);
-		*free = true;
+	*quads = quads_alloc = malloc(nrects * sizeof *quads_alloc);
+	*nquads = nrects;
+
+	view = pnode->view;
+	for (i = 0; i < nrects; i++) {
+		global_to_surface(&rects[i], view, polygon, &axis_aligned);
+		clipper_quad_init(&quads_alloc[i], polygon, axis_aligned);
 	}
+
+	if (compress)
+		free(rects);
 }
 
 static void
@@ -1303,9 +1301,8 @@ draw_paint_node(struct weston_paint_node *pnode,
 	pixman_region32_t surface_blend;
 	GLint filter;
 	struct gl_shader_config sconf;
-	pixman_box32_t *rects = NULL;
-	bool free_rects = false;
-	int nrects;
+	struct clipper_quad *quads = NULL;
+	int nquads;
 
 	if (gb->shader_variant == SHADER_VARIANT_NONE &&
 	    !buffer->direct_display)
@@ -1365,21 +1362,20 @@ draw_paint_node(struct weston_paint_node *pnode,
 		else
 			glDisable(GL_BLEND);
 
-		transform_damage(&repaint, &rects, &nrects, &free_rects);
-		repaint_region(gr, pnode, rects, nrects, &surface_opaque, &alt);
+		transform_damage(pnode, &repaint, &quads, &nquads);
+		repaint_region(gr, pnode, quads, nquads, &surface_opaque, &alt);
 		gs->used_in_output_repaint = true;
 	}
 
 	if (pixman_region32_not_empty(&surface_blend)) {
 		glEnable(GL_BLEND);
-
-		transform_damage(&repaint, &rects, &nrects, &free_rects);
-		repaint_region(gr, pnode, rects, nrects, &surface_blend, &sconf);
+		transform_damage(pnode, &repaint, &quads, &nquads);
+		repaint_region(gr, pnode, quads, nquads, &surface_blend, &sconf);
 		gs->used_in_output_repaint = true;
 	}
 
-	if (free_rects)
-		free(rects);
+	if (quads)
+		free(quads);
 
 	pixman_region32_fini(&surface_blend);
 	pixman_region32_fini(&surface_opaque);
