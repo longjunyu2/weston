@@ -1195,10 +1195,7 @@ compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects)
 	pixman_box32_t *out, merge_rect;
 	int i, j, nout;
 
-	if (!nrects) {
-		*outrects = NULL;
-		return 0;
-	}
+	assert(nrects > 0);
 
 	/* nrects is an upper bound - we're not too worried about
 	 * allocating a little extra
@@ -1253,7 +1250,7 @@ node_axis_aligned(const struct weston_view *view)
 /* Transform damage 'region' in global coordinates to damage 'quads' in surface
  * coordinates. 'quads' and 'nquads' are output arguments set if 'quads' is
  * NULL, no transformation happens otherwise. Caller must free 'quads' if
- * set.
+ * set. Caller must ensure 'region' is not empty.
  */
 static void
 transform_damage(const struct weston_paint_node *pnode,
@@ -1276,6 +1273,7 @@ transform_damage(const struct weston_paint_node *pnode,
 	if (compress)
 		nrects = compress_bands(rects, nrects, &rects);
 
+	assert(nrects > 0);
 	*quads = quads_alloc = malloc(nrects * sizeof *quads_alloc);
 	*nquads = nrects;
 
