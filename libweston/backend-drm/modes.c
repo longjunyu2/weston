@@ -384,37 +384,55 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 
 #endif /* HAVE_LIBDISPLAY_INFO else */
 
-/** Parse monitor make, model and serial from EDID
- *
- * \param head The head whose \c drm_edid to fill in.
- * \param props The DRM connector properties to get the EDID from.
- * \param[out] dhi Receives information from EDID.
- *
- * \c *dhi must be drm_head_info_fini()'d by the caller.
- */
 static void
-find_and_parse_output_edid(struct drm_head *head,
-			   drmModeObjectPropertiesPtr props,
-			   struct drm_head_info *dhi)
+drm_head_set_display_data(struct drm_head *head, const void *data, size_t len)
+{
+	free(head->display_data);
+
+	if (!data || len == 0) {
+		head->display_data = NULL;
+		head->display_data_len = 0;
+		return;
+	}
+
+	head->display_data = xmalloc(len);
+	head->display_data_len = len;
+	memcpy(head->display_data, data, len);
+}
+
+static bool
+drm_head_maybe_update_display_data(struct drm_head *head,
+				   drmModeObjectPropertiesPtr props)
 {
 	struct drm_device *device = head->connector.device;
 	drmModePropertyBlobPtr edid_blob = NULL;
 	uint32_t blob_id;
+	bool changed = false;
 
 	blob_id =
 		drm_property_get_value(
 			&head->connector.props[WDRM_CONNECTOR_EDID],
 			props, 0);
-	if (!blob_id)
-		return;
+	if (blob_id)
+		edid_blob = drmModeGetPropertyBlob(device->drm.fd, blob_id);
 
-	edid_blob = drmModeGetPropertyBlob(device->drm.fd, blob_id);
-	if (!edid_blob)
-		return;
-
-	drm_head_info_from_edid(dhi, edid_blob->data, edid_blob->length);
+	if (edid_blob && edid_blob->length > 0) {
+		if (!head->display_data ||
+		    head->display_data_len != edid_blob->length ||
+		    memcmp(head->display_data, edid_blob->data, edid_blob->length)) {
+			drm_head_set_display_data(head, edid_blob->data, edid_blob->length);
+			changed = true;
+		}
+	} else {
+		if (head->display_data) {
+			drm_head_set_display_data(head, NULL, 0);
+			changed = true;
+		}
+	}
 
 	drmModeFreePropertyBlob(edid_blob);
+
+	return changed;
 }
 
 static void
@@ -597,7 +615,9 @@ update_head_from_connector(struct drm_head *head)
 	drmModeConnector *conn = connector->conn;
 	struct drm_head_info dhi = { .eotf_mask = WESTON_EOTF_MODE_SDR };
 
-	find_and_parse_output_edid(head, props, &dhi);
+	drm_head_maybe_update_display_data(head, props);
+
+	drm_head_info_from_edid(&dhi, head->display_data, head->display_data_len);
 
 	weston_head_set_monitor_strings(&head->base, dhi.make,
 					dhi.model,

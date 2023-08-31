@@ -2704,6 +2704,7 @@ drm_head_destroy(struct weston_head *base)
 	if (head->backlight)
 		backlight_destroy(head->backlight);
 
+	free(head->display_data);
 	free(head);
 }
 

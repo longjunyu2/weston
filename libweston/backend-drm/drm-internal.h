@@ -616,6 +616,9 @@ struct drm_head {
 
 	/* drm_output::disable_head */
 	struct wl_list disable_head_link;
+
+	void *display_data;             /**< EDID or DisplayID blob */
+	size_t display_data_len;        /**< bytes */
 };
 
 struct drm_crtc {
