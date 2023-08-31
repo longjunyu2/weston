@@ -112,7 +112,7 @@ weston_coord_global_to_surface(struct weston_view *view, struct weston_coord_glo
 
 static void
 global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
-		  struct clipper_vertex polygon[4], bool *axis_aligned)
+		  struct clipper_vertex polygon[4])
 {
 	struct weston_coord_global rect_g[4] = {
 		{ .c = weston_coord(rect->x1, rect->y1) },
@@ -128,9 +128,13 @@ global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
 		polygon[i].x = (float)rect_s.x;
 		polygon[i].y = (float)rect_s.y;
 	}
+}
 
-	*axis_aligned = !ev->transform.enabled ||
-		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
+static bool
+node_axis_aligned(const struct weston_view *view)
+{
+	return !view->transform.enabled ||
+		(view->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
 }
 
 /* ---------------------- copied ends -----------------------*/
@@ -279,12 +283,11 @@ redraw_handler(struct widget *widget, void *data)
 	cairo_surface_t *surface;
 	struct clipper_quad quad;
 	struct clipper_vertex transformed_v[4], v[8];
-	bool axis_aligned;
 	int n;
 
-	global_to_surface(&g->quad, &cliptest->view, transformed_v,
-			  &axis_aligned);
-	clipper_quad_init(&quad, transformed_v, axis_aligned);
+	global_to_surface(&g->quad, &cliptest->view, transformed_v);
+	clipper_quad_init(&quad, transformed_v,
+			  node_axis_aligned(&cliptest->view));
 	n = clipper_quad_clip_box32(&quad, &g->surf, v);
 
 	widget_get_allocation(cliptest->widget, &allocation);
@@ -554,7 +557,6 @@ benchmark(void)
 	struct geometry geom;
 	struct clipper_quad quad;
 	struct clipper_vertex transformed_v[4], v[8];
-	bool axis_aligned;
 	int i;
 	double t;
 	const int N = 1000000;
@@ -579,9 +581,9 @@ benchmark(void)
 	reset_timer();
 	for (i = 0; i < N; i++) {
 		geometry_set_phi(&geom, (float)i / 360.0f);
-		global_to_surface(&geom.quad, &view, transformed_v,
-				  &axis_aligned);
-		clipper_quad_init(&quad, transformed_v, axis_aligned);
+		global_to_surface(&geom.quad, &view, transformed_v);
+		clipper_quad_init(&quad, transformed_v,
+				  node_axis_aligned(&view));
 		clipper_quad_clip_box32(&quad, &geom.surf, v);
 	}
 	t = read_timer();

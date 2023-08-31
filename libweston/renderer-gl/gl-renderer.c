@@ -1225,7 +1225,7 @@ compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects)
 
 static void
 global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
-		  struct clipper_vertex polygon[4], bool *axis_aligned)
+		  struct clipper_vertex polygon[4])
 {
 	struct weston_coord_global rect_g[4] = {
 		{ .c = weston_coord(rect->x1, rect->y1) },
@@ -1241,9 +1241,13 @@ global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
 		polygon[i].x = (float)rect_s.x;
 		polygon[i].y = (float)rect_s.y;
 	}
+}
 
-	*axis_aligned = !ev->transform.enabled ||
-		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
+static bool
+node_axis_aligned(const struct weston_view *view)
+{
+	return !view->transform.enabled ||
+		(view->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
 }
 
 /* Transform damage 'region' in global coordinates to damage 'quads' in surface
@@ -1276,8 +1280,9 @@ transform_damage(const struct weston_paint_node *pnode,
 	*nquads = nrects;
 
 	view = pnode->view;
+	axis_aligned = node_axis_aligned(view);
 	for (i = 0; i < nrects; i++) {
-		global_to_surface(&rects[i], view, polygon, &axis_aligned);
+		global_to_surface(&rects[i], view, polygon);
 		clipper_quad_init(&quads_alloc[i], polygon, axis_aligned);
 	}
 
