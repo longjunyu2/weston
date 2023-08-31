@@ -613,18 +613,7 @@ update_head_from_connector(struct drm_head *head)
 	struct drm_connector *connector = &head->connector;
 	drmModeObjectProperties *props = connector->props_drm;
 	drmModeConnector *conn = connector->conn;
-	struct drm_head_info dhi = { .eotf_mask = WESTON_EOTF_MODE_SDR };
 
-	drm_head_maybe_update_display_data(head, props);
-
-	drm_head_info_from_edid(&dhi, head->display_data, head->display_data_len);
-
-	weston_head_set_monitor_strings(&head->base, dhi.make,
-					dhi.model,
-					dhi.serial_number);
-
-	prune_eotf_modes_by_kms_support(head, &dhi.eotf_mask);
-	weston_head_set_supported_eotf_mask(&head->base, dhi.eotf_mask);
 	weston_head_set_non_desktop(&head->base,
 				    check_non_desktop(connector, props));
 	weston_head_set_subpixel(&head->base,
@@ -638,6 +627,21 @@ update_head_from_connector(struct drm_head *head)
 	/* Unknown connection status is assumed disconnected. */
 	weston_head_set_connection_status(&head->base,
 				conn->connection == DRM_MODE_CONNECTED);
+
+	/* If EDID did not change, skip everything about it */
+	if (!drm_head_maybe_update_display_data(head, props))
+		return;
+
+	struct drm_head_info dhi = { .eotf_mask = WESTON_EOTF_MODE_SDR };
+
+	drm_head_info_from_edid(&dhi, head->display_data, head->display_data_len);
+
+	weston_head_set_monitor_strings(&head->base, dhi.make,
+					dhi.model,
+					dhi.serial_number);
+
+	prune_eotf_modes_by_kms_support(head, &dhi.eotf_mask);
+	weston_head_set_supported_eotf_mask(&head->base, dhi.eotf_mask);
 
 	drm_head_info_fini(&dhi);
 }
