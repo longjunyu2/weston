@@ -2774,6 +2774,7 @@ drm_head_destroy(struct weston_head *base)
 
 	assert(head);
 
+	drm_free_display_info(&head->base.display_info);
 	weston_head_release(&head->base);
 
 	drm_connector_fini(&head->connector);

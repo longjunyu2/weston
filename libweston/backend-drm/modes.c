@@ -264,7 +264,7 @@ get_eotf_mask(const struct di_info *info)
 
 #endif /* HAVE_LIBDISPLAY_INFO_HIGH_LEVEL_COLORIMETRY */
 
-static void
+static struct di_info *
 drm_head_info_from_edid(struct drm_head_info *dhi,
 			const uint8_t *data,
 			size_t length)
@@ -277,7 +277,7 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 		memset(dhi, 0, sizeof(*dhi));
 		dhi->eotf_mask = WESTON_EOTF_MODE_SDR;
 		dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_DEFAULT;
-		return;
+		return NULL;
 	}
 
 	msg = di_info_get_failure_msg(di_ctx);
@@ -289,10 +289,20 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 	dhi->serial_number = di_info_get_serial(di_ctx);
 	dhi->eotf_mask = get_eotf_mask(di_ctx);
 
-	di_info_destroy(di_ctx);
-
 	/* TODO: parse this from EDID */
 	dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_ALL_MASK;
+
+	return di_ctx;
+}
+
+void
+drm_free_display_info(struct di_info **display_info)
+{
+	if (!*display_info)
+		return;
+
+	di_info_destroy(*display_info);
+	*display_info = NULL;
 }
 
 static void
@@ -576,7 +586,10 @@ update_head_from_connector(struct drm_head *head)
 
 	struct drm_head_info dhi;
 
-	drm_head_info_from_edid(&dhi, head->display_data, head->display_data_len);
+	drm_free_display_info(&head->base.display_info);
+	head->base.display_info = drm_head_info_from_edid(&dhi, head->display_data,
+							  head->display_data_len);
+	weston_head_set_device_changed(&head->base);
 
 	weston_head_set_monitor_strings(&head->base, dhi.make,
 					dhi.model,
