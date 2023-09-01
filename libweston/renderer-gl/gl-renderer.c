@@ -1175,24 +1175,17 @@ gl_shader_config_init_for_paint_node(struct gl_shader_config *sconf,
 	return true;
 }
 
-static bool
-merge_down(pixman_box32_t *a, pixman_box32_t *b, pixman_box32_t *merge)
-{
-	if (a->x1 == b->x1 && a->x2 == b->x2 && a->y1 == b->y2) {
-		merge->x1 = a->x1;
-		merge->x2 = a->x2;
-		merge->y1 = b->y1;
-		merge->y2 = a->y2;
-		return true;
-	}
-	return false;
-}
-
+/* A Pixman region is implemented as a "y-x-banded" array of rectangles sorted
+ * first vertically and then horizontally. This means that if 2 rectangles with
+ * different y coordinates share a group of scanlines, both rectangles will be
+ * split into 2 more rectangles with sharing edges. While Pixman coalesces
+ * rectangles in horizontal bands whenever possible, this function merges
+ * vertical bands.
+ */
 static int
 compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects)
 {
-	bool merged = false;
-	pixman_box32_t *out, merge_rect;
+	pixman_box32_t *out;
 	int i, j, nout;
 
 	assert(nrects > 0);
@@ -1205,16 +1198,16 @@ compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects)
 	nout = 1;
 	for (i = 1; i < nrects; i++) {
 		for (j = 0; j < nout; j++) {
-			merged = merge_down(&inrects[i], &out[j], &merge_rect);
-			if (merged) {
-				out[j] = merge_rect;
-				break;
+			if (inrects[i].x1 == out[j].x1 &&
+			    inrects[i].x2 == out[j].x2 &&
+			    inrects[i].y1 == out[j].y2) {
+				out[j].y2 = inrects[i].y2;
+				goto merged;
 			}
 		}
-		if (!merged) {
-			out[nout] = inrects[i];
-			nout++;
-		}
+		out[nout] = inrects[i];
+		nout++;
+	merged: ;
 	}
 	*outrects = out;
 	return nout;
