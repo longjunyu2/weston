@@ -2558,7 +2558,7 @@ drm_connector_fini(struct drm_connector *connector)
 static void
 drm_head_log_info(struct drm_head *head, const char *msg)
 {
-	char *eotf_list;
+	char *str;
 
 	if (head->base.connected) {
 		weston_log("DRM: head '%s' %s, connector %d is connected, "
@@ -2566,13 +2566,13 @@ drm_head_log_info(struct drm_head *head, const char *msg)
 			   head->base.name, msg, head->connector.connector_id,
 			   head->base.make, head->base.model,
 			   head->base.serial_number ?: "");
-		eotf_list = weston_eotf_mask_to_str(head->base.supported_eotf_mask);
-		if (eotf_list) {
+		str = weston_eotf_mask_to_str(head->base.supported_eotf_mask);
+		if (str) {
 			weston_log_continue(STAMP_SPACE
 					    "Supported EOTF modes: %s\n",
-					    eotf_list);
+					    str);
 		}
-		free(eotf_list);
+		free(str);
 	} else {
 		weston_log("DRM: head '%s' %s, connector %d is disconnected.\n",
 			   head->base.name, msg, head->connector.connector_id);
