@@ -222,6 +222,55 @@ struct weston_testsuite_data {
 	void *test_private_data;
 };
 
+/** Colorimetry mode for outputs and heads
+ *
+ * A list of colorimetry modes for driving displays, defined by ANSI/CTA-861-H.
+ *
+ * On heads, a bitmask of one or more entries shows which modes are claimed
+ * supported.
+ *
+ * On outputs, the mode to be used for driving the video sink.
+ *
+ * Default (RGB) colorimetry differs from all the others in that the signal
+ * colorimetry is not defined here. It is defined by the video sink, and it
+ * may be described in e.g. EDID.
+ */
+enum weston_colorimetry_mode {
+	/** Invalid colorimetry mode, or none supported. */
+	WESTON_COLORIMETRY_MODE_NONE			= 0,
+
+	/** Default (RGB) colorimetry, video sink dependant */
+	WESTON_COLORIMETRY_MODE_DEFAULT			= 0x01,
+
+	/** Rec. ITU-R BT.2020 constant luminance YCbCr */
+	WESTON_COLORIMETRY_MODE_BT2020_CYCC		= 0x02,
+
+	/** Rec. ITU-R BT.2020 non-constant luminance YCbCr */
+	WESTON_COLORIMETRY_MODE_BT2020_YCC		= 0x04,
+
+	/** Rec. ITU-R BT.2020 RGB */
+	WESTON_COLORIMETRY_MODE_BT2020_RGB		= 0x08,
+
+	/** SMPTE ST 2113 DCI-P3 RGB D65 */
+	WESTON_COLORIMETRY_MODE_P3D65			= 0x10,
+
+	/** SMPTE ST 2113 DCI-P3 RGB Theater */
+	WESTON_COLORIMETRY_MODE_P3DCI			= 0x20,
+
+	/** Rec. ITU-R BT.2100 ICtCp HDR (with PQ and/or HLG)*/
+	WESTON_COLORIMETRY_MODE_ICTCP			= 0x40,
+};
+
+/** Bitmask of all defined colorimetry modes */
+#define WESTON_COLORIMETRY_MODE_ALL_MASK \
+	((uint32_t)(WESTON_COLORIMETRY_MODE_DEFAULT | \
+		    WESTON_COLORIMETRY_MODE_BT2020_CYCC | \
+		    WESTON_COLORIMETRY_MODE_BT2020_YCC | \
+		    WESTON_COLORIMETRY_MODE_BT2020_RGB | \
+		    WESTON_COLORIMETRY_MODE_P3D65 | \
+		    WESTON_COLORIMETRY_MODE_P3DCI | \
+		    WESTON_COLORIMETRY_MODE_ICTCP))
+
 /** EOTF mode for outputs and heads
  *
  * A list of EOTF modes for driving displays, defined by CTA-861-G for
@@ -351,6 +400,7 @@ struct weston_head {
 	bool connected;			/**< is physically connected */
 	bool non_desktop;		/**< non-desktop display, e.g. HMD */
 	uint32_t supported_eotf_mask;	/**< supported weston_eotf_mode bits */
+	uint32_t supported_colorimetry_mask; /**< supported weston_colorimetry_mode bits */
 
 	/** Current content protection status */
 	enum weston_hdcp_protection current_protection;
@@ -501,6 +551,7 @@ struct weston_output {
 	struct weston_color_profile *color_profile;
 	bool from_blend_to_output_by_backend;
 	enum weston_eotf_mode eotf_mode;
+	enum weston_colorimetry_mode colorimetry_mode;
 	struct weston_color_characteristics color_characteristics;
 
 	struct weston_output_color_outcome *color_outcome;
@@ -2532,6 +2583,13 @@ enum weston_eotf_mode
 weston_output_get_eotf_mode(const struct weston_output *output);
 
 void
+weston_output_set_colorimetry_mode(struct weston_output *output,
+				   enum weston_colorimetry_mode colorimetry_mode);
+
+enum weston_colorimetry_mode
+weston_output_get_colorimetry_mode(const struct weston_output *output);
+
+void
 weston_output_set_color_characteristics(struct weston_output *output,
 					const struct weston_color_characteristics *cc);
 
@@ -2555,6 +2613,9 @@ weston_output_disable(struct weston_output *output);
 
 uint32_t
 weston_output_get_supported_eotf_modes(struct weston_output *output);
+
+uint32_t
+weston_output_get_supported_colorimetry_modes(struct weston_output *output);
 
 void
 weston_output_power_off(struct weston_output *output);

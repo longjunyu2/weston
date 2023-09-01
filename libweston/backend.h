@@ -159,6 +159,10 @@ void
 weston_head_set_supported_eotf_mask(struct weston_head *head,
 				    uint32_t eotf_mask);
 
+void
+weston_head_set_supported_colorimetry_mask(struct weston_head *head,
+					   uint32_t colorimetry_mask);
+
 /* weston_output */
 
 void

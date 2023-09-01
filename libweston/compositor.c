@@ -6213,6 +6213,7 @@ weston_head_init(struct weston_head *head, const char *name)
 	wl_list_init(&head->cm_output_resource_list);
 	head->name = xstrdup(name);
 	head->supported_eotf_mask = WESTON_EOTF_MODE_SDR;
+	head->supported_colorimetry_mask = WESTON_COLORIMETRY_MODE_DEFAULT;
 	head->current_protection = WESTON_HDCP_DISABLE;
 
 	weston_head_set_monitor_strings(head, NULL, NULL, NULL);
@@ -6812,6 +6813,32 @@ weston_head_set_supported_eotf_mask(struct weston_head *head,
 		return;
 
 	head->supported_eotf_mask = eotf_mask;
+
+	weston_head_set_device_changed(head);
+}
+
+/** Store the set of supported colorimetry modes
+ *
+ * \param head The head to modify.
+ * \param colorimetry_mask A bit mask with the possible bits or'ed together from
+ * enum weston_colorimetry_mode.
+ *
+ * This may set the device_changed flag.
+ *
+ * \ingroup head
+ * \internal
+ */
+WL_EXPORT void
+weston_head_set_supported_colorimetry_mask(struct weston_head *head,
+					   uint32_t colorimetry_mask)
+{
+	weston_assert_legal_bits(head->compositor,
+				 colorimetry_mask, WESTON_COLORIMETRY_MODE_ALL_MASK);
+
+	if (head->supported_colorimetry_mask == colorimetry_mask)
+		return;
+
+	head->supported_colorimetry_mask = colorimetry_mask;
 
 	weston_head_set_device_changed(head);
 }
@@ -7681,6 +7708,56 @@ weston_output_get_eotf_mode(const struct weston_output *output)
 	return output->eotf_mode;
 }
 
+/** Set colorimetry mode on an output
+ *
+ * \param output The output to modify, must be in disabled state.
+ * \param colorimetry_mode The colorimetry mode to set.
+ *
+ * Setting the output colorimetry mode is used for choosing the video signal
+ * encoding colorimetry. This is purely metadata to be sent to the video sink,
+ * intended to allow the video sink to decode the sent pixels correctly.
+ * This may be used to enable wide color gamut modes. ST2084 and HLG EOTF modes
+ * for HDR tend to use BT.2020 colorimetry mode.
+ *
+ * Only backends that directly drive a video sink might use this information
+ * (DRM-backend).
+ *
+ * After attaching heads to an output, you can find out the possibly supported
+ * colorimetry modes with weston_output_get_supported_colorimetry_modes().
+ *
+ * This function does not check whether the given colorimetry_mode is actually
+ * supported on the output. Enabling an output with an unsupported colorimetry
+ * mode has undefined visual results.
+ *
+ * TODO: Enforce mode validity.
+ *
+ * The initial colorimetry mode is DEFAULT.
+ *
+ * \ingroup output
+ */
+WL_EXPORT void
+weston_output_set_colorimetry_mode(struct weston_output *output,
+				   enum weston_colorimetry_mode colorimetry_mode)
+{
+	weston_assert_false(output->compositor, output->enabled);
+
+	output->colorimetry_mode = colorimetry_mode;
+}
+
+/** Get colorimetry mode of an output
+ *
+ * \param output The output to query.
+ * \return The colorimetry mode.
+ *
+ * \sa weston_output_set_colorimetry_mode
+ * \ingroup output
+ */
+WL_EXPORT enum weston_colorimetry_mode
+weston_output_get_colorimetry_mode(const struct weston_output *output)
+{
+	return output->colorimetry_mode;
+}
+
 /** Get HDR static metadata type 1
  *
  * \param output The output to query.
@@ -7812,6 +7889,7 @@ weston_output_init(struct weston_output *output,
 	wl_signal_init(&output->user_destroy_signal);
 	output->enabled = false;
 	output->eotf_mode = WESTON_EOTF_MODE_SDR;
+	output->colorimetry_mode = WESTON_COLORIMETRY_MODE_DEFAULT;
 	output->desired_protection = WESTON_HDCP_DISABLE;
 	output->allow_protection = true;
 	output->power_state = WESTON_OUTPUT_POWER_NORMAL;
@@ -7975,8 +8053,10 @@ weston_output_enable(struct weston_output *output)
 
 	weston_output_update_matrix(output);
 
-	weston_log("Output '%s' attempts EOTF mode: %s\n", output->name,
-		   weston_eotf_mode_to_str(output->eotf_mode));
+	weston_log("Output '%s' attempts EOTF mode %s and colorimetry mode %s.\n",
+		   output->name,
+		   weston_eotf_mode_to_str(output->eotf_mode),
+		   weston_colorimetry_mode_to_str(output->colorimetry_mode));
 
 	if (!weston_output_set_color_outcome(output))
 		return -1;
@@ -8322,6 +8402,34 @@ weston_output_get_supported_eotf_modes(struct weston_output *output)
 		eotf_modes = eotf_modes & head->supported_eotf_mask;
 
 	return eotf_modes;
+}
+
+/** Get supported colorimetry modes as a bit mask
+ *
+ * \param output The output to query.
+ * \return A bit mask with values from enum weston_colorimetry_mode or'ed together.
+ *
+ * Returns the intersection of the colorimetry modes supported by the currently
+ * attached heads as a bit mask. Adding or removing heads may change the result.
+ * An output can be queried regardless of whether it is enabled or disabled.
+ *
+ * If no heads are attached, no colorimetry modes are deemed supported.
+ *
+ * \ingroup output
+ */
+WL_EXPORT uint32_t
+weston_output_get_supported_colorimetry_modes(struct weston_output *output)
+{
+	uint32_t colorimetry_modes = WESTON_COLORIMETRY_MODE_ALL_MASK;
+	struct weston_head *head;
+
+	if (wl_list_empty(&output->head_list))
+		return WESTON_COLORIMETRY_MODE_NONE;
+
+	wl_list_for_each(head, &output->head_list, output_link)
+		colorimetry_modes = colorimetry_modes & head->supported_colorimetry_mask;
+
+	return colorimetry_modes;
 }
 
 /* Set the forced-power state of output

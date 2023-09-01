@@ -40,6 +40,7 @@
 #include "id-number-allocator.h"
 #include "libweston-internal.h"
 #include <libweston/weston-log.h>
+#include "shared/helpers.h"
 #include "shared/xalloc.h"
 
 /**
@@ -447,4 +448,57 @@ WL_EXPORT char *
 weston_eotf_mask_to_str(uint32_t eotf_mask)
 {
 	return bits_to_str(eotf_mask, weston_eotf_mode_to_str);
+}
+
+static const struct weston_colorimetry_mode_info colorimetry_mode_info_map[] = {
+	{ WESTON_COLORIMETRY_MODE_NONE, "(none)", WDRM_COLORSPACE__COUNT },
+	{ WESTON_COLORIMETRY_MODE_DEFAULT, "default", WDRM_COLORSPACE_DEFAULT },
+	{ WESTON_COLORIMETRY_MODE_BT2020_CYCC, "BT.2020 (cYCC)", WDRM_COLORSPACE_BT2020_CYCC },
+	{ WESTON_COLORIMETRY_MODE_BT2020_YCC, "BT.2020 (YCC)", WDRM_COLORSPACE_BT2020_YCC },
+	{ WESTON_COLORIMETRY_MODE_BT2020_RGB, "BT.2020 (RGB)", WDRM_COLORSPACE_BT2020_RGB },
+	{ WESTON_COLORIMETRY_MODE_P3D65, "DCI-P3 RGB D65", WDRM_COLORSPACE_DCI_P3_RGB_D65 },
+	{ WESTON_COLORIMETRY_MODE_P3DCI, "DCI-P3 RGB Theatre", WDRM_COLORSPACE_DCI_P3_RGB_THEATER },
+	{ WESTON_COLORIMETRY_MODE_ICTCP, "BT.2100 ICtCp", WDRM_COLORSPACE__COUNT },
+};
+
+/** Get information structure of colorimetry mode
+ *
+ * \internal
+ */
+WL_EXPORT const struct weston_colorimetry_mode_info *
+weston_colorimetry_mode_info_get(enum weston_colorimetry_mode c)
+{
+	unsigned i;
+
+	for (i = 0; i < ARRAY_LENGTH(colorimetry_mode_info_map); i++)
+		if (colorimetry_mode_info_map[i].mode == c)
+			return &colorimetry_mode_info_map[i];
+
+	return NULL;
+}
+
+/** Get a string naming the colorimetry mode
+ *
+ * \internal
+ */
+WL_EXPORT const char *
+weston_colorimetry_mode_to_str(enum weston_colorimetry_mode c)
+{
+	const struct weston_colorimetry_mode_info *info;
+
+	info = weston_colorimetry_mode_info_get(c);
+
+	return info ? info->name : "???";
+}
+
+/** A list of colorimetry modes as a string
+ *
+ * \param colorimetry_mask Bitwise-or'd enum weston_colorimetry_mode values.
+ * \return Comma separated names of the listed colorimetry modes.
+ * Must be free()'d by the caller.
+ */
+WL_EXPORT char *
+weston_colorimetry_mask_to_str(uint32_t colorimetry_mask)
+{
+	return bits_to_str(colorimetry_mask, weston_colorimetry_mode_to_str);
 }

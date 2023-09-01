@@ -31,6 +31,8 @@
 #include <stdint.h>
 #include <libweston/libweston.h>
 
+#include "backend-drm/drm-kms-enums.h"
+
 enum weston_hdr_metadata_type1_groups {
 	/** weston_hdr_metadata_type1::primary is set */
 	WESTON_HDR_METADATA_TYPE1_GROUP_PRIMARIES	= 0x01,
@@ -547,6 +549,26 @@ weston_eotf_mode_to_str(enum weston_eotf_mode e);
 
 char *
 weston_eotf_mask_to_str(uint32_t eotf_mask);
+
+struct weston_colorimetry_mode_info {
+	/** Primary key: the colorimetry mode */
+	enum weston_colorimetry_mode mode;
+
+	/** Its name as a string for logging. */
+	const char *name;
+
+	/** wdrm equivalent, or WDRM_COLORSPACE__COUNT if none */
+	enum wdrm_colorspace wdrm;
+};
+
+const struct weston_colorimetry_mode_info *
+weston_colorimetry_mode_info_get(enum weston_colorimetry_mode c);
+
+const char *
+weston_colorimetry_mode_to_str(enum weston_colorimetry_mode c);
+
+char *
+weston_colorimetry_mask_to_str(uint32_t colorimetry_mask);
 
 void
 weston_output_color_outcome_destroy(struct weston_output_color_outcome **pco);
