@@ -583,16 +583,98 @@ static const struct vertex_clip_test_data quad_clip_expected_data[] = {
 		.clipped_n = 5,
 	},
 
-	/* Miscellaneous cases: */
+	/* Box intersects entire smaller aligned quad of different winding
+	 * orders and first edge orientations: */
 
-	/* Box intersects entire smaller aligned quad. */
+	/* Clockwise winding and top/left initial vertex. */
 	{
 		.aligned   = true,
-		.box       = BOX (-0.50f, -0.50f,  0.50f,  0.50f),
-		.polygon   = QUAD(-0.25f, -0.25f,  0.25f,  0.25f),
-		.clipped   = QUAD(-0.25f, -0.25f,  0.25f,  0.25f),
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{-0.25f, -0.25f}, { 0.25f, -0.25f},
+			      { 0.25f,  0.25f}, {-0.25f,  0.25f}},
+		.clipped   = {{-0.25f, -0.25f}, { 0.25f, -0.25f},
+			      { 0.25f,  0.25f}, {-0.25f,  0.25f}},
 		.clipped_n = 4,
 	},
+
+	/* Clockwise winding and top/right initial vertex. */
+	{
+		.aligned   = true,
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{ 0.25f, -0.25f}, { 0.25f,  0.25f},
+			      {-0.25f,  0.25f}, {-0.25f, -0.25f}},
+		.clipped   = {{ 0.25f, -0.25f}, { 0.25f,  0.25f},
+			      {-0.25f,  0.25f}, {-0.25f, -0.25f}},
+		.clipped_n = 4,
+	},
+
+	/* Clockwise winding and bottom/right initial vertex. */
+	{
+		.aligned   = true,
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{ 0.25f,  0.25f}, {-0.25f,  0.25f},
+			      {-0.25f, -0.25f}, { 0.25f, -0.25f}},
+		.clipped   = {{ 0.25f,  0.25f}, {-0.25f,  0.25f},
+			      {-0.25f, -0.25f}, { 0.25f, -0.25f}},
+		.clipped_n = 4,
+	},
+
+	/* Clockwise winding and bottom/left initial vertex. */
+	{
+		.aligned   = true,
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{-0.25f,  0.25f}, {-0.25f, -0.25f},
+			      { 0.25f, -0.25f}, { 0.25f,  0.25f}},
+		.clipped   = {{-0.25f,  0.25f}, {-0.25f, -0.25f},
+			      { 0.25f, -0.25f}, { 0.25f,  0.25f}},
+		.clipped_n = 4,
+	},
+
+	/* Counter-clockwise winding and top/left initial vertex. */
+	{
+		.aligned   = true,
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{-0.25f, -0.25f}, {-0.25f,  0.25f},
+			      { 0.25f,  0.25f}, { 0.25f, -0.25f}},
+		.clipped   = {{-0.25f, -0.25f}, {-0.25f,  0.25f},
+			      { 0.25f,  0.25f}, { 0.25f, -0.25f}},
+		.clipped_n = 4,
+	},
+
+	/* Counter-clockwise winding and top/right initial vertex. */
+	{
+		.aligned   = true,
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{ 0.25f, -0.25f}, {-0.25f, -0.25f},
+			      {-0.25f,  0.25f}, { 0.25f,  0.25f}},
+		.clipped   = {{ 0.25f, -0.25f}, {-0.25f, -0.25f},
+			      {-0.25f,  0.25f}, { 0.25f,  0.25f}},
+		.clipped_n = 4,
+	},
+
+	/* Counter-clockwise winding and bottom/right initial vertex. */
+	{
+		.aligned   = true,
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{ 0.25f,  0.25f}, { 0.25f, -0.25f},
+			      {-0.25f, -0.25f}, {-0.25f,  0.25f}},
+		.clipped   = {{ 0.25f,  0.25f}, { 0.25f, -0.25f},
+			      {-0.25f, -0.25f}, {-0.25f,  0.25f}},
+		.clipped_n = 4,
+	},
+
+	/* Counter-clockwise winding and bottom/left initial vertex. */
+	{
+		.aligned   = true,
+		.box       = BOX(-0.50f, -0.50f,  0.50f,  0.50f),
+		.polygon   = {{-0.25f,  0.25f}, { 0.25f,  0.25f},
+			      { 0.25f, -0.25f}, {-0.25f, -0.25f}},
+		.clipped   = {{-0.25f,  0.25f}, { 0.25f,  0.25f},
+			      { 0.25f, -0.25f}, {-0.25f, -0.25f}},
+		.clipped_n = 4,
+	},
+
+	/* Miscellaneous cases: */
 
 	/* Box intersects entire same size aligned quad. */
 	{

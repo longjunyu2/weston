@@ -374,7 +374,7 @@ clipper_quad_clip(struct clipper_quad *quad,
 			vertices[i].y = CLIP(quad->polygon[i].y,
 					     box[0].y, box[1].y);
 		}
-		if ((vertices[0].x != vertices[1].x) &&
+		if ((vertices[0].x != vertices[2].x) &&
 		    (vertices[0].y != vertices[2].y))
 			return 4;
 		else
