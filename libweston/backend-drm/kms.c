@@ -154,6 +154,25 @@ struct drm_property_enum_info content_type_enums[] = {
 	[WDRM_CONTENT_TYPE_GAME] = { .name = "Game", },
 };
 
+struct drm_property_enum_info colorspace_enums[] = {
+	[WDRM_COLORSPACE_DEFAULT] = { .name = "Default", },
+	[WDRM_COLORSPACE_SMPTE_170M_YCC] = { .name = "SMPTE_170M_YCC", },
+	[WDRM_COLORSPACE_BT709_YCC] = { .name = "BT709_YCC", },
+	[WDRM_COLORSPACE_XVYCC_601] = { .name = "XVYCC_601", },
+	[WDRM_COLORSPACE_XVYCC_709] = { .name = "XVYCC_709", },
+	[WDRM_COLORSPACE_SYCC_601] = { .name = "SYCC_601", },
+	[WDRM_COLORSPACE_OPYCC_601] = { .name = "opYCC_601", },
+	[WDRM_COLORSPACE_OPRGB] = { .name = "opRGB", },
+	[WDRM_COLORSPACE_BT2020_CYCC] = { .name = "BT2020_CYCC", },
+	[WDRM_COLORSPACE_BT2020_RGB] = { .name = "BT2020_RGB", },
+	[WDRM_COLORSPACE_BT2020_YCC] = { .name = "BT2020_YCC", },
+	[WDRM_COLORSPACE_DCI_P3_RGB_D65] = { .name = "DCI-P3_RGB_D65", },
+	[WDRM_COLORSPACE_DCI_P3_RGB_THEATER] = { .name = "DCI-P3_RGB_Theater", },
+	[WDRM_COLORSPACE_RGB_WIDE_FIXED] = { .name = "RGB_WIDE_FIXED", },
+	[WDRM_COLORSPACE_RGB_WIDE_FLOAT] = { .name = "RGB_WIDE_FLOAT", },
+	[WDRM_COLORSPACE_BT601_YCC] = { .name = "BT601_YCC", },
+};
+
 const struct drm_property_info connector_props[] = {
 	[WDRM_CONNECTOR_EDID] = { .name = "EDID" },
 	[WDRM_CONNECTOR_DPMS] = {
@@ -189,6 +208,11 @@ const struct drm_property_info connector_props[] = {
 		.name = "content type",
 		.enum_values = content_type_enums,
 		.num_enum_values = WDRM_CONTENT_TYPE__COUNT,
+	},
+	[WDRM_CONNECTOR_COLORSPACE] = {
+		.name = "Colorspace",
+		.enum_values = colorspace_enums,
+		.num_enum_values = WDRM_COLORSPACE__COUNT,
 	},
 };
 
