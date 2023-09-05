@@ -254,12 +254,48 @@ get_eotf_mask(const struct di_info *info)
 	return mask;
 }
 
+static uint32_t
+get_colorimetry_mask(const struct di_info *info)
+{
+	const struct di_supported_signal_colorimetry *ssc;
+	uint32_t mask = WESTON_COLORIMETRY_MODE_DEFAULT;
+
+	ssc = di_info_get_supported_signal_colorimetry(info);
+	if (!ssc)
+		return mask;
+
+	if (ssc->bt2020_cycc)
+		mask |= WESTON_COLORIMETRY_MODE_BT2020_CYCC;
+
+	if (ssc->bt2020_rgb)
+		mask |= WESTON_COLORIMETRY_MODE_BT2020_RGB;
+
+	if (ssc->bt2020_ycc)
+		mask |= WESTON_COLORIMETRY_MODE_BT2020_YCC;
+
+	if (ssc->st2113_rgb) {
+		mask |= WESTON_COLORIMETRY_MODE_P3D65;
+		mask |= WESTON_COLORIMETRY_MODE_P3DCI;
+	}
+
+	if (ssc->ictcp)
+		mask |= WESTON_COLORIMETRY_MODE_ICTCP;
+
+	return mask;
+}
+
 #else /* HAVE_LIBDISPLAY_INFO_HIGH_LEVEL_COLORIMETRY */
 
 static uint32_t
 get_eotf_mask(const struct di_info *info)
 {
 	return WESTON_EOTF_MODE_SDR;
+}
+
+static uint32_t
+get_colorimetry_mask(const struct di_info *info)
+{
+	return WESTON_COLORIMETRY_MODE_DEFAULT;
 }
 
 #endif /* HAVE_LIBDISPLAY_INFO_HIGH_LEVEL_COLORIMETRY */
@@ -288,9 +324,7 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 	dhi->model = di_info_get_model(di_ctx);
 	dhi->serial_number = di_info_get_serial(di_ctx);
 	dhi->eotf_mask = get_eotf_mask(di_ctx);
-
-	/* TODO: parse this from EDID */
-	dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_ALL_MASK;
+	dhi->colorimetry_mask = get_colorimetry_mask(di_ctx);
 
 	return di_ctx;
 }
