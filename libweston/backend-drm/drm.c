@@ -2576,6 +2576,14 @@ drm_head_log_info(struct drm_head *head, const char *msg)
 					    str);
 		}
 		free(str);
+
+		str = weston_colorimetry_mask_to_str(head->base.supported_colorimetry_mask);
+		if (str) {
+			weston_log_continue(STAMP_SPACE
+					    "Supported colorimetry modes: %s\n",
+					    str);
+		}
+		free(str);
 	} else {
 		weston_log("DRM: head '%s' %s, connector %d is disconnected.\n",
 			   head->base.name, msg, head->connector.connector_id);

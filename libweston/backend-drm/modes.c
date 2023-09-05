@@ -49,6 +49,11 @@ struct drm_head_info {
  	 * enum weston_eotf_mode bits.
 	 */
 	uint32_t eotf_mask;
+
+	/* The monitor supported colorimetry modes, combination of
+	 * enum weston_colorimetry_mode bits.
+	 */
+	uint32_t colorimetry_mask;
 };
 
 static void
@@ -251,6 +256,7 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 
 	/* TODO: parse this from EDID */
 	dhi->eotf_mask = WESTON_EOTF_MODE_ALL_MASK;
+	dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_ALL_MASK;
 }
 
 #else /* HAVE_LIBDISPLAY_INFO */
@@ -380,6 +386,7 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 
 	/* This ad hoc code will never parse HDR data. */
 	dhi->eotf_mask = WESTON_EOTF_MODE_SDR;
+	dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_DEFAULT;
 }
 
 #endif /* HAVE_LIBDISPLAY_INFO else */
@@ -445,6 +452,35 @@ prune_eotf_modes_by_kms_support(struct drm_head *head, uint32_t *eotf_mask)
 	info = &head->connector.props[WDRM_CONNECTOR_HDR_OUTPUT_METADATA];
 	if (!head->connector.device->atomic_modeset || info->prop_id == 0)
 		*eotf_mask = WESTON_EOTF_MODE_SDR;
+}
+
+static uint32_t
+drm_head_get_kms_colorimetry_modes(const struct drm_head *head)
+{
+	const struct drm_property_info *info;
+
+	/* Cannot bother implementing without atomic */
+	if (!head->connector.device->atomic_modeset)
+		return WESTON_COLORIMETRY_MODE_DEFAULT;
+
+	info = &head->connector.props[WDRM_CONNECTOR_COLORSPACE];
+	if (info->prop_id == 0)
+		return WESTON_COLORIMETRY_MODE_DEFAULT;
+
+	uint32_t colorimetry_modes = WESTON_COLORIMETRY_MODE_NONE;
+	unsigned i; /* actually enum wdrm_colorspace */
+
+	for (i = 0; i < WDRM_COLORSPACE__COUNT; i++) {
+		if (info->enum_values[i].valid) {
+			const struct weston_colorimetry_mode_info *cm;
+
+			cm = weston_colorimetry_mode_info_get_by_wdrm(i);
+			if (cm)
+				colorimetry_modes |= cm->mode;
+		}
+	}
+
+	return colorimetry_modes;
 }
 
 static uint32_t
@@ -642,6 +678,9 @@ update_head_from_connector(struct drm_head *head)
 
 	prune_eotf_modes_by_kms_support(head, &dhi.eotf_mask);
 	weston_head_set_supported_eotf_mask(&head->base, dhi.eotf_mask);
+
+	dhi.colorimetry_mask &= drm_head_get_kms_colorimetry_modes(head);
+	weston_head_set_supported_colorimetry_mask(&head->base, dhi.colorimetry_mask);
 
 	drm_head_info_fini(&dhi);
 }

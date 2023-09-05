@@ -477,6 +477,22 @@ weston_colorimetry_mode_info_get(enum weston_colorimetry_mode c)
 	return NULL;
 }
 
+/** Get information structure of colorimetry mode from KMS "Colorspace" enum
+ *
+ * \internal
+ */
+WL_EXPORT const struct weston_colorimetry_mode_info *
+weston_colorimetry_mode_info_get_by_wdrm(enum wdrm_colorspace cs)
+{
+	unsigned i;
+
+	for (i = 0; i < ARRAY_LENGTH(colorimetry_mode_info_map); i++)
+		if (colorimetry_mode_info_map[i].wdrm == cs)
+			return &colorimetry_mode_info_map[i];
+
+	return NULL;
+}
+
 /** Get a string naming the colorimetry mode
  *
  * \internal

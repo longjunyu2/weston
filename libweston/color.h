@@ -564,6 +564,9 @@ struct weston_colorimetry_mode_info {
 const struct weston_colorimetry_mode_info *
 weston_colorimetry_mode_info_get(enum weston_colorimetry_mode c);
 
+const struct weston_colorimetry_mode_info *
+weston_colorimetry_mode_info_get_by_wdrm(enum wdrm_colorspace cs);
+
 const char *
 weston_colorimetry_mode_to_str(enum weston_colorimetry_mode c);
 
