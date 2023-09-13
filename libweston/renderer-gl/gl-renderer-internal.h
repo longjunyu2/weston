@@ -164,8 +164,9 @@ struct gl_renderer {
 
 	uint32_t gl_version;
 
-	struct wl_array vertices;
-	struct wl_array vtxcnt;
+	/* Vertex streams. */
+	struct wl_array position_stream;
+	struct wl_array indices;
 
 	EGLDeviceEXT egl_device;
 	const char *drm_device;

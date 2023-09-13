@@ -106,6 +106,17 @@ do { \
 	({ typeof(d) tmp = (d); ((n) + tmp - 1) / tmp; })
 
 /**
+ * Round up to the next multiple of a power of 2.
+ *
+ * @param a the value to round up.
+ * @param n the power of 2.
+ * @return the rounded up value.
+ */
+#ifndef ROUND_UP_N
+#define ROUND_UP_N(a, n) (((a) + (n) - 1) & ~((n) - 1))
+#endif
+
+/**
  * Returns a pointer to the containing struct of a given member item.
  *
  * To demonstrate, the following example retrieves a pointer to

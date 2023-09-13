@@ -484,55 +484,6 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 	wl_list_insert(&go->timeline_render_point_list, &trp->link);
 }
 
-static int
-texture_region(struct weston_paint_node *pnode,
-	       struct clipper_quad *quads,
-	       int nquads,
-	       pixman_region32_t *region)
-{
-	struct weston_compositor *ec = pnode->surface->compositor;
-	struct gl_renderer *gr = get_renderer(ec);
-	struct clipper_vertex *v;
-	unsigned int *vtxcnt, nvtx = 0;
-	pixman_box32_t *rects;
-	int i, j, nrects;
-
-	rects = pixman_region32_rectangles(region, &nrects);
-
-	/* worst case we can have 8 vertices per rect (ie. clipped into
-	 * an octagon):
-	 */
-	v = wl_array_add(&gr->vertices, nquads * nrects * 8 * sizeof *v);
-	vtxcnt = wl_array_add(&gr->vtxcnt, nquads * nrects * sizeof *vtxcnt);
-
-	for (i = 0; i < nquads; i++) {
-		for (j = 0; j < nrects; j++) {
-			int n;
-
-			/* The transformed quad, after clipping to the surface rect, can
-			 * have as many as eight sides, emitted as a triangle-fan. The
-			 * first vertex in the triangle fan can be chosen arbitrarily,
-			 * since the area is guaranteed to be convex.
-			 *
-			 * If a corner of the transformed quad falls outside of the
-			 * surface rect, instead of emitting one vertex, up to two are
-			 * emitted for two corresponding intersection point(s) between the
-			 * edges.
-			 *
-			 * To do this, we first calculate the (up to eight) points at the
-			 * intersection of the edges of the quad and the surface rect.
-			 */
-			n = clipper_quad_clip_box32(&quads[i], &rects[j], v);
-			if (n >= 3) {
-				v += n;
-				vtxcnt[nvtx++] = n;
-			}
-		}
-	}
-
-	return nvtx;
-}
-
 /** Create a texture and a framebuffer object
  *
  * \param fbotex To be initialized.
@@ -1036,113 +987,6 @@ gl_renderer_send_shader_error(struct weston_paint_node *pnode)
 		wl_resource_get_id(resource));
 }
 
-static void
-triangle_fan_debug(struct gl_renderer *gr,
-		   const struct gl_shader_config *sconf,
-		   struct weston_output *output,
-		   int first, int count)
-{
-	int i;
-	/* There can be at most eight vertices for a given view. */
-	GLushort buffer[(8 - 1 + 8 - 2) * 2];
-	GLushort *index;
-	GLsizei nelems;
-	static int color_idx = 0;
-	struct gl_shader_config alt;
-	const GLfloat *col;
-	struct weston_color_transform *ctransf;
-	static const GLfloat color[][4] = {
-			{ 1.0, 0.0, 0.0, 1.0 },
-			{ 0.0, 1.0, 0.0, 1.0 },
-			{ 0.0, 0.0, 1.0, 1.0 },
-			{ 1.0, 1.0, 1.0, 1.0 },
-	};
-
-	col = color[color_idx++ % ARRAY_LENGTH(color)];
-	alt = (struct gl_shader_config) {
-		.req = {
-			.variant = SHADER_VARIANT_SOLID,
-			.input_is_premult = true,
-		},
-		.projection = sconf->projection,
-		.view_alpha = 1.0f,
-		.unicolor = { col[0], col[1], col[2], col[3] },
-	};
-
-	ctransf = output->color_outcome->from_sRGB_to_blend;
-	if (!gl_shader_config_set_color_transform(gr, &alt, ctransf)) {
-		weston_log("GL-renderer: %s failed to generate a color transformation.\n",
-			   __func__);
-		return;
-	}
-
-	gl_renderer_use_program(gr, &alt);
-
-	nelems = (count - 1 + count - 2) * 2;
-	assert((unsigned long)nelems <= ARRAY_LENGTH(buffer));
-
-	index = buffer;
-
-	for (i = 1; i < count; i++) {
-		*index++ = first;
-		*index++ = first + i;
-	}
-
-	for (i = 2; i < count; i++) {
-		*index++ = first + i - 1;
-		*index++ = first + i;
-	}
-
-	glDrawElements(GL_LINES, nelems, GL_UNSIGNED_SHORT, buffer);
-
-	gl_renderer_use_program(gr, sconf);
-}
-
-static void
-repaint_region(struct gl_renderer *gr,
-	       struct weston_paint_node *pnode,
-	       struct clipper_quad *quads,
-	       int nquads,
-	       pixman_region32_t *region,
-	       const struct gl_shader_config *sconf)
-{
-	struct weston_output *output = pnode->output;
-	GLfloat *v;
-	unsigned int *vtxcnt;
-	int i, first, nfans;
-
-	/* The final region to be painted is the intersection of the damage
-	 * rects and the surface region. However, damage rects are in global
-	 * coordinates and surface region is in surface coordinates.
-	 * texture_region() will iterate over all pairs of rectangles from both
-	 * regions, compute the intersection polygon for each pair, and store it
-	 * as a triangle fan if it has a non-zero area (at least 3 vertices,
-	 * actually).
-	 */
-	nfans = texture_region(pnode, quads, nquads, region);
-
-	v = gr->vertices.data;
-	vtxcnt = gr->vtxcnt.data;
-
-	/* position: */
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof *v, v);
-
-	if (!gl_renderer_use_program(gr, sconf)) {
-		gl_renderer_send_shader_error(pnode);
-		/* continue drawing with the fallback shader */
-	}
-
-	for (i = 0, first = 0; i < nfans; i++) {
-		glDrawArrays(GL_TRIANGLE_FAN, first, vtxcnt[i]);
-		if (gr->fan_debug)
-			triangle_fan_debug(gr, sconf, output, first, vtxcnt[i]);
-		first += vtxcnt[i];
-	}
-
-	gr->vertices.size = 0;
-	gr->vtxcnt.size = 0;
-}
-
 static int
 use_output(struct weston_output *output)
 {
@@ -1465,6 +1309,128 @@ transform_damage(const struct weston_paint_node *pnode,
 
 	if (compress)
 		free(rects);
+}
+
+/* Triangulate a sub-mesh of 'count' vertices as an indexed triangle strip.
+ * 'bias' is added to each index. In order to chain sub-meshes, the last index
+ * is followed by 2 indices creating 4 degenerate triangles. 'count' must be
+ * less than or equal to 8. 16 indices (32 bytes) are stored unconditionally
+ * into 'indices'. The return value is the index count, including the 2 chaining
+ * indices.
+ */
+static int
+store_indices(size_t count,
+	      uint16_t bias,
+	      uint16_t *indices)
+ {
+	/* Look-up table of triangle strips with last entry storing the index
+	 * count. Padded to 16 elements for compilers to emit packed adds. */
+	static const uint16_t strips[][16] = {
+		{}, {}, {},
+		{ 0, 2, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  5 },
+		{ 0, 3, 1, 2, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0,  6 },
+		{ 0, 4, 1, 3, 2, 2, 5, 0, 0, 0, 0, 0, 0, 0, 0,  7 },
+		{ 0, 5, 1, 4, 2, 3, 3, 6, 0, 0, 0, 0, 0, 0, 0,  8 },
+		{ 0, 6, 1, 5, 2, 4, 3, 3, 7, 0, 0, 0, 0, 0, 0,  9 },
+		{ 0, 7, 1, 6, 2, 5, 3, 4, 4, 8, 0, 0, 0, 0, 0, 10 },
+	};
+	int i;
+
+	assert(count < ARRAY_LENGTH(strips));
+
+	for (i = 0; i < 16; i++)
+		indices[i] = strips[count][i] + bias;
+
+	return strips[count][15];
+}
+
+static void
+draw_mesh(struct gl_renderer *gr,
+	  struct weston_paint_node *pnode,
+	  const struct gl_shader_config *sconf,
+	  const struct clipper_vertex *positions,
+	  const uint16_t *strip,
+	  int nstrip)
+{
+	assert(nstrip > 0);
+
+	if (!gl_renderer_use_program(gr, sconf))
+		gl_renderer_send_shader_error(pnode); /* Use fallback shader. */
+
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, positions);
+	glDrawElements(GL_TRIANGLE_STRIP, nstrip, GL_UNSIGNED_SHORT, strip);
+}
+
+static void
+repaint_region(struct gl_renderer *gr,
+	       struct weston_paint_node *pnode,
+	       struct clipper_quad *quads,
+	       int nquads,
+	       pixman_region32_t *region,
+	       const struct gl_shader_config *sconf)
+{
+	pixman_box32_t *rects;
+	struct clipper_vertex *positions;
+	uint16_t *indices;
+	int i, j, n, nrects, positions_size, indices_size;
+	int nvtx = 0, nidx = 0;
+
+	/* Build-time sub-mesh constants. Clipping emits 8 vertices max.
+	 * store_indices() stores at most 10 indices. */
+	const int nvtx_max = 8;
+	const int nidx_max = 10;
+
+	rects = pixman_region32_rectangles(region, &nrects);
+	assert((nrects > 0) && (nquads > 0));
+
+	/* Worst case allocation sizes per sub-mesh. */
+	n = nquads * nrects;
+	positions_size = n * nvtx_max * sizeof *positions;
+	indices_size = ROUND_UP_N(n * nidx_max * sizeof *indices, 32);
+
+	positions = wl_array_add(&gr->position_stream, positions_size);
+	indices = wl_array_add(&gr->indices, indices_size);
+
+	/* A node's damage mesh is created by clipping damage quads to surface
+	 * rects and by chaining the resulting sub-meshes into an indexed
+	 * triangle strip. Damage quads are transformed to surface space in a
+	 * prior pass for clipping to take place there. A surface rect is always
+	 * axis-aligned in surface space. In the common (and fast) case, a
+	 * damage quad is axis-aligned and clipping generates an axis-aligned
+	 * rectangle. When a damage quad isn't axis-aligned, clipping generates
+	 * a convex [3,8]-gon. No vertices are generated if the intersection is
+	 * empty.
+	 *
+	 *   0 -------- 1        Clipped vertices are emitted using quads'
+	 *   !     _.-'/ '.      clockwise winding order. Sub-meshes are then
+	 *   ! _.-'   /    '.    triangulated by zigzagging between the first
+	 *   5       /       2   and last emitted vertices, ending up with a
+	 *    '.    /    _.-'!   counter-clockwise winding order.
+	 *      '. / _.-'    !
+	 *        4 -------- 3   Triangle strip: 0, 5, 1, 4, 2, 3.
+	 */
+	for (i = 0; i < nquads; i++) {
+		for (j = 0; j < nrects; j++) {
+			n = clipper_quad_clip_box32(&quads[i], &rects[j],
+						    &positions[nvtx]);
+			nidx += store_indices(n, nvtx, &indices[nidx]);
+			nvtx += n;
+
+			/* Highly unlikely flush to prevent index wraparound.
+			 * Subtracting 2 removes the last chaining indices. */
+			if ((nvtx + nvtx_max) > UINT16_MAX) {
+				draw_mesh(gr, pnode, sconf, positions, indices,
+					  nidx - 2);
+				nvtx = nidx = 0;
+			}
+		}
+	}
+
+	if (nvtx)
+		draw_mesh(gr, pnode, sconf, positions, indices, nidx - 2);
+
+	gr->position_stream.size = 0;
+	gr->indices.size = 0;
 }
 
 static void
@@ -4043,8 +4009,8 @@ gl_renderer_destroy(struct weston_compositor *ec)
 	eglTerminate(gr->egl_display);
 	eglReleaseThread();
 
-	wl_array_release(&gr->vertices);
-	wl_array_release(&gr->vtxcnt);
+	wl_array_release(&gr->position_stream);
+	wl_array_release(&gr->indices);
 
 	if (gr->fragment_binding)
 		weston_binding_destroy(gr->fragment_binding);
