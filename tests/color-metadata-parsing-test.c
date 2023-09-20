@@ -46,6 +46,7 @@ fixture_setup(struct weston_test_harness *harness)
 			 cfgln("[output]"),
 			 cfgln("name=headless"),
 			 cfgln("color_characteristics=my-awesome-color"),
+			 cfgln("colorimetry-mode=bt2020rgb"),
 			 cfgln("eotf-mode=st2084"),
 
 			 cfgln("[color_characteristics]"),
@@ -74,6 +75,7 @@ PLUGIN_TEST(color_characteristics_from_weston_ini)
 	struct weston_output *output = NULL;
 	struct weston_output *it;
 	enum weston_eotf_mode mode;
+	enum weston_colorimetry_mode colorimetry_mode;
 	const struct weston_color_characteristics *cc;
 	const struct weston_hdr_metadata_type1 *hdr_meta;
 
@@ -88,6 +90,9 @@ PLUGIN_TEST(color_characteristics_from_weston_ini)
 
 	mode = weston_output_get_eotf_mode(output);
 	assert(mode == WESTON_EOTF_MODE_ST2084);
+
+	colorimetry_mode = weston_output_get_colorimetry_mode(output);
+	assert(colorimetry_mode == WESTON_COLORIMETRY_MODE_BT2020_RGB);
 
 	cc = weston_output_get_color_characteristics(output);
 	assert(cc->group_mask == WESTON_COLOR_CHARACTERISTICS_GROUP_ALL_MASK);
