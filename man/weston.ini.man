@@ -596,6 +596,36 @@ A comma separated list of the IDs of applications to place on this output.
 These IDs should match the application IDs as set with the xdg_shell.set_app_id
 request. Currently, this option is supported by kiosk-shell.
 .TP 7
+.BI "colorimetry-mode=" default
+Sets the colorimetry mode on the output. The colorimetry mode together with
+the EOTF mode below define the color encoding used in the video signal. The
+colorimetry mode is used for choosing between the default sink defined
+colorimetry (intended to be described by EDID), and standardised other
+encodings that support wide color gamut (WCG).
+
+The display driver, the graphics card, and the video sink (monitor) need to
+support the chosen mode, otherwise the result is undefined or fails.
+
+The mode can be one of the following strings:
+.PP
+.RS 10
+.nf
+.BR  "default              " "default (RGB) colorimetry, video sink dependant"
+.BR  "bt2020cycc           " "Rec. ITU-R BT.2020 constant luminance YCbCr"
+.BR  "bt2020ycc            " "Rec. ITU-R BT.2020 non-constant luminance YCbCr"
+.BR  "bt2020rgb            " "Rec. ITU-R BT.2020 RGB"
+.BR  "p3d65                " "SMPTE ST 2113 DCI-P3 RGB D65"
+.BR  "p3dci                " "SMPTE ST 2113 DCI-P3 RGB Theater"
+.BR  "ictcp                " "Rec. ITU-R BT.2100 ICtCp"
+.fi
+.RE
+.IP
+Defaults to
+.BR default ". Non-default modes require " "color-management=true" .
+
+Note: The operating system might not honor the choice between RGB and YCbCr,
+that may be picked by a Linux display driver automatically.
+.TP 7
 .BI "eotf-mode=" sdr
 Sets the EOTF mode on the output. This is used for choosing between standard
 dynamic range (SDR) mode and the various high dynamic range (HDR) modes. The

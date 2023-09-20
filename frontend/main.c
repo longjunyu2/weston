@@ -1473,6 +1473,79 @@ wet_output_set_eotf_mode(struct weston_output *output,
 	return 0;
 }
 
+static int
+wet_output_set_colorimetry_mode(struct weston_output *output,
+				struct weston_config_section *section,
+				bool have_color_manager)
+{
+	static const struct {
+		const char *name;
+		enum weston_colorimetry_mode cmode;
+	} modes[] = {
+		{ "default",	WESTON_COLORIMETRY_MODE_DEFAULT },
+		{ "bt2020cycc",	WESTON_COLORIMETRY_MODE_BT2020_CYCC },
+		{ "bt2020ycc",	WESTON_COLORIMETRY_MODE_BT2020_YCC },
+		{ "bt2020rgb",	WESTON_COLORIMETRY_MODE_BT2020_RGB },
+		{ "p3d65",	WESTON_COLORIMETRY_MODE_P3D65 },
+		{ "p3dci",	WESTON_COLORIMETRY_MODE_P3DCI },
+		{ "ictcp",	WESTON_COLORIMETRY_MODE_ICTCP },
+	};
+	enum weston_colorimetry_mode cmode = WESTON_COLORIMETRY_MODE_DEFAULT;
+	char *str = NULL;
+	unsigned i;
+
+	if (section) {
+		weston_config_section_get_string(section, "colorimetry-mode",
+						 &str, NULL);
+	}
+
+	if (!str) {
+		/* The default RGB mode is always supported. */
+		assert(weston_output_get_supported_colorimetry_modes(output) & cmode);
+		weston_output_set_colorimetry_mode(output, cmode);
+		return 0;
+	}
+
+	for (i = 0; i < ARRAY_LENGTH(modes); i++)
+		if (strcmp(str, modes[i].name) == 0)
+			break;
+
+	if (i == ARRAY_LENGTH(modes)) {
+		weston_log("Error in config for output '%s': '%s' is not a valid colorimetry mode. Try one of:",
+			   output->name, str);
+		for (i = 0; i < ARRAY_LENGTH(modes); i++)
+			weston_log_continue(" %s", modes[i].name);
+		weston_log_continue("\n");
+		free(str);
+		return -1;
+	}
+	cmode = modes[i].cmode;
+
+	if ((weston_output_get_supported_colorimetry_modes(output) & cmode) == 0) {
+		weston_log("Error: output '%s' does not support colorimetry mode %s.\n",
+			   output->name, str);
+#if !HAVE_LIBDISPLAY_INFO
+		weston_log_continue(STAMP_SPACE "Weston was built without libdisplay-info, "
+				    "so colorimetry capabilities cannot be detected.\n");
+#endif
+		free(str);
+		return -1;
+	}
+
+	if (cmode != WESTON_COLORIMETRY_MODE_DEFAULT &&
+	    !have_color_manager) {
+		weston_log("Error: Colorimetry mode %s on output '%s' requires color-management=true in weston.ini\n",
+			   str, output->name);
+		free(str);
+		return -1;
+	}
+
+	weston_output_set_colorimetry_mode(output, cmode);
+
+	free(str);
+	return 0;
+}
+
 struct wet_color_characteristics_keys {
 	const char *name;
 	enum weston_color_characteristics_groups group;
@@ -2213,6 +2286,8 @@ drm_backend_output_configure(struct weston_output *output,
 	allow_content_protection(output, section);
 
 	if (wet_output_set_eotf_mode(output, section, wet->use_color_manager) < 0)
+		return -1;
+	if (wet_output_set_colorimetry_mode(output, section, wet->use_color_manager) < 0)
 		return -1;
 
 	if (wet_output_set_color_characteristics(output,
@@ -3127,6 +3202,8 @@ headless_backend_output_configure(struct weston_output *output)
 
 	section = weston_config_get_section(wc, "output", "name", output->name);
 	if (wet_output_set_eotf_mode(output, section, wet->use_color_manager) < 0)
+		return -1;
+	if (wet_output_set_colorimetry_mode(output, section, wet->use_color_manager) < 0)
 		return -1;
 
 	if (wet_output_set_color_characteristics(output, wc, section) < 0)
