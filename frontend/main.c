@@ -1406,7 +1406,8 @@ wet_output_set_color_profile(struct weston_output *output,
 
 static int
 wet_output_set_eotf_mode(struct weston_output *output,
-			 struct weston_config_section *section)
+			 struct weston_config_section *section,
+			 bool have_color_manager)
 {
 	static const struct {
 		const char *name;
@@ -1417,12 +1418,9 @@ wet_output_set_eotf_mode(struct weston_output *output,
 		{ "st2084",	WESTON_EOTF_MODE_ST2084 },
 		{ "hlg",	WESTON_EOTF_MODE_HLG },
 	};
-	struct wet_compositor *compositor;
 	enum weston_eotf_mode eotf_mode = WESTON_EOTF_MODE_SDR;
 	char *str = NULL;
 	unsigned i;
-
-	compositor = to_wet_compositor(output->compositor);
 
 	if (section) {
 		weston_config_section_get_string(section, "eotf-mode",
@@ -1461,8 +1459,7 @@ wet_output_set_eotf_mode(struct weston_output *output,
 		return -1;
 	}
 
-	if (eotf_mode != WESTON_EOTF_MODE_SDR &&
-	    !compositor->use_color_manager) {
+	if (eotf_mode != WESTON_EOTF_MODE_SDR && !have_color_manager) {
 		weston_log("Error: EOTF mode %s on output '%s' requires color-management=true in weston.ini\n",
 			   str, output->name);
 		free(str);
@@ -2214,7 +2211,7 @@ drm_backend_output_configure(struct weston_output *output,
 
 	allow_content_protection(output, section);
 
-	if (wet_output_set_eotf_mode(output, section) < 0)
+	if (wet_output_set_eotf_mode(output, section, wet->use_color_manager) < 0)
 		return -1;
 
 	if (wet_output_set_color_characteristics(output,
@@ -3123,11 +3120,12 @@ headless_backend_output_configure(struct weston_output *output)
 		.scale = 1,
 		.transform = WL_OUTPUT_TRANSFORM_NORMAL
 	};
-	struct weston_config *wc = wet_get_config(output->compositor);
+	struct wet_compositor *wet = to_wet_compositor(output->compositor);
+	struct weston_config *wc = wet->config;
 	struct weston_config_section *section;
 
 	section = weston_config_get_section(wc, "output", "name", output->name);
-	if (wet_output_set_eotf_mode(output, section) < 0)
+	if (wet_output_set_eotf_mode(output, section, wet->use_color_manager) < 0)
 		return -1;
 
 	if (wet_output_set_color_characteristics(output, wc, section) < 0)
