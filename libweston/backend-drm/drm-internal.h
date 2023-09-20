@@ -548,6 +548,7 @@ struct drm_output {
 	uint64_t ackd_color_outcome_serial;
 
 	unsigned max_bpc;
+	enum wdrm_colorspace connector_colorspace;
 
 	bool deprecated_gamma_is_set;
 	bool legacy_gamma_not_supported;
@@ -766,6 +767,9 @@ drm_output_set_cursor_view(struct drm_output *output, struct weston_view *ev);
 
 int
 drm_output_ensure_hdr_output_metadata_blob(struct drm_output *output);
+
+enum wdrm_colorspace
+wdrm_colorspace_from_output(struct weston_output *output);
 
 #ifdef BUILD_DRM_GBM
 extern struct drm_fb *

@@ -2259,6 +2259,10 @@ drm_output_enable(struct weston_output *base)
 			output->format = b->format;
 	}
 
+	output->connector_colorspace = wdrm_colorspace_from_output(&output->base);
+	if (output->connector_colorspace == WDRM_COLORSPACE__COUNT)
+		return -1;
+
 	ret = drm_output_attach_crtc(output);
 	if (ret < 0)
 		return -1;

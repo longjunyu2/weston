@@ -1168,6 +1168,32 @@ drm_connector_set_content_type(struct drm_connector *connector,
 }
 
 static int
+drm_connector_set_colorspace(struct drm_connector *connector,
+			     enum wdrm_colorspace colorspace,
+			     drmModeAtomicReq *req)
+{
+	const struct drm_property_info *info;
+	const struct drm_property_enum_info *enum_info;
+
+	assert(colorspace >= 0);
+	assert(colorspace < WDRM_COLORSPACE__COUNT);
+
+	if (!drm_connector_has_prop(connector, WDRM_CONNECTOR_COLORSPACE)) {
+		if (colorspace == WDRM_COLORSPACE_DEFAULT)
+			return 0;
+
+		return -1;
+	}
+
+	info = &connector->props[WDRM_CONNECTOR_COLORSPACE];
+	enum_info = &info->enum_values[colorspace];
+	assert(enum_info->valid);
+
+	return connector_add_prop(req, connector,
+				  WDRM_CONNECTOR_COLORSPACE, enum_info->value);
+}
+
+static int
 drm_output_apply_state_atomic(struct drm_output_state *state,
 			      drmModeAtomicReq *req,
 			      uint32_t *flags)
@@ -1276,6 +1302,8 @@ drm_output_apply_state_atomic(struct drm_output_state *state,
 		}
 
 		ret |= drm_connector_set_max_bpc(&head->connector, output, req);
+		ret |= drm_connector_set_colorspace(&head->connector,
+						    output->connector_colorspace, req);
 	}
 
 	if (ret != 0) {

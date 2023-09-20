@@ -176,3 +176,20 @@ drm_output_ensure_hdr_output_metadata_blob(struct drm_output *output)
 
 	return 0;
 }
+
+enum wdrm_colorspace
+wdrm_colorspace_from_output(struct weston_output *output)
+{
+	enum weston_colorimetry_mode cmode = output->colorimetry_mode;
+	const struct weston_colorimetry_mode_info *cm;
+
+	cm = weston_colorimetry_mode_info_get(cmode);
+	if (!(weston_output_get_supported_colorimetry_modes(output) & cmode) ||
+	    !cm || cm->wdrm == WDRM_COLORSPACE__COUNT) {
+		weston_log("Error: DRM output '%s' does not support colorimetry mode %s.",
+			   output->name, weston_colorimetry_mode_to_str(cmode));
+		return WDRM_COLORSPACE__COUNT;
+	}
+
+	return cm->wdrm;
+}
