@@ -40,3 +40,13 @@ int
 wet_output_set_color_characteristics(struct weston_output *output,
 				     struct weston_config *wc,
 				     struct weston_config_section *section);
+
+int
+wet_output_set_eotf_mode(struct weston_output *output,
+			 struct weston_config_section *section,
+			 bool have_color_manager);
+
+int
+wet_output_set_colorimetry_mode(struct weston_output *output,
+				struct weston_config_section *section,
+				bool have_color_manager);

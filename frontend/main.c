@@ -1404,7 +1404,7 @@ wet_output_set_color_profile(struct weston_output *output,
 	return ok ? 0 : -1;
 }
 
-static int
+WESTON_EXPORT_FOR_TESTS int
 wet_output_set_eotf_mode(struct weston_output *output,
 			 struct weston_config_section *section,
 			 bool have_color_manager)
@@ -1473,7 +1473,7 @@ wet_output_set_eotf_mode(struct weston_output *output,
 	return 0;
 }
 
-static int
+WESTON_EXPORT_FOR_TESTS int
 wet_output_set_colorimetry_mode(struct weston_output *output,
 				struct weston_config_section *section,
 				bool have_color_manager)
