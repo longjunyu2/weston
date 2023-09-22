@@ -4412,7 +4412,7 @@ gl_renderer_allocator_destroy(struct dmabuf_allocator *allocator)
 	if (!allocator)
 		return;
 
-	if (allocator->gbm_device)
+	if (allocator->gbm_device && allocator->has_own_device)
 		gbm_device_destroy(allocator->gbm_device);
 
 	free(allocator);
@@ -4424,16 +4424,21 @@ gl_renderer_allocator_create(struct gl_renderer *gr,
 {
 	struct dmabuf_allocator *allocator;
 	struct gbm_device *gbm = NULL;
+	bool has_own_device = false;
 
-	if (gr->drm_device) {
+	if (options->egl_platform == EGL_PLATFORM_GBM_KHR)
+		gbm = options->egl_native_display;
+	if (!gbm && gr->drm_device) {
 		int fd = open(gr->drm_device, O_RDWR);
 		gbm = gbm_create_device(fd);
+		has_own_device = true;
 	}
 	if (!gbm)
 		return NULL;
 
 	allocator = xzalloc(sizeof(*allocator));
 	allocator->gbm_device = gbm;
+	allocator->has_own_device = has_own_device;
 
 	return allocator;
 }
