@@ -100,6 +100,7 @@ struct pipewire_head {
 
 struct pipewire_frame_data {
 	struct weston_renderbuffer *renderbuffer;
+	struct pipewire_memfd *memfd;
 };
 
 /* Pipewire default configuration for heads */
@@ -257,7 +258,7 @@ pipewire_output_connect(struct pipewire_output *output)
 
 	ret = pw_stream_connect(output->stream, PW_DIRECTION_OUTPUT, PW_ID_ANY,
 				PW_STREAM_FLAG_DRIVER |
-				PW_STREAM_FLAG_MAP_BUFFERS,
+				PW_STREAM_FLAG_ALLOC_BUFFERS,
 				params, i);
 	if (ret != 0) {
 		weston_log("Failed to connect PipeWire stream: %s",
@@ -460,6 +461,7 @@ pipewire_output_stream_param_changed(void *data, uint32_t id,
 		SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 	const struct spa_pod *params[2];
 	struct spa_video_info video_info;
+	uint32_t buffertype;
 	int32_t width;
 	int32_t height;
 	int32_t stride;
@@ -477,13 +479,17 @@ pipewire_output_stream_param_changed(void *data, uint32_t id,
 
 	spa_format_video_raw_parse(format, &video_info.info.raw);
 
-	pipewire_output_debug(output, "param changed: %dx%d@(%d/%d) (%s)",
+	buffertype = SPA_DATA_MemFd;
+
+	pipewire_output_debug(output, "param changed: %dx%d@(%d/%d) (%s) (%s)",
 			      video_info.info.raw.size.width,
 			      video_info.info.raw.size.height,
 			      video_info.info.raw.max_framerate.num,
 			      video_info.info.raw.max_framerate.denom,
 			      spa_debug_type_find_short_name(spa_type_video_format,
-				      video_info.info.raw.format));
+				      video_info.info.raw.format),
+			      spa_debug_type_find_short_name(spa_type_data_type,
+				      buffertype));
 
 	width = video_info.info.raw.size.width;
 	height = video_info.info.raw.size.height;
@@ -494,7 +500,8 @@ pipewire_output_stream_param_changed(void *data, uint32_t id,
 		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
 		SPA_PARAM_BUFFERS_size, SPA_POD_Int(size),
 		SPA_PARAM_BUFFERS_stride, SPA_POD_Int(stride),
-		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(4, 2, 8));
+		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(4, 2, 8),
+		SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int(1u << buffertype));
 
 	params[1] = spa_pod_builder_add_object(&builder,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
@@ -551,17 +558,96 @@ pipewire_output_stream_add_buffer_gl(struct pipewire_output *output,
 					format, width, height, ptr);
 }
 
+struct pipewire_memfd {
+	int fd;
+	unsigned int size;
+};
+
+static struct pipewire_memfd *
+pipewire_output_create_memfd(struct pipewire_output *output)
+{
+	struct pipewire_memfd *memfd;
+	const struct pixel_format_info *format;
+	unsigned int width;
+	unsigned int height;
+	unsigned int stride;
+	size_t size;
+	int fd;
+
+	memfd = xzalloc(sizeof *memfd);
+
+	format = output->pixel_format;
+	width = output->base.width;
+	height = output->base.height;
+	stride = width * format->bpp / 8;
+	size = height * stride;
+
+	fd = memfd_create("weston-pipewire", MFD_CLOEXEC);
+	if (fd == -1)
+		return NULL;
+	if (ftruncate(fd, size) == -1)
+		return NULL;
+
+	memfd->fd = fd;
+	memfd->size = size;
+
+	return memfd;
+}
+
+static void
+pipewire_destroy_memfd(struct pipewire_output *output,
+			struct pipewire_memfd *memfd)
+{
+	close(memfd->fd);
+	free(memfd);
+}
+
+static void
+pipewire_output_setup_memfd(struct pipewire_output *output,
+			    struct pw_buffer *buffer,
+			    struct pipewire_memfd *memfd)
+{
+	struct spa_buffer *buf = buffer->buffer;
+	struct spa_data *d = buf->datas;
+
+	d[0].type = SPA_DATA_MemFd;
+	d[0].flags = SPA_DATA_FLAG_READWRITE;
+	d[0].fd = memfd->fd;
+	d[0].mapoffset = 0;
+	d[0].maxsize = memfd->size;
+	d[0].data = mmap(NULL, d[0].maxsize,
+			 PROT_READ|PROT_WRITE, MAP_SHARED,
+			 d[0].fd, d[0].mapoffset);
+	buf->n_datas = 1;
+}
+
 static void
 pipewire_output_stream_add_buffer(void *data, struct pw_buffer *buffer)
 {
 	struct pipewire_output *output = data;
 	struct weston_renderer *renderer = output->base.compositor->renderer;
+	struct spa_buffer *buf = buffer->buffer;
+	struct spa_data *d = buf->datas;
+	unsigned int buffertype = d[0].type;
 	struct pipewire_frame_data *frame_data;
 
 	pipewire_output_debug(output, "add buffer: %p", buffer);
 
 	frame_data = xzalloc(sizeof *frame_data);
 	buffer->user_data = frame_data;
+
+	if (buffertype & (1u << SPA_DATA_MemFd)) {
+		struct pipewire_memfd *memfd;
+
+		memfd = pipewire_output_create_memfd(output);
+		if (!memfd) {
+			pw_stream_set_error(output->stream, -ENOMEM,
+					    "failed to allocate MemFd buffer");
+			return;
+		}
+		pipewire_output_setup_memfd(output, buffer, memfd);
+		frame_data->memfd = memfd;
+	}
 
 	switch (renderer->type) {
 	case WESTON_RENDERER_PIXMAN:
@@ -580,8 +666,15 @@ pipewire_output_stream_remove_buffer(void *data, struct pw_buffer *buffer)
 {
 	struct pipewire_output *output = data;
 	struct pipewire_frame_data *frame_data = buffer->user_data;
+	struct spa_buffer *buf = buffer->buffer;
+	struct spa_data *d = buf->datas;
 
 	pipewire_output_debug(output, "remove buffer: %p", buffer);
+
+	if (frame_data->memfd) {
+		munmap(d[0].data, d[0].maxsize);
+		pipewire_destroy_memfd(output, frame_data->memfd);
+	}
 
 	if (frame_data->renderbuffer)
 		weston_renderbuffer_unref(frame_data->renderbuffer);
