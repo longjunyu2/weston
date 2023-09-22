@@ -3979,14 +3979,19 @@ gl_renderer_output_set_border(struct weston_output *output,
 }
 
 static void
+gl_renderer_remove_renderbuffer(struct gl_renderbuffer *renderbuffer)
+{
+	wl_list_remove(&renderbuffer->link);
+	weston_renderbuffer_unref(&renderbuffer->base);
+}
+
+static void
 gl_renderer_remove_renderbuffers(struct gl_output_state *go)
 {
 	struct gl_renderbuffer *renderbuffer, *tmp;
 
-	wl_list_for_each_safe(renderbuffer, tmp, &go->renderbuffer_list, link) {
-		wl_list_remove(&renderbuffer->link);
-		weston_renderbuffer_unref(&renderbuffer->base);
-	}
+	wl_list_for_each_safe(renderbuffer, tmp, &go->renderbuffer_list, link)
+		gl_renderer_remove_renderbuffer(renderbuffer);
 }
 
 static bool
