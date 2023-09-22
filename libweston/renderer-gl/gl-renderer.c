@@ -31,6 +31,7 @@
 #include <GLES2/gl2ext.h>
 #include <GLES3/gl3.h>
 
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -41,6 +42,8 @@
 #include <assert.h>
 #include <linux/input.h>
 #include <unistd.h>
+
+#include <gbm.h>
 
 #include "linux-sync-file.h"
 #include "timeline.h"
@@ -146,6 +149,17 @@ struct gl_capture_task {
 	bool reverse;
 	EGLSyncKHR sync;
 	int fd;
+};
+
+struct dmabuf_allocator {
+	struct gbm_device *gbm_device;
+	bool has_own_device;
+};
+
+struct gl_renderer_dmabuf_memory {
+	struct linux_dmabuf_memory base;
+	struct dmabuf_allocator *allocator;
+	struct gbm_bo *bo;
 };
 
 struct dmabuf_renderbuffer {
@@ -4266,6 +4280,83 @@ gl_renderer_remove_renderbuffer_dmabuf(struct weston_output *output,
 }
 
 static void
+gl_renderer_dmabuf_destroy(struct linux_dmabuf_memory *dmabuf)
+{
+	struct gl_renderer_dmabuf_memory *gl_renderer_dmabuf;
+	struct dmabuf_attributes *attributes;
+	int i;
+
+	gl_renderer_dmabuf = (struct gl_renderer_dmabuf_memory *)dmabuf;
+
+	attributes = dmabuf->attributes;
+	for (i = 0; i < attributes->n_planes; ++i)
+		close(attributes->fd[i]);
+	free(dmabuf->attributes);
+
+	gbm_bo_destroy(gl_renderer_dmabuf->bo);
+	free(gl_renderer_dmabuf);
+}
+
+static struct linux_dmabuf_memory *
+gl_renderer_dmabuf_alloc(struct weston_renderer *renderer,
+			 unsigned int width, unsigned int height,
+			 uint32_t format,
+			 const uint64_t *modifiers, const unsigned int count)
+{
+	struct gl_renderer *gr = (struct gl_renderer *)renderer;
+	struct dmabuf_allocator *allocator = gr->allocator;
+	struct gl_renderer_dmabuf_memory *gl_renderer_dmabuf;
+	struct linux_dmabuf_memory *dmabuf;
+	struct dmabuf_attributes *attributes;
+	struct gbm_bo *bo;
+	int i;
+
+	if (!allocator)
+		return NULL;
+
+#ifdef HAVE_GBM_BO_CREATE_WITH_MODIFIERS2
+	bo = gbm_bo_create_with_modifiers2(allocator->gbm_device,
+					   width, height, format,
+					   modifiers, count,
+					   GBM_BO_USE_RENDERING);
+#else
+	bo = gbm_bo_create_with_modifiers(allocator->gbm_device,
+					  width, height, format,
+					  modifiers, count);
+#endif
+	if (!bo)
+		bo = gbm_bo_create(allocator->gbm_device,
+				   width, height, format,
+				   GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+	if (!bo) {
+		weston_log("failed to create gbm_bo\n");
+		return NULL;
+	}
+
+	gl_renderer_dmabuf = xzalloc(sizeof(*gl_renderer_dmabuf));
+	gl_renderer_dmabuf->bo = bo;
+	gl_renderer_dmabuf->allocator = allocator;
+
+	attributes = xzalloc(sizeof(*attributes));
+	attributes->width = width;
+	attributes->height = height;
+	attributes->format = format;
+	attributes->n_planes = gbm_bo_get_plane_count(bo);
+	for (i = 0; i < attributes->n_planes; ++i) {
+		attributes->fd[i] = gbm_bo_get_fd(bo);
+		attributes->stride[i] = gbm_bo_get_stride_for_plane(bo, i);
+		attributes->offset[i] = gbm_bo_get_offset(bo, i);
+	}
+	attributes->modifier = gbm_bo_get_modifier(bo);
+
+	dmabuf = &gl_renderer_dmabuf->base;
+	dmabuf->attributes = attributes;
+	dmabuf->destroy = gl_renderer_dmabuf_destroy;
+
+	return dmabuf;
+}
+
+static void
 gl_renderer_output_destroy(struct weston_output *output)
 {
 	struct gl_renderer *gr = get_renderer(output->compositor);
@@ -4316,6 +4407,38 @@ gl_renderer_create_fence_fd(struct weston_output *output)
 }
 
 static void
+gl_renderer_allocator_destroy(struct dmabuf_allocator *allocator)
+{
+	if (!allocator)
+		return;
+
+	if (allocator->gbm_device)
+		gbm_device_destroy(allocator->gbm_device);
+
+	free(allocator);
+}
+
+static struct dmabuf_allocator *
+gl_renderer_allocator_create(struct gl_renderer *gr,
+			     const struct gl_renderer_display_options * options)
+{
+	struct dmabuf_allocator *allocator;
+	struct gbm_device *gbm = NULL;
+
+	if (gr->drm_device) {
+		int fd = open(gr->drm_device, O_RDWR);
+		gbm = gbm_create_device(fd);
+	}
+	if (!gbm)
+		return NULL;
+
+	allocator = xzalloc(sizeof(*allocator));
+	allocator->gbm_device = gbm;
+
+	return allocator;
+}
+
+static void
 gl_renderer_destroy(struct weston_compositor *ec)
 {
 	struct gl_renderer *gr = get_renderer(ec);
@@ -4346,6 +4469,8 @@ gl_renderer_destroy(struct weston_compositor *ec)
 		dmabuf_format_destroy(format);
 
 	weston_drm_format_array_fini(&gr->supported_formats);
+
+	gl_renderer_allocator_destroy(gr->allocator);
 
 	eglTerminate(gr->egl_display);
 	eglReleaseThread();
@@ -4436,6 +4561,10 @@ gl_renderer_display_create(struct weston_compositor *ec,
 	if (gl_renderer_setup_egl_display(gr, options->egl_native_display) < 0)
 		goto fail;
 
+	gr->allocator = gl_renderer_allocator_create(gr, options);
+	if (!gr->allocator)
+		weston_log("failed to initialize allocator\n");
+
 	weston_drm_format_array_init(&gr->supported_formats);
 
 	log_egl_info(gr, gr->egl_display);
@@ -4470,6 +4599,9 @@ gl_renderer_display_create(struct weston_compositor *ec,
 	ec->capabilities |= WESTON_CAP_VIEW_CLIP_MASK;
 	if (gr->has_native_fence_sync && gr->has_wait_sync)
 		ec->capabilities |= WESTON_CAP_EXPLICIT_SYNC;
+
+	if (gr->allocator)
+		gr->base.dmabuf_alloc = gl_renderer_dmabuf_alloc;
 
 	if (gr->has_dmabuf_import) {
 		gr->base.import_dmabuf = gl_renderer_import_dmabuf;

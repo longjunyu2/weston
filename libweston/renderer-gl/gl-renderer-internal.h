@@ -113,6 +113,7 @@ static_assert(sizeof(struct gl_shader_requirements) ==
 
 struct gl_shader;
 struct weston_color_transform;
+struct dmabuf_allocator;
 
 #define GL_SHADER_INPUT_TEX_MAX 3
 #define GL_SHADER_WIREFRAME_TEX_UNIT GL_SHADER_INPUT_TEX_MAX
@@ -276,6 +277,8 @@ struct gl_renderer {
 	 */
 	struct wl_list shader_list;
 	struct weston_log_scope *shader_scope;
+
+	struct dmabuf_allocator *allocator;
 };
 
 static inline struct gl_renderer *

@@ -142,6 +142,26 @@ struct weston_renderer {
 	void (*remove_renderbuffer_dmabuf)(struct weston_output *output,
 					   struct weston_renderbuffer *renderbuffer);
 
+	/* Allocate a DMABUF that can be imported as renderbuffer
+	 *
+	 * \param renderer The renderer that allocated the DMABUF
+	 * \param width The width of the allocated DMABUF
+	 * \param height The height of the allocated DMABUF
+	 * \param format The pixel format of the allocated DMABUF
+	 * \param modifiers The suggested modifiers for the allocated DMABUF
+	 * \param count The number of suggested modifiers for the allocated DMABUF
+	 * \return A linux_dmabuf_memory object that may be imported as renderbuffer
+	 *
+	 * Request a DMABUF from the renderer. The returned DMABUF can be
+	 * imported into the renderer as a renderbuffer and exported to other
+	 * processes.
+	 */
+	struct linux_dmabuf_memory *
+			(*dmabuf_alloc)(struct weston_renderer *renderer,
+					unsigned int width, unsigned int height,
+					uint32_t format,
+					const uint64_t *modifiers, unsigned int count);
+
 	enum weston_renderer_type type;
 	const struct gl_renderer_interface *gl;
 	const struct pixman_renderer_interface *pixman;
