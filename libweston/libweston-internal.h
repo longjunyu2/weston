@@ -62,6 +62,12 @@ weston_renderbuffer_unref(struct weston_renderbuffer *renderbuffer);
 struct weston_renderer_options {
 };
 
+struct linux_dmabuf_memory {
+	struct dmabuf_attributes *attributes;
+
+	void (*destroy)(struct linux_dmabuf_memory *dmabuf);
+};
+
 struct weston_renderer {
 	int (*read_pixels)(struct weston_output *output,
 			   const struct pixel_format_info *format, void *pixels,
@@ -101,6 +107,40 @@ struct weston_renderer {
 
 	void (*buffer_init)(struct weston_compositor *ec,
 			    struct weston_buffer *buffer);
+
+	/**
+	 * Add DMABUF as renderbuffer to the output
+	 *
+	 * \param output The output to add the DMABUF renderbuffer for.
+	 * \param dmabuf The description object of the DMABUF to import.
+	 * \return A weston_renderbuffer on success, NULL on failure.
+	 *
+	 * This function imports the DMABUF memory as renderbuffer and adds
+	 * it to the output. The returned weston_renderbuffer can be passed to
+	 * repaint_output() to render into the DMABUF.
+	 *
+	 * The ownership of the linux_dmabuf_memory is transferred to the
+	 * returned weston_renderbuffer. The linux_dmabuf_memory will be
+	 * destroyed automatically when the weston_renderbuffer is destroyed.
+	 */
+	struct weston_renderbuffer *
+			(*create_renderbuffer_dmabuf)(struct weston_output *output,
+						      struct linux_dmabuf_memory *dmabuf);
+
+	/**
+	 * Remove the DAMBUF renderbuffer from the output
+	 *
+	 * \param output The output to remove a DMABUF renderbuffer from.
+	 * \param renderbuffer The weston_renderbuffer that shall be removed
+	 *
+	 * This function removes the DMABUF renderbuffer from the output.
+	 *
+	 * This allows the backend to signal the renderer that it will no longer
+	 * use the renderbuffer for rendering and the renderer may free the
+	 * resources of the renderbuffer.
+	 */
+	void (*remove_renderbuffer_dmabuf)(struct weston_output *output,
+					   struct weston_renderbuffer *renderbuffer);
 
 	enum weston_renderer_type type;
 	const struct gl_renderer_interface *gl;

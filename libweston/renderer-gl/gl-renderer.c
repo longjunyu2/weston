@@ -148,6 +148,14 @@ struct gl_capture_task {
 	int fd;
 };
 
+struct dmabuf_renderbuffer {
+	struct gl_renderbuffer base;
+	struct gl_renderer *gr;
+	/* The wrapped dmabuf memory */
+	struct linux_dmabuf_memory *dmabuf;
+	EGLImageKHR image;
+};
+
 struct dmabuf_format {
 	uint32_t format;
 	struct wl_list link;
@@ -595,6 +603,12 @@ static inline struct gl_renderbuffer *
 to_gl_renderbuffer(struct weston_renderbuffer *renderbuffer)
 {
 	return container_of(renderbuffer, struct gl_renderbuffer, base);
+}
+
+static inline struct dmabuf_renderbuffer *
+to_dmabuf_renderbuffer(struct gl_renderbuffer *renderbuffer)
+{
+	return container_of(renderbuffer, struct dmabuf_renderbuffer, base);
 }
 
 static void
@@ -4158,6 +4172,100 @@ gl_renderer_output_fbo_create(struct weston_output *output,
 }
 
 static void
+gl_renderer_dmabuf_renderbuffer_destroy(struct weston_renderbuffer *renderbuffer)
+{
+	struct gl_renderbuffer *gl_renderbuffer = to_gl_renderbuffer(renderbuffer);
+	struct dmabuf_renderbuffer *dmabuf_renderbuffer = to_dmabuf_renderbuffer(gl_renderbuffer);
+	struct gl_renderer *gr = dmabuf_renderbuffer->gr;
+
+	glDeleteFramebuffers(1, &gl_renderbuffer->fbo);
+	glDeleteRenderbuffers(1, &gl_renderbuffer->rb);
+	pixman_region32_fini(&gl_renderbuffer->base.damage);
+
+	gr->destroy_image(gr->egl_display, dmabuf_renderbuffer->image);
+
+	/* Destroy the owned dmabuf */
+	dmabuf_renderbuffer->dmabuf->destroy(dmabuf_renderbuffer->dmabuf);
+
+	free(dmabuf_renderbuffer);
+}
+
+static struct weston_renderbuffer *
+gl_renderer_create_renderbuffer_dmabuf(struct weston_output *output,
+				       struct linux_dmabuf_memory *dmabuf)
+{
+	struct gl_renderer *gr = get_renderer(output->compositor);
+	struct gl_output_state *go = get_output_state(output);
+	struct dmabuf_attributes *attributes = dmabuf->attributes;
+	struct dmabuf_renderbuffer *rb;
+	struct gl_renderbuffer *renderbuffer;
+	int fb_status;
+
+	rb = xzalloc(sizeof(*rb));
+	renderbuffer = &rb->base;
+
+	rb->image = import_simple_dmabuf(gr, attributes);
+	if (rb->image == EGL_NO_IMAGE_KHR) {
+		weston_log("Failed to import dmabuf renderbuffer\n");
+		free(rb);
+		return NULL;
+	}
+
+	glGenFramebuffers(1, &renderbuffer->fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, renderbuffer->fbo);
+
+	glGenRenderbuffers(1, &renderbuffer->rb);
+	glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer->rb);
+	gr->image_target_renderbuffer_storage(GL_RENDERBUFFER, rb->image);
+	if (glGetError() == GL_INVALID_OPERATION) {
+		weston_log("Failed to create renderbuffer\n");
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+		glDeleteRenderbuffers(1, &renderbuffer->rb);
+		gr->destroy_image(gr->egl_display, rb->image);
+		free(rb);
+		return NULL;
+	}
+
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				  GL_RENDERBUFFER, renderbuffer->rb);
+
+	fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	if (fb_status != GL_FRAMEBUFFER_COMPLETE) {
+		weston_log("failed to bind renderbuffer to fbo\n");
+		glDeleteFramebuffers(1, &renderbuffer->fbo);
+		glDeleteRenderbuffers(1, &renderbuffer->rb);
+		gr->destroy_image(gr->egl_display, rb->image);
+		free(rb);
+		return NULL;
+	}
+
+	rb->gr = gr;
+	rb->dmabuf = dmabuf;
+
+	pixman_region32_init(&rb->base.base.damage);
+	/*
+	 * One reference is kept on the renderbuffer_list,
+	 * the other is returned to the calling backend.
+	 */
+	rb->base.base.refcount = 2;
+	rb->base.base.destroy = gl_renderer_dmabuf_renderbuffer_destroy;
+	wl_list_insert(&go->renderbuffer_list, &rb->base.link);
+
+	return &rb->base.base;
+}
+
+static void
+gl_renderer_remove_renderbuffer_dmabuf(struct weston_output *output,
+				       struct weston_renderbuffer *renderbuffer)
+{
+	struct gl_renderbuffer *gl_renderbuffer = to_gl_renderbuffer(renderbuffer);
+
+	gl_renderer_remove_renderbuffer(gl_renderbuffer);
+}
+
+static void
 gl_renderer_output_destroy(struct weston_output *output)
 {
 	struct gl_renderer *gr = get_renderer(output->compositor);
@@ -4366,6 +4474,8 @@ gl_renderer_display_create(struct weston_compositor *ec,
 	if (gr->has_dmabuf_import) {
 		gr->base.import_dmabuf = gl_renderer_import_dmabuf;
 		gr->base.get_supported_formats = gl_renderer_get_supported_formats;
+		gr->base.create_renderbuffer_dmabuf = gl_renderer_create_renderbuffer_dmabuf;
+		gr->base.remove_renderbuffer_dmabuf = gl_renderer_remove_renderbuffer_dmabuf;
 		ret = populate_supported_formats(ec, &gr->supported_formats);
 		if (ret < 0)
 			goto fail_terminate;
@@ -4561,6 +4671,9 @@ gl_renderer_setup(struct weston_compositor *ec)
 
 	gr->image_target_texture_2d =
 		(void *) eglGetProcAddress("glEGLImageTargetTexture2DOES");
+
+	gr->image_target_renderbuffer_storage =
+		(void *)eglGetProcAddress("glEGLImageTargetRenderbufferStorageOES");
 
 	extensions = (const char *) glGetString(GL_EXTENSIONS);
 	if (!extensions) {
