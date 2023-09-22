@@ -112,6 +112,8 @@ struct gl_output_state {
 	struct weston_size fb_size; /**< in pixels, including borders */
 	struct weston_geometry area; /**< composited area in pixels inside fb */
 
+	float y_flip;
+
 	EGLSurface egl_surface;
 	struct gl_border_image borders[4];
 	enum gl_border_status border_status;
@@ -285,6 +287,12 @@ static bool
 shadow_exists(const struct gl_output_state *go)
 {
 	return go->shadow.fbo != 0;
+}
+
+static bool
+is_y_flipped(const struct gl_output_state *go)
+{
+	return go->y_flip < 0.0f;
 }
 
 struct yuv_format_descriptor yuv_formats[] = {
@@ -967,7 +975,8 @@ gl_renderer_do_capture_tasks(struct gl_renderer *gr,
 		format = output->compositor->read_format;
 		rect = go->area;
 		/* Because glReadPixels has bottom-left origin */
-		rect.y = go->fb_size.height - go->area.y - go->area.height;
+		if (is_y_flipped(go))
+			rect.y = go->fb_size.height - go->area.y - go->area.height;
 		break;
 	case WESTON_OUTPUT_CAPTURE_SOURCE_FULL_FRAMEBUFFER:
 		format = output->compositor->read_format;
@@ -1194,7 +1203,7 @@ gl_shader_config_init_for_paint_node(struct gl_shader_config *sconf,
 	} else {
 		weston_matrix_scale(&sconf->surface_to_buffer,
 				    1.0f / buffer->width,
-				    -1.0f / buffer->height, 1);
+				    go->y_flip / buffer->height, 1);
 		weston_matrix_translate(&sconf->surface_to_buffer, 0, 1, 0);
 	}
 
@@ -1945,7 +1954,7 @@ draw_output_borders(struct weston_output *output,
 	weston_matrix_translate(&sconf.projection,
 				-fb->width / 2.0, -fb->height / 2.0, 0);
 	weston_matrix_scale(&sconf.projection,
-			    2.0 / fb->width, -2.0 / fb->height, 1);
+			    2.0 / fb->width, go->y_flip * 2.0 / fb->height, 1);
 
 	glActiveTexture(GL_TEXTURE0);
 	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
@@ -2066,14 +2075,14 @@ output_get_dummy_renderbuffer(struct weston_output *output)
  *
  * @param output The output whose co-ordinate space we are after
  * @param global_region The affected region in global co-ordinate space
- * @param[out] rects Y-inverted quads in {x,y,w,h} order; caller must free
+ * @param[out] rects quads in {x,y,w,h} order; caller must free
  * @param[out] nrects Number of quads (4x number of co-ordinates)
  */
 static void
-pixman_region_to_egl_y_invert(struct weston_output *output,
-			      struct pixman_region32 *global_region,
-			      EGLint **rects,
-			      EGLint *nrects)
+pixman_region_to_egl(struct weston_output *output,
+		     struct pixman_region32 *global_region,
+		     EGLint **rects,
+		     EGLint *nrects)
 {
 	struct gl_output_state *go = get_output_state(output);
 	pixman_region32_t transformed;
@@ -2097,15 +2106,17 @@ pixman_region_to_egl_y_invert(struct weston_output *output,
 					 &transformed);
 	}
 
-	/* Convert from a Pixman region into {x,y,w,h} quads, flipping in the
-	 * Y axis to account for GL's lower-left-origin co-ordinate space. */
+	/* Convert from a Pixman region into {x,y,w,h} quads, potentially
+	 * flipping in the Y axis to account for GL's lower-left-origin
+	 * coordinate space if the output uses the GL coordinate space. */
 	box = pixman_region32_rectangles(&transformed, nrects);
 	*rects = malloc(*nrects * 4 * sizeof(EGLint));
 
 	d = *rects;
 	for (i = 0; i < *nrects; ++i) {
 		*d++ = box[i].x1;
-		*d++ = go->fb_size.height - box[i].y2;
+		*d++ = is_y_flipped(go) ?
+		       go->fb_size.height - box[i].y2 : box[i].y1;
 		*d++ = box[i].x2 - box[i].x1;
 		*d++ = box[i].y2 - box[i].y1;
 	}
@@ -2125,10 +2136,10 @@ blit_shadow_to_output(struct weston_output *output,
 		},
 		.projection = {
 			.d = { /* transpose */
-				 2.0f,  0.0f,        0.0f, 0.0f,
-				 0.0f, -1.0f * 2.0f, 0.0f, 0.0f,
-				 0.0f,  0.0f,        1.0f, 0.0f,
-				-1.0f,  1.0f,        0.0f, 1.0f
+				 2.0f,	0.0f,              0.0f, 0.0f,
+				 0.0f,  go->y_flip * 2.0f, 0.0f, 0.0f,
+				 0.0f,  0.0f,              1.0f, 0.0f,
+				-1.0f, -go->y_flip,        0.0f, 1.0f
 			},
 			.type = WESTON_MATRIX_TRANSFORM_SCALE |
 				WESTON_MATRIX_TRANSFORM_TRANSLATE,
@@ -2188,13 +2199,13 @@ blit_shadow_to_output(struct weston_output *output,
 		position[3].y = y2;
 
 		texcoord[0].s = x1;
-		texcoord[0].t = y1_flipped;
+		texcoord[0].t = is_y_flipped(go) ?  y1_flipped : y1;
 		texcoord[1].s = x2;
-		texcoord[1].t = y1_flipped;
+		texcoord[1].t = is_y_flipped(go) ?  y1_flipped : y1;
 		texcoord[2].s = x2;
-		texcoord[2].t = y2_flipped;
+		texcoord[2].t = is_y_flipped(go) ?  y2_flipped : y2;
 		texcoord[3].s = x1;
-		texcoord[3].t = y2_flipped;
+		texcoord[3].t = is_y_flipped(go) ?  y2_flipped : y2;
 
 		glVertexAttribPointer(SHADER_ATTRIB_LOC_POSITION, 2, GL_FLOAT,
 				      GL_FALSE, 0, position);
@@ -2229,8 +2240,8 @@ gl_renderer_repaint_output(struct weston_output *output,
 	struct gl_renderer *gr = get_renderer(compositor);
 	static int errored;
 	struct weston_paint_node *pnode;
-	const int32_t area_inv_y =
-		go->fb_size.height - go->area.y - go->area.height;
+	const int32_t area_y =
+		is_y_flipped(go) ? go->fb_size.height - go->area.height - go->area.y : go->area.y;
 	struct gl_renderbuffer *rb;
 
 	assert(output->from_blend_to_output_by_backend ||
@@ -2273,7 +2284,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 				-(go->area.height / 2.0), 0);
 	weston_matrix_scale(&go->output_matrix,
 			    2.0 / go->area.width,
-			    -2.0 / go->area.height, 1);
+			    go->y_flip * 2.0 / go->area.height, 1);
 
 	/* If using shadow, redirect all drawing to it first. */
 	if (shadow_exists(go)) {
@@ -2281,7 +2292,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 		glViewport(0, 0, go->area.width, go->area.height);
 	} else {
 		glBindFramebuffer(GL_FRAMEBUFFER, rb->fbo);
-		glViewport(go->area.x, area_inv_y,
+		glViewport(go->area.x, area_y,
 			   go->area.width, go->area.height);
 	}
 
@@ -2314,8 +2325,8 @@ gl_renderer_repaint_output(struct weston_output *output,
 		/* For partial_update, we need to pass the region which has
 		 * changed since we last rendered into this specific buffer;
 		 * this is total_damage. */
-		pixman_region_to_egl_y_invert(output, &rb->base.damage,
-					      &egl_rects, &n_egl_rects);
+		pixman_region_to_egl(output, &rb->base.damage,
+				     &egl_rects, &n_egl_rects);
 		gr->set_damage_region(gr->egl_display, go->egl_surface,
 				      egl_rects, n_egl_rects);
 		free(egl_rects);
@@ -2329,7 +2340,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 			repaint_views(output, output_damage);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, rb->fbo);
-		glViewport(go->area.x, area_inv_y,
+		glViewport(go->area.x, area_y,
 			   go->area.width, go->area.height);
 		blit_shadow_to_output(output, &rb->base.damage);
 	} else {
@@ -2360,8 +2371,8 @@ gl_renderer_repaint_output(struct weston_output *output,
 			/* For swap_buffers_with_damage, we need to pass the region
 			 * which has changed since the previous SwapBuffers on this
 			 * surface - this is output_damage. */
-			pixman_region_to_egl_y_invert(output, output_damage,
-						      &egl_rects, &n_egl_rects);
+			pixman_region_to_egl(output, output_damage,
+					     &egl_rects, &n_egl_rects);
 			ret = gr->swap_buffers_with_damage(gr->egl_display,
 							   go->egl_surface,
 							   egl_rects, n_egl_rects);
@@ -2404,10 +2415,10 @@ gl_renderer_repaint_output(struct weston_output *output,
 						       rb->base.damage.extents);
 
 		if (gr->debug_clear) {
-			rect.y = go->fb_size.height - go->area.y - go->area.height;
+			rect.y = go->area.y;
 			rect.height = go->area.height;
 		} else {
-			rect.y = go->fb_size.height - go->area.y - extents.y2;
+			rect.y = go->area.y + extents.y1;
 			rect.height = extents.y2 - extents.y1;
 			pixels += rect.width * extents.y1;
 		}
@@ -4056,6 +4067,7 @@ gl_renderer_output_create(struct weston_output *output,
 		return -1;
 
 	go->egl_surface = surface;
+	go->y_flip = -1.0f;
 
 	if (gr->has_disjoint_timer_query)
 		gr->gen_queries(1, &go->render_query);
