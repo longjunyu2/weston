@@ -201,6 +201,45 @@ spa_video_format_from_drm_fourcc(uint32_t fourcc)
 	}
 }
 
+static struct spa_pod *
+spa_pod_build_format(struct spa_pod_builder *builder,
+		     int width, int height, int framerate,
+		     uint32_t format, uint64_t *modifier)
+{
+	struct spa_pod_frame f;
+
+	spa_pod_builder_push_object(builder, &f,
+				    SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
+	spa_pod_builder_add(builder,
+			    SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video), 0);
+	spa_pod_builder_add(builder,
+			    SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw), 0);
+
+	spa_pod_builder_add(builder,
+			    SPA_FORMAT_VIDEO_format,
+			    SPA_POD_Id(spa_video_format_from_drm_fourcc(format)), 0);
+	if (modifier) {
+		spa_pod_builder_prop(builder,
+				     SPA_FORMAT_VIDEO_modifier, SPA_POD_PROP_FLAG_MANDATORY);
+		spa_pod_builder_long(builder, *modifier);
+	}
+
+	spa_pod_builder_prop(builder, SPA_FORMAT_VIDEO_size, 0);
+	spa_pod_builder_rectangle(builder, width, height);
+
+	spa_pod_builder_add(builder,
+			    SPA_FORMAT_VIDEO_framerate,
+			    SPA_POD_Fraction(&SPA_FRACTION(0, 1)), 0);
+	spa_pod_builder_add(builder,
+			    SPA_FORMAT_VIDEO_maxFramerate,
+			    SPA_POD_CHOICE_RANGE_Fraction(
+				    &SPA_FRACTION(framerate,1),
+				    &SPA_FRACTION(1,1),
+				    &SPA_FRACTION(framerate,1)), 0);
+
+	return spa_pod_builder_pop(builder, &f);
+}
+
 static int
 pipewire_output_connect(struct pipewire_output *output)
 {
@@ -208,34 +247,18 @@ pipewire_output_connect(struct pipewire_output *output)
 	struct spa_pod_builder builder =
 		SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 	const struct spa_pod *params[1];
-	int framerate;
-	int width;
-	int height;
-	enum spa_video_format format;
+	int i = 0;
 	int ret;
 
-	framerate = output->base.current_mode->refresh / 1000;
-	width = output->base.width;
-	height = output->base.height;
-
-	format = spa_video_format_from_drm_fourcc(output->pixel_format->format);
-
-	params[0] = spa_pod_builder_add_object(&builder,
-		SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
-		SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video),
-		SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
-		SPA_FORMAT_VIDEO_format, SPA_POD_Id(format),
-		SPA_FORMAT_VIDEO_size, SPA_POD_Rectangle(&SPA_RECTANGLE(width, height)),
-		SPA_FORMAT_VIDEO_framerate, SPA_POD_Fraction(&SPA_FRACTION (0, 1)),
-		SPA_FORMAT_VIDEO_maxFramerate,
-		SPA_POD_CHOICE_RANGE_Fraction(&SPA_FRACTION(framerate, 1),
-			&SPA_FRACTION(1, 1),
-			&SPA_FRACTION(framerate, 1)));
+	params[i++] = spa_pod_build_format(&builder,
+					   output->base.width, output->base.height,
+					   output->base.current_mode->refresh / 1000,
+					   output->pixel_format->format, NULL);
 
 	ret = pw_stream_connect(output->stream, PW_DIRECTION_OUTPUT, PW_ID_ANY,
 				PW_STREAM_FLAG_DRIVER |
 				PW_STREAM_FLAG_MAP_BUFFERS,
-				params, 1);
+				params, i);
 	if (ret != 0) {
 		weston_log("Failed to connect PipeWire stream: %s",
 			   spa_strerror(ret));
