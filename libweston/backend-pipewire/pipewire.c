@@ -560,7 +560,8 @@ pipewire_output_stream_remove_buffer(void *data, struct pw_buffer *buffer)
 
 	pipewire_output_debug(output, "remove buffer: %p", buffer);
 
-	weston_renderbuffer_unref(frame_data->renderbuffer);
+	if (frame_data->renderbuffer)
+		weston_renderbuffer_unref(frame_data->renderbuffer);
 	free(frame_data);
 }
 
@@ -746,7 +747,10 @@ pipewire_output_repaint(struct weston_output *base)
 	pipewire_output_debug(output, "dequeued buffer: %p", buffer);
 
 	frame_data = buffer->user_data;
-	ec->renderer->repaint_output(&output->base, &damage, frame_data->renderbuffer);
+	if (frame_data->renderbuffer)
+		ec->renderer->repaint_output(&output->base, &damage, frame_data->renderbuffer);
+	else
+		output->base.full_repaint_needed = true;
 
 	pipewire_submit_buffer(output, buffer);
 
