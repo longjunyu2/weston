@@ -188,6 +188,9 @@ struct gl_renderer {
 	bool has_texture_storage;
 	bool has_pack_reverse;
 	bool has_rgb8_rgba8;
+	bool has_pbo;
+
+	struct wl_list pending_capture_list;
 
 	struct gl_shader *current_shader;
 	struct gl_shader *fallback_shader;

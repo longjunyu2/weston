@@ -124,6 +124,17 @@ struct gl_output_state {
 
 struct gl_renderer;
 
+struct gl_capture_task {
+	struct weston_capture_task *task;
+	struct wl_event_source *source;
+	struct gl_renderer *gr;
+	struct wl_list link;
+	GLuint pbo;
+	int stride;
+	int height;
+	bool reverse;
+};
+
 struct dmabuf_format {
 	uint32_t format;
 	struct wl_list link;
@@ -787,6 +798,104 @@ gl_renderer_do_capture(struct gl_renderer *gr, struct weston_buffer *into,
 	return ret;
 }
 
+static int
+async_capture_handler(void *data)
+{
+	struct gl_capture_task *gl_task = (struct gl_capture_task *) data;
+	struct weston_buffer *buffer =
+		weston_capture_task_get_buffer(gl_task->task);
+	struct wl_shm_buffer *shm = buffer->shm_buffer;
+	uint8_t *src, *dst;
+	int i;
+
+	assert(shm);
+
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, gl_task->pbo);
+	src = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0,
+			       gl_task->stride * gl_task->height,
+			       GL_MAP_READ_BIT);
+	dst = wl_shm_buffer_get_data(shm);
+	wl_shm_buffer_begin_access(shm);
+
+	if (!gl_task->reverse) {
+		memcpy(dst, src, gl_task->stride * gl_task->height);
+	} else {
+		src += (gl_task->height - 1) * gl_task->stride;
+		for (i = 0; i < gl_task->height; i++) {
+			memcpy(dst, src, gl_task->stride);
+			dst += gl_task->stride;
+			src -= gl_task->stride;
+		}
+	}
+
+	wl_shm_buffer_end_access(shm);
+	glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	glDeleteBuffers(1, &gl_task->pbo);
+
+	weston_capture_task_retire_complete(gl_task->task);
+	wl_list_remove(&gl_task->link);
+	wl_event_source_remove(gl_task->source);
+	free(gl_task);
+
+	return 0;
+}
+
+static bool
+gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
+				 struct weston_output *output,
+				 struct weston_capture_task *task,
+				 const struct weston_geometry *rect)
+{
+	struct weston_buffer *buffer = weston_capture_task_get_buffer(task);
+	const struct pixel_format_info *fmt = buffer->pixel_format;
+	struct gl_capture_task *gl_task;
+	struct wl_event_loop *loop;
+	int refresh_mhz, refresh_msec;
+
+	assert(gr->has_pbo);
+	assert(output->current_mode->refresh > 0);
+	assert(buffer->type == WESTON_BUFFER_SHM);
+	assert(buffer->shm_buffer);
+	assert(fmt->gl_type != 0);
+	assert(fmt->gl_format != 0);
+
+	if (wl_shm_buffer_get_stride(buffer->shm_buffer) % 4 != 0)
+		return false;
+
+	glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	if (gr->has_pack_reverse)
+		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_TRUE);
+
+	gl_task = xzalloc(sizeof *gl_task);
+	gl_task->task = task;
+	gl_task->gr = gr;
+	gl_task->stride = (gr->compositor->read_format->bpp / 8) * rect->width;
+	gl_task->height = rect->height;
+	gl_task->reverse = !gr->has_pack_reverse;
+
+	glGenBuffers(1, &gl_task->pbo);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, gl_task->pbo);
+	glBufferData(GL_PIXEL_PACK_BUFFER, gl_task->stride * gl_task->height,
+		     NULL, GL_STREAM_READ);
+	glReadPixels(rect->x, rect->y, rect->width, rect->height,
+		     fmt->gl_format, fmt->gl_type, 0);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+
+	/* We guess here an async read back doesn't take more than 5 frames on
+	 * most platforms. */
+	loop = wl_display_get_event_loop(gr->compositor->wl_display);
+	gl_task->source = wl_event_loop_add_timer(loop, async_capture_handler,
+						  gl_task);
+	refresh_mhz = output->current_mode->refresh;
+	refresh_msec = millihz_to_nsec(refresh_mhz) / 1000000;
+	wl_event_source_timer_update(gl_task->source, 5 * refresh_msec);
+
+	wl_list_insert(&gr->pending_capture_list, &gl_task->link);
+
+	return true;
+}
+
 static void
 gl_renderer_do_capture_tasks(struct gl_renderer *gr,
 			     struct weston_output *output,
@@ -827,6 +936,12 @@ gl_renderer_do_capture_tasks(struct gl_renderer *gr,
 		if (buffer->type != WESTON_BUFFER_SHM ||
 		    buffer->buffer_origin != ORIGIN_TOP_LEFT) {
 			weston_capture_task_retire_failed(ct, "GL: unsupported buffer");
+			continue;
+		}
+
+		if (gr->has_pbo) {
+			if (!gl_renderer_do_read_pixels_async(gr, output, ct, &rect))
+				weston_capture_task_retire_failed(ct, "GL: capture failed");
 			continue;
 		}
 
@@ -3827,11 +3942,18 @@ gl_renderer_destroy(struct weston_compositor *ec)
 {
 	struct gl_renderer *gr = get_renderer(ec);
 	struct dmabuf_format *format, *next_format;
+	struct gl_capture_task *gl_task, *tmp;
 
 	wl_signal_emit(&gr->destroy_signal, gr);
 
 	if (gr->has_bind_display)
 		gr->unbind_display(gr->egl_display, ec->wl_display);
+
+	wl_list_for_each_safe(gl_task, tmp, &gr->pending_capture_list, link) {
+		wl_list_remove(&gl_task->link);
+		glDeleteBuffers(1, &gl_task->pbo);
+		free(gl_task);
+	}
 
 	gl_renderer_shader_list_destroy(gr);
 	if (gr->fallback_shader)
@@ -4214,6 +4336,11 @@ gl_renderer_setup(struct weston_compositor *ec)
 	    weston_check_egl_extension(extensions, "GL_OES_rgb8_rgba8"))
 		gr->has_rgb8_rgba8 = true;
 
+	if (gr->gl_version >= gr_gl_version(3, 0))
+		gr->has_pbo = true;
+
+	wl_list_init(&gr->pending_capture_list);
+
 	if (gr->gl_version >= gr_gl_version(3, 0) &&
 	    weston_check_egl_extension(extensions, "GL_OES_texture_float_linear") &&
 	    weston_check_egl_extension(extensions, "GL_EXT_color_buffer_half_float") &&
@@ -4286,6 +4413,8 @@ gl_renderer_setup(struct weston_compositor *ec)
 			    ec->read_format->drm_format_name);
 	weston_log_continue(STAMP_SPACE "glReadPixels supports y-flip: %s\n",
 			    yesno(gr->has_pack_reverse));
+	weston_log_continue(STAMP_SPACE "glReadPixels supports PBO: %s\n",
+			    yesno(gr->has_pbo));
 	weston_log_continue(STAMP_SPACE "wl_shm 10 bpc formats: %s\n",
 			    yesno(gr->has_texture_type_2_10_10_10_rev));
 	weston_log_continue(STAMP_SPACE "wl_shm 16 bpc formats: %s\n",
