@@ -1669,10 +1669,11 @@ parse_simple_mode(struct weston_output *output,
 
 static int
 wet_configure_windowed_output_from_config(struct weston_output *output,
-					  struct wet_output_config *defaults)
+					  struct wet_output_config *defaults,
+					  enum weston_windowed_output_type type)
 {
 	const struct weston_windowed_output_api *api =
-		weston_windowed_output_get_api(output->compositor);
+		weston_windowed_output_get_api(output->compositor, type);
 
 	struct weston_config *wc = wet_get_config(output->compositor);
 	struct weston_config_section *section = NULL;
@@ -3132,7 +3133,8 @@ headless_backend_output_configure(struct weston_output *output)
 	if (wet_output_set_color_characteristics(output, wc, section) < 0)
 		return -1;
 
-	return wet_configure_windowed_output_from_config(output, &defaults);
+	return wet_configure_windowed_output_from_config(output, &defaults,
+							 WESTON_WINDOWED_OUTPUT_HEADLESS);
 }
 
 static int
@@ -3207,7 +3209,7 @@ load_headless_backend(struct weston_compositor *c,
 		return -1;
 
 	if (!no_outputs) {
-		api = weston_windowed_output_get_api(c);
+		api = weston_windowed_output_get_api(c, WESTON_WINDOWED_OUTPUT_HEADLESS);
 
 		if (!api) {
 			weston_log("Cannot use weston_windowed_output_api.\n");
@@ -3596,7 +3598,8 @@ x11_backend_output_configure(struct weston_output *output)
 		.transform = WL_OUTPUT_TRANSFORM_NORMAL
 	};
 
-	return wet_configure_windowed_output_from_config(output, &defaults);
+	return wet_configure_windowed_output_from_config(output, &defaults,
+							 WESTON_WINDOWED_OUTPUT_X11);
 }
 
 static int
@@ -3655,7 +3658,7 @@ load_x11_backend(struct weston_compositor *c,
 	if (!wb)
 		return -1;
 
-	api = weston_windowed_output_get_api(c);
+	api = weston_windowed_output_get_api(c, WESTON_WINDOWED_OUTPUT_X11);
 
 	if (!api) {
 		weston_log("Cannot use weston_windowed_output_api.\n");
@@ -3715,7 +3718,8 @@ wayland_backend_output_configure(struct weston_output *output)
 		.transform = WL_OUTPUT_TRANSFORM_NORMAL
 	};
 
-	return wet_configure_windowed_output_from_config(output, &defaults);
+	return wet_configure_windowed_output_from_config(output, &defaults,
+							 WESTON_WINDOWED_OUTPUT_WAYLAND);
 }
 
 static int
@@ -3787,7 +3791,7 @@ load_wayland_backend(struct weston_compositor *c,
 	if (!wb)
 		return -1;
 
-	api = weston_windowed_output_get_api(c);
+	api = weston_windowed_output_get_api(c, WESTON_WINDOWED_OUTPUT_WAYLAND);
 
 	if (api == NULL) {
 		/* We will just assume if load_backend() finished cleanly and

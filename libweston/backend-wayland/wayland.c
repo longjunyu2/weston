@@ -3082,7 +3082,8 @@ weston_backend_init(struct weston_compositor *compositor,
 		return 0;
 	}
 
-	ret = weston_plugin_api_register(compositor, WESTON_WINDOWED_OUTPUT_API_NAME,
+	ret = weston_plugin_api_register(compositor,
+					 WESTON_WINDOWED_OUTPUT_API_NAME_WAYLAND,
 					 &windowed_api, sizeof(windowed_api));
 
 	if (ret < 0) {

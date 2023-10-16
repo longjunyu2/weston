@@ -1986,7 +1986,8 @@ x11_backend_create(struct weston_compositor *compositor,
 				   " synchronization support failed.\n");
 	}
 
-	ret = weston_plugin_api_register(compositor, WESTON_WINDOWED_OUTPUT_API_NAME,
+	ret = weston_plugin_api_register(compositor,
+					 WESTON_WINDOWED_OUTPUT_API_NAME_X11,
 					 &api, sizeof(api));
 
 	if (ret < 0) {

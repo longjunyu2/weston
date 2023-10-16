@@ -638,7 +638,8 @@ headless_backend_create(struct weston_compositor *compositor,
 			goto err_input;
 	}
 
-	ret = weston_plugin_api_register(compositor, WESTON_WINDOWED_OUTPUT_API_NAME,
+	ret = weston_plugin_api_register(compositor,
+					 WESTON_WINDOWED_OUTPUT_API_NAME_HEADLESS,
 					 &api, sizeof(api));
 
 	if (ret < 0) {
