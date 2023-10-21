@@ -3918,6 +3918,37 @@ wet_xwayland_destroy(struct weston_compositor *comp, void *wet_xwl)
 #endif
 
 static int
+execute_command(struct wet_compositor *wet, int argc, char **argv) {
+	/* alloca allocates in the stack rather than in the heap
+	 * and we thus do not need to free this pointer.
+	 */
+	char **exec_args = alloca(sizeof(char*) * (argc + 1));
+	int i;
+	pid_t tmp_pid = -1;
+
+	wet->autolaunch_watch = true;
+
+	tmp_pid = fork();
+	if (tmp_pid == -1) {
+		weston_log("Failed to fork command line command process: %s\n", strerror(errno));
+		return -1;
+	} else if (tmp_pid == 0) {
+		for (i = 0; i < argc; i++)
+			exec_args[i] = argv[i + 1];
+		exec_args[i] = NULL;
+
+		cleanup_for_child_process();
+		execvp(exec_args[0], exec_args);
+		/* execvp shouldn't return */
+		fprintf(stderr, "Failed to execute command line command: %s\n", strerror(errno));
+		_exit(1);
+	}
+
+	wet->autolaunch_pid = tmp_pid;
+	return 0;
+}
+
+static int
 execute_autolaunch(struct wet_compositor *wet, struct weston_config *config)
 {
 	int ret = -1;
@@ -4356,15 +4387,28 @@ wet_main(int argc, char *argv[], const struct weston_testsuite_data *test_data)
 		}
 	}
 
-	for (i = 1; i < argc; i++)
-		weston_log("fatal: unhandled option: %s\n", argv[i]);
-	if (argc > 1)
-		goto out;
+	if (argc > 1 && strcmp(argv[1], "--") == 0) {
+		/* remove the '--' entry and move up the rest */
+		for (i = 1; i < argc; i++)
+			argv[i] = argv[i + 1];
+		argv[i] = NULL;
+		argc -= 1;
+	} else {
+		for (i = 1; i < argc; i++)
+			weston_log("fatal: unhandled option: %s\n", argv[i]);
+		if (argc > 1)
+			goto out;
+	}
 
 	weston_compositor_wake(wet.compositor);
 
-	if (execute_autolaunch(&wet, config) < 0)
-		goto out;
+	if (argc > 1) {
+		if (execute_command(&wet, argc, argv) < 0)
+			goto out;
+	} else {
+		if (execute_autolaunch(&wet, config) < 0)
+			goto out;
+	}
 
 	wl_display_run(display);
 
