@@ -167,10 +167,17 @@ parse_options(const struct weston_option *options,
 	      int count, int *argc, char *argv[])
 {
 	int i, j;
+	int ignore_options = 0;
 
 	for (i = 1, j = 1; i < *argc; i++) {
-		if (argv[i][0] == '-') {
+		if (argv[i][0] == '-' && ignore_options == 0) {
 			if (argv[i][1] == '-') {
+				if (strlen(argv[i]) == 2) {
+					/* '--' to ignore the remaining options */
+					i--; /* reinsert the '--' entry */
+					ignore_options = 1;
+					continue;
+				}
 				/* Long option, e.g. --foo or --foo=bar */
 				if (long_option(options, count, argv[i]))
 					continue;
