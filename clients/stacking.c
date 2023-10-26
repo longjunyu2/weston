@@ -35,14 +35,24 @@
 #include <cairo.h>
 #include <wayland-util.h>
 
+#include "shared/xalloc.h"
 #include "shared/helpers.h"
 #include "window.h"
 
-struct stacking {
-	struct display *display;
-	struct window *root_window;
+struct stacking_window {
+	struct stacking *stacking;
+	struct window *window;
+	struct widget *widget;
+	struct wl_list link;
 };
 
+struct stacking {
+	struct display *display;
+	struct wl_list windows;
+};
+
+static void
+close_handler(void *data);
 static void
 button_handler(struct widget *widget,
                struct input *input, uint32_t time,
@@ -63,28 +73,52 @@ redraw_handler(struct widget *widget, void *data);
 
 /* Iff parent_window is set, the new window will be transient. */
 static struct window *
-new_window(struct stacking *stacking, struct window *parent_window)
+create_window(struct stacking *stacking, struct window *parent_window)
 {
+	struct stacking_window *new_stacking_window;
 	struct window *new_window;
 	struct widget *new_widget;
 
+	new_stacking_window = xzalloc(sizeof *new_stacking_window);
+	new_stacking_window->stacking = stacking;
 	new_window = window_create(stacking->display);
+	new_stacking_window->window = new_window;
 	window_set_parent(new_window, parent_window);
 
 	new_widget = window_frame_create(new_window, new_window);
+	new_stacking_window->widget = new_widget;
+
+	wl_list_insert(stacking->windows.prev, &new_stacking_window->link);
 
 	window_set_title(new_window, "Stacking Test");
 	window_set_appid(new_window, "org.freedesktop.weston.stacking-test");
 	window_set_key_handler(new_window, key_handler);
 	window_set_keyboard_focus_handler(new_window, keyboard_focus_handler);
 	window_set_fullscreen_handler(new_window, fullscreen_handler);
+	window_set_close_handler(new_window, close_handler);
 	widget_set_button_handler(new_widget, button_handler);
 	widget_set_redraw_handler(new_widget, redraw_handler);
-	window_set_user_data(new_window, stacking);
+	window_set_user_data(new_window, new_stacking_window);
 
 	window_schedule_resize(new_window, 300, 300);
 
 	return new_window;
+}
+
+static void
+destroy_window(struct stacking_window *stacking_window)
+{
+	struct stacking *stacking = stacking_window->stacking;
+
+	widget_destroy(stacking_window->widget);
+	window_destroy(stacking_window->window);
+
+	wl_list_remove(&stacking_window->link);
+	free(stacking_window);
+
+	if (wl_list_empty(&stacking->windows))
+		display_exit(stacking->display);
+
 }
 
 static void
@@ -109,17 +143,25 @@ show_popup(struct stacking *stacking, struct input *input, uint32_t time,
 }
 
 static void
+close_handler(void *data)
+{
+	struct stacking_window *stacking_window = data;
+
+	destroy_window(stacking_window);
+}
+
+static void
 button_handler(struct widget *widget,
                struct input *input, uint32_t time,
                uint32_t button,
                enum wl_pointer_button_state state, void *data)
 {
-	struct stacking *stacking = data;
+	struct stacking_window *stacking_window = data;
 
 	switch (button) {
 	case BTN_RIGHT:
 		if (state == WL_POINTER_BUTTON_STATE_PRESSED)
-			show_popup(stacking, input, time,
+			show_popup(stacking_window->stacking, input, time,
 			           widget_get_user_data(widget));
 		break;
 
@@ -135,7 +177,8 @@ key_handler(struct window *window,
             uint32_t key, uint32_t sym, enum wl_keyboard_key_state state,
             void *data)
 {
-	struct stacking *stacking = data;
+	struct stacking_window *stacking_window = data;
+	struct stacking *stacking = stacking_window->stacking;
 
 	if (state != WL_KEYBOARD_KEY_STATE_PRESSED)
 		return;
@@ -151,20 +194,24 @@ key_handler(struct window *window,
 
 	case XKB_KEY_n:
 		/* New top-level window. */
-		new_window(stacking, NULL);
+		create_window(stacking, NULL);
 		break;
 
 	case XKB_KEY_p:
 		show_popup(stacking, input, time, window);
 		break;
 
+	case XKB_KEY_c:
+		destroy_window(stacking_window);
+		break;
+
 	case XKB_KEY_q:
-		exit (0);
+		display_exit(stacking->display);
 		break;
 
 	case XKB_KEY_t:
 		/* New transient window. */
-		new_window(stacking, window);
+		create_window(stacking, window);
 		break;
 
 	default:
@@ -276,7 +323,8 @@ redraw_handler(struct widget *widget, void *data)
 	            "Transient? %u\n"
 	            "Keys: (f)ullscreen, (m)aximize,\n"
 	            "      (n)ew window, (p)opup,\n"
-	            "      (q)uit, (t)ransient window\n",
+	            "      (c)lose, (q)uit,\n"
+	            "      (t)ransient window\n",
 	            window, window_is_fullscreen(window),
 	            window_is_maximized(window), window_get_parent(window) ? 1 : 0);
 
@@ -287,8 +335,10 @@ int
 main(int argc, char *argv[])
 {
 	struct stacking stacking;
+	struct stacking_window *stacking_window, *tmp;
 
 	memset(&stacking, 0, sizeof stacking);
+	wl_list_init(&stacking.windows);
 
 	stacking.display = display_create(&argc, argv);
 	if (stacking.display == NULL) {
@@ -299,11 +349,13 @@ main(int argc, char *argv[])
 
 	display_set_user_data(stacking.display, &stacking);
 
-	stacking.root_window = new_window(&stacking, NULL);
+	create_window(&stacking, NULL);
 
 	display_run(stacking.display);
 
-	window_destroy(stacking.root_window);
+	wl_list_for_each_safe(stacking_window, tmp, &stacking.windows, link)
+		destroy_window(stacking_window);
+
 	display_destroy(stacking.display);
 
 	return 0;
