@@ -133,6 +133,8 @@ struct gl_capture_task {
 	int stride;
 	int height;
 	bool reverse;
+	EGLSyncKHR sync;
+	int fd;
 };
 
 struct dmabuf_format {
@@ -791,10 +793,46 @@ gl_renderer_do_capture(struct gl_renderer *gr, struct weston_buffer *into,
 	return ret;
 }
 
-static int
-async_capture_handler(void *data)
+static struct gl_capture_task*
+create_capture_task(struct weston_capture_task *task,
+		    struct gl_renderer *gr,
+		    const struct weston_geometry *rect)
 {
-	struct gl_capture_task *gl_task = (struct gl_capture_task *) data;
+	struct gl_capture_task *gl_task = xzalloc(sizeof *gl_task);
+
+	gl_task->task = task;
+	gl_task->gr = gr;
+	glGenBuffers(1, &gl_task->pbo);
+	gl_task->stride = (gr->compositor->read_format->bpp / 8) * rect->width;
+	gl_task->height = rect->height;
+	gl_task->reverse = !gr->has_pack_reverse;
+	gl_task->sync = EGL_NO_SYNC_KHR;
+	gl_task->fd = EGL_NO_NATIVE_FENCE_FD_ANDROID;
+
+	return gl_task;
+}
+
+static void
+destroy_capture_task(struct gl_capture_task *gl_task)
+{
+	assert(gl_task);
+
+	wl_event_source_remove(gl_task->source);
+	wl_list_remove(&gl_task->link);
+	glDeleteBuffers(1, &gl_task->pbo);
+
+	if (gl_task->sync != EGL_NO_SYNC_KHR)
+		gl_task->gr->destroy_sync(gl_task->gr->egl_display,
+					  gl_task->sync);
+	if (gl_task->fd != EGL_NO_NATIVE_FENCE_FD_ANDROID)
+		close(gl_task->fd);
+
+	free(gl_task);
+}
+
+static void
+copy_capture(struct gl_capture_task *gl_task)
+{
 	struct weston_buffer *buffer =
 		weston_capture_task_get_buffer(gl_task->task);
 	struct wl_shm_buffer *shm = buffer->shm_buffer;
@@ -824,12 +862,38 @@ async_capture_handler(void *data)
 	wl_shm_buffer_end_access(shm);
 	glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-	glDeleteBuffers(1, &gl_task->pbo);
+}
 
+static int
+async_capture_handler(void *data)
+{
+	struct gl_capture_task *gl_task = (struct gl_capture_task *) data;
+
+	assert(gl_task);
+
+	copy_capture(gl_task);
 	weston_capture_task_retire_complete(gl_task->task);
-	wl_list_remove(&gl_task->link);
-	wl_event_source_remove(gl_task->source);
-	free(gl_task);
+	destroy_capture_task(gl_task);
+
+	return 0;
+}
+
+static int
+async_capture_handler_fd(int fd, uint32_t mask, void *data)
+{
+	struct gl_capture_task *gl_task = (struct gl_capture_task *) data;
+
+	assert(gl_task);
+	assert(fd == gl_task->fd);
+
+	if (mask & WL_EVENT_READABLE) {
+		copy_capture(gl_task);
+		weston_capture_task_retire_complete(gl_task->task);
+	} else {
+		weston_capture_task_retire_failed(gl_task->task,
+						  "GL: capture failed");
+	}
+	destroy_capture_task(gl_task);
 
 	return 0;
 }
@@ -856,14 +920,8 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 	if (gr->has_pack_reverse)
 		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_TRUE);
 
-	gl_task = xzalloc(sizeof *gl_task);
-	gl_task->task = task;
-	gl_task->gr = gr;
-	gl_task->stride = (gr->compositor->read_format->bpp / 8) * rect->width;
-	gl_task->height = rect->height;
-	gl_task->reverse = !gr->has_pack_reverse;
+	gl_task = create_capture_task(task, gr, rect);
 
-	glGenBuffers(1, &gl_task->pbo);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, gl_task->pbo);
 	glBufferData(GL_PIXEL_PACK_BUFFER, gl_task->stride * gl_task->height,
 		     NULL, GL_STREAM_READ);
@@ -871,14 +929,35 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 		     fmt->gl_format, fmt->gl_type, 0);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 
-	/* We guess here an async read back doesn't take more than 5 frames on
-	 * most platforms. */
 	loop = wl_display_get_event_loop(gr->compositor->wl_display);
-	gl_task->source = wl_event_loop_add_timer(loop, async_capture_handler,
-						  gl_task);
-	refresh_mhz = output->current_mode->refresh;
-	refresh_msec = millihz_to_nsec(refresh_mhz) / 1000000;
-	wl_event_source_timer_update(gl_task->source, 5 * refresh_msec);
+	gl_task->sync = create_render_sync(gr);
+
+	/* Make sure the read back request is flushed. Doing so right between
+	 * fence sync object creation and native fence fd duplication ensures
+	 * the fd is created as stated by EGL_ANDROID_native_fence_sync: "the
+	 * next Flush() operation performed by the current client API causes a
+	 * new native fence object to be created". */
+	glFlush();
+
+	if (gl_task->sync != EGL_NO_SYNC_KHR)
+		gl_task->fd = gr->dup_native_fence_fd(gr->egl_display,
+						      gl_task->sync);
+
+	if (gl_task->fd != EGL_NO_NATIVE_FENCE_FD_ANDROID) {
+		gl_task->source = wl_event_loop_add_fd(loop, gl_task->fd,
+						       WL_EVENT_READABLE,
+						       async_capture_handler_fd,
+						       gl_task);
+	} else {
+		/* We guess here an async read back doesn't take more than 5
+		 * frames on most platforms. */
+		gl_task->source = wl_event_loop_add_timer(loop,
+							  async_capture_handler,
+							  gl_task);
+		refresh_mhz = output->current_mode->refresh;
+		refresh_msec = millihz_to_nsec(refresh_mhz) / 1000000;
+		wl_event_source_timer_update(gl_task->source, 5 * refresh_msec);
+	}
 
 	wl_list_insert(&gr->pending_capture_list, &gl_task->link);
 }
@@ -3940,11 +4019,8 @@ gl_renderer_destroy(struct weston_compositor *ec)
 	if (gr->has_bind_display)
 		gr->unbind_display(gr->egl_display, ec->wl_display);
 
-	wl_list_for_each_safe(gl_task, tmp, &gr->pending_capture_list, link) {
-		wl_list_remove(&gl_task->link);
-		glDeleteBuffers(1, &gl_task->pbo);
-		free(gl_task);
-	}
+	wl_list_for_each_safe(gl_task, tmp, &gr->pending_capture_list, link)
+		destroy_capture_task(gl_task);
 
 	gl_renderer_shader_list_destroy(gr);
 	if (gr->fallback_shader)
