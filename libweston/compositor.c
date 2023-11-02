@@ -380,6 +380,7 @@ weston_paint_node_create(struct weston_surface *surface,
 	pnode->plane = &pnode->output->primary_plane;
 	pnode->plane_next = NULL;
 
+	pnode->need_hole = false;
 	pnode->status = PAINT_NODE_ALL_DIRTY & ~PAINT_NODE_PLANE_DIRTY;
 
 	return pnode;

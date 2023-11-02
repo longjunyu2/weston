@@ -561,6 +561,8 @@ struct weston_paint_node {
 	bool is_direct;
 	bool draw_solid;
 	struct weston_solid_buffer_values solid;
+
+	bool need_hole;
 };
 
 struct weston_paint_node *
