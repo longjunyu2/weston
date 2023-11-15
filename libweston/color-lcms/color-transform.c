@@ -464,24 +464,45 @@ merge_curvesets(cmsPipeline **lut, cmsContext context_id)
 	return modified;
 }
 
+enum color_transform_step {
+	PRE_CURVE,
+	POST_CURVE,
+};
+
 static bool
-translate_curve_element(struct weston_color_curve *curve,
-			cmsToneCurve *stash[3],
-			void (*func)(struct weston_color_transform *xform,
-				     float *values, unsigned len),
-			cmsStage *elem)
+translate_curve_element(struct cmlcms_color_transform *xform,
+			cmsStage *elem, enum color_transform_step step)
 {
+	struct weston_compositor *compositor = xform->base.cm->compositor;
+	struct weston_color_curve *curve;
+	cmsToneCurve **stash;
 	_cmsStageToneCurvesData *trc_data;
 	unsigned i;
 
-	assert(cmsStageType(elem) == cmsSigCurveSetElemType);
+	weston_assert_uint64_eq(compositor, cmsStageType(elem),
+				cmsSigCurveSetElemType);
 
 	trc_data = cmsStageData(elem);
 	if (trc_data->nCurves != 3)
 		return false;
 
+	switch(step) {
+	case PRE_CURVE:
+		curve = &xform->base.pre_curve;
+		curve->u.lut_3x1d.fill_in = cmlcms_fill_in_pre_curve;
+		stash = xform->pre_curve;
+		break;
+	case POST_CURVE:
+		curve = &xform->base.post_curve;
+		curve->u.lut_3x1d.fill_in = cmlcms_fill_in_post_curve;
+		stash = xform->post_curve;
+		break;
+	default:
+		weston_assert_not_reached(compositor,
+					  "curve should be a pre or post curve");
+	}
+
 	curve->type = WESTON_COLOR_CURVE_TYPE_LUT_3x1D;
-	curve->u.lut_3x1d.fill_in = func;
 	curve->u.lut_3x1d.optimal_len = cmlcms_reasonable_1D_points();
 
 	for (i = 0; i < 3; i++) {
@@ -533,9 +554,7 @@ translate_pipeline(struct cmlcms_color_transform *xform, const cmsPipeline *lut)
 		return true;
 
 	if (cmsStageType(elem) == cmsSigCurveSetElemType) {
-		if (!translate_curve_element(&xform->base.pre_curve,
-					     xform->pre_curve,
-					     cmlcms_fill_in_pre_curve, elem))
+		if (!translate_curve_element(xform, elem, PRE_CURVE))
 			return false;
 
 		elem = cmsStageNext(elem);
@@ -555,9 +574,7 @@ translate_pipeline(struct cmlcms_color_transform *xform, const cmsPipeline *lut)
 		return true;
 
 	if (cmsStageType(elem) == cmsSigCurveSetElemType) {
-		if (!translate_curve_element(&xform->base.post_curve,
-					     xform->post_curve,
-					     cmlcms_fill_in_post_curve, elem))
+		if (!translate_curve_element(xform, elem, POST_CURVE))
 			return false;
 
 		elem = cmsStageNext(elem);

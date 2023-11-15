@@ -109,6 +109,9 @@ do {										\
 #define weston_assert_uint32_lt(compositor, a, b) \
 	weston_assert_(compositor, a, b, uint32_t, "%u", <)
 
+#define weston_assert_uint64_eq(compositor, a, b) \
+	weston_assert_(compositor, a, b, uint64_t, "%" PRIx64, ==)
+
 #define weston_assert_str_eq(compositor, a, b) \
 	weston_assert_fn_(compositor, strcmp, a, b, const char *, "%s", ==)
 
