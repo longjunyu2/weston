@@ -71,7 +71,6 @@
 #include "shared/os-compatibility.h"
 #include "shared/string-helpers.h"
 #include "shared/timespec-util.h"
-#include "shared/signal.h"
 #include "shared/xalloc.h"
 #include "tearing-control-v1-server-protocol.h"
 #include "git-version.h"
@@ -2413,7 +2412,7 @@ weston_view_unmap(struct weston_view *view)
 	wl_list_for_each_safe(pnode, pntmp, &view->paint_node_list, view_link)
 		weston_paint_node_destroy(pnode);
 
-	weston_signal_emit_mutable(&view->unmap_signal, view);
+	wl_signal_emit_mutable(&view->unmap_signal, view);
 	view->surface->compositor->view_list_needs_rebuild = true;
 }
 
@@ -2426,7 +2425,7 @@ weston_surface_map(struct weston_surface *surface)
 	surface->is_mapping = true;
 	surface->is_mapped = true;
 	surface->compositor->view_list_needs_rebuild = true;
-	weston_signal_emit_mutable(&surface->map_signal, surface);
+	wl_signal_emit_mutable(&surface->map_signal, surface);
 }
 
 WL_EXPORT void
@@ -2438,7 +2437,7 @@ weston_surface_unmap(struct weston_surface *surface)
 	wl_list_for_each(view, &surface->views, surface_link)
 		weston_view_unmap(view);
 	surface->output = NULL;
-	weston_signal_emit_mutable(&surface->unmap_signal, surface);
+	wl_signal_emit_mutable(&surface->unmap_signal, surface);
 }
 
 WL_EXPORT void
@@ -2447,7 +2446,7 @@ weston_view_destroy(struct weston_view *view)
 	if (weston_view_is_mapped(view))
 		weston_view_unmap(view);
 
-	weston_signal_emit_mutable(&view->destroy_signal, view);
+	wl_signal_emit_mutable(&view->destroy_signal, view);
 
 	assert(wl_list_empty(&view->geometry.child_list));
 
@@ -2498,7 +2497,7 @@ weston_surface_unref(struct weston_surface *surface)
 
 	assert(surface->resource == NULL);
 
-	weston_signal_emit_mutable(&surface->destroy_signal, surface);
+	wl_signal_emit_mutable(&surface->destroy_signal, surface);
 
 	assert(wl_list_empty(&surface->subsurface_list_pending));
 	assert(wl_list_empty(&surface->subsurface_list));
@@ -2580,7 +2579,7 @@ weston_buffer_destroy_handler(struct wl_listener *listener, void *data)
 	if (buffer->busy_count + buffer->passive_count > 0)
 		return;
 
-	weston_signal_emit_mutable(&buffer->destroy_signal, buffer);
+	wl_signal_emit_mutable(&buffer->destroy_signal, buffer);
 	free(buffer);
 }
 
@@ -2725,7 +2724,7 @@ weston_buffer_reference(struct weston_buffer_reference *ref,
 	 * weston_buffer, since we'll never need it again */
 	if (old_ref.buffer->busy_count + old_ref.buffer->passive_count == 0 &&
 	    !old_ref.buffer->resource) {
-		weston_signal_emit_mutable(&old_ref.buffer->destroy_signal,
+		wl_signal_emit_mutable(&old_ref.buffer->destroy_signal,
 					   old_ref.buffer);
 		free(old_ref.buffer);
 	}
@@ -3878,7 +3877,7 @@ weston_view_move_to_layer(struct weston_view *view,
 	weston_surface_damage(view->surface);
 
 	if (!was_mapped)
-		weston_signal_emit_mutable(&view->map_signal, view);
+		wl_signal_emit_mutable(&view->map_signal, view);
 }
 
 WL_EXPORT void
@@ -6395,7 +6394,7 @@ weston_head_detach(struct weston_head *head)
 WL_EXPORT void
 weston_head_release(struct weston_head *head)
 {
-	weston_signal_emit_mutable(&head->destroy_signal, head);
+	wl_signal_emit_mutable(&head->destroy_signal, head);
 
 	weston_head_detach(head);
 
@@ -7282,8 +7281,8 @@ weston_compositor_remove_output(struct weston_output *output)
 	wl_list_insert(compositor->pending_output_list.prev, &output->link);
 	output->enabled = false;
 
-	weston_signal_emit_mutable(&compositor->output_destroyed_signal, output);
-	weston_signal_emit_mutable(&output->destroy_signal, output);
+	wl_signal_emit_mutable(&compositor->output_destroyed_signal, output);
+	wl_signal_emit_mutable(&output->destroy_signal, output);
 
 	wl_list_for_each(head, &output->head_list, output_link)
 		weston_head_remove_global(head);
@@ -7967,7 +7966,7 @@ weston_output_release(struct weston_output *output)
 
 	output->destroying = 1;
 
-	weston_signal_emit_mutable(&output->user_destroy_signal, output);
+	wl_signal_emit_mutable(&output->user_destroy_signal, output);
 
 	if (output->enabled)
 		weston_compositor_remove_output(output);
@@ -9569,7 +9568,7 @@ weston_compositor_destroy(struct weston_compositor *compositor)
 	/* prevent further rendering while shutting down */
 	compositor->state = WESTON_COMPOSITOR_OFFSCREEN;
 
-	weston_signal_emit_mutable(&compositor->destroy_signal, compositor);
+	wl_signal_emit_mutable(&compositor->destroy_signal, compositor);
 
 	weston_compositor_xkb_destroy(compositor);
 

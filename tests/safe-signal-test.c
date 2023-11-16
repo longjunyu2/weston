@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../shared/signal.h"
+#include <wayland-server-core.h>
 #include "weston-test-client-helper.h"
 
 struct test_surface_state {
@@ -48,7 +48,7 @@ DECLARE_FIXTURE_SETUP(fixture_setup);
 static void
 destroy_test_surface(struct test_surface_state *st)
 {
-	weston_signal_emit_mutable(&st->signal_destroy, st);
+	wl_signal_emit_mutable(&st->signal_destroy, st);
 }
 
 static void

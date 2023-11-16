@@ -37,7 +37,6 @@
 #include "pixel-formats.h"
 #include "output-capture.h"
 #include "shared/helpers.h"
-#include "shared/signal.h"
 #include "shared/weston-drm-fourcc.h"
 #include "shared/xalloc.h"
 
