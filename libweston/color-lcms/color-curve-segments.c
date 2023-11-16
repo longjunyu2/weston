@@ -301,7 +301,7 @@ are_segments_equal(const cmsCurveSegment *seg_A, const cmsCurveSegment *seg_B)
 	/* Parametric curve. Determine the number of params that we should
 	 * compare. */
 	for (i = 0; i < ARRAY_LENGTH(types); i++) {
-		if (types[i] == abs(seg_A->Type)) {
+		if (types[i] == (uint32_t)abs(seg_A->Type)) {
 			n_params = types_n_params[i];
 			break;
 		}

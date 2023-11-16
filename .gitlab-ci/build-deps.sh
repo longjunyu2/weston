@@ -201,3 +201,12 @@ meson build --wrap-mode=nofallback
 ninja ${NINJAFLAGS} -C build install
 cd ..
 rm -rf libdisplay-info
+
+# Build and install lcms2, which we use to support color-management.
+git clone --branch master https://github.com/mm2/Little-CMS.git lcms2
+cd lcms2
+git checkout -b snapshot lcms2.16
+meson build --wrap-mode=nofallback
+ninja ${NINJAFLAGS} -C build install
+cd ..
+rm  -rf lcms2
