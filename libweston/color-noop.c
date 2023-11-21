@@ -243,7 +243,6 @@ weston_color_manager_noop_create(struct weston_compositor *compositor)
 
 	cm->base.name = "no-op";
 	cm->base.compositor = compositor;
-	cm->base.supports_client_protocol = false;
 	cm->base.init = cmnoop_init;
 	cm->base.destroy = cmnoop_destroy;
 	cm->base.destroy_color_profile = cmnoop_destroy_color_profile;
