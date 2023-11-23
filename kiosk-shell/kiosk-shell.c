@@ -961,7 +961,6 @@ desktop_surface_committed(struct weston_desktop_surface *desktop_surface,
 						      shsurf->output);
 		struct kiosk_shell_seat *kiosk_seat;
 
-		shsurf->view->is_mapped = true;
 		weston_surface_map(surface);
 
 		kiosk_seat = get_kiosk_shell_seat(seat);
