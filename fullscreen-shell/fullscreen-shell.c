@@ -316,6 +316,7 @@ fs_output_create(struct fullscreen_shell *shell, struct weston_output *output)
 
 	fsout->shell = shell;
 	wl_list_insert(&shell->output_list, &fsout->link);
+	wl_list_init(&fsout->transform.link);
 
 	fsout->output = output;
 	fsout->output_destroyed.notify = output_destroyed;
@@ -326,10 +327,8 @@ fs_output_create(struct fullscreen_shell *shell, struct weston_output *output)
 	fsout->curtain = create_curtain(shell->compositor, fsout,
 					output->pos,
 					output->width, output->height);
-	fsout->curtain->view->is_mapped = true;
-	weston_layer_entry_insert(&shell->layer.view_list,
-			          &fsout->curtain->view->layer_link);
-	wl_list_init(&fsout->transform.link);
+	weston_view_move_to_layer(fsout->curtain->view,
+				  &shell->layer.view_list);
 
 	if (!wl_list_empty(&shell->default_surface_list)) {
 		surf = container_of(shell->default_surface_list.prev,
@@ -580,6 +579,12 @@ configure_presented_surface_internal(struct weston_surface *surface)
 	if (surface->committed != configure_presented_surface)
 		return;
 
+	if (!weston_surface_has_content(surface))
+		return;
+
+	if (!weston_surface_is_mapped(surface))
+		weston_surface_map(surface);
+
 	wl_list_for_each(fsout, &shell->output_list, link)
 		if (fsout->surface == surface ||
 		    fsout->pending.surface == surface)
@@ -590,6 +595,10 @@ static void
 fs_output_apply_pending(struct fs_output *fsout)
 {
 	assert(fsout->pending.surface);
+
+	if (!weston_surface_is_mapped(fsout->pending.surface) &&
+	    !weston_surface_has_content(fsout->pending.surface))
+		return;
 
 	if (fsout->surface && fsout->surface != fsout->pending.surface) {
 		wl_list_remove(&fsout->surface_destroyed.link);
@@ -611,13 +620,14 @@ fs_output_apply_pending(struct fs_output *fsout)
 
 	if (fsout->surface != fsout->pending.surface) {
 		fsout->surface = fsout->pending.surface;
+		if (!weston_surface_is_mapped(fsout->surface))
+			weston_surface_map(fsout->surface);
 
 		fsout->view = weston_view_create(fsout->surface);
 		if (!fsout->view) {
 			weston_log("no memory\n");
 			return;
 		}
-		fsout->surface->is_mapped = true;
 
 		wl_signal_add(&fsout->surface->destroy_signal,
 			      &fsout->surface_destroyed);
