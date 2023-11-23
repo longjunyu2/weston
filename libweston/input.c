@@ -3224,12 +3224,9 @@ tablet_tool_cursor_surface_committed(struct weston_surface *es,
 	empty_region(&es->input);
 
 	if (!weston_surface_is_mapped(es)) {
-		weston_layer_entry_insert(
-			&es->compositor->cursor_layer.view_list,
-			&tool->sprite->layer_link);
-		weston_view_update_transform(tool->sprite);
-		es->is_mapped = true;
-		tool->sprite->is_mapped = true;
+		weston_surface_map(es);
+		weston_view_move_to_layer(tool->sprite,
+					  &es->compositor->cursor_layer.view_list);
 	}
 }
 
