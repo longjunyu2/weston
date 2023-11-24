@@ -131,15 +131,18 @@ replace_default_surface(struct fullscreen_shell *shell, struct weston_surface *s
 		prev = container_of(shell->default_surface_list.prev,
 				    struct fs_client_surface, link);
 
+	if (prev)
+		remove_default_surface(prev);
+
+	if (!surface)
+		return;
+
 	surf = zalloc(sizeof *surf);
 	if (!surf)
 		return;
 
 	surf->surface = surface;
 	surf->method = method;
-
-	if (prev)
-		remove_default_surface(prev);
 
 	wl_list_insert(shell->default_surface_list.prev, &surf->link);
 
