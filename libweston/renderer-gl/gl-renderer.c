@@ -776,22 +776,15 @@ gl_renderer_do_capture(struct gl_renderer *gr, struct weston_buffer *into,
 {
 	struct wl_shm_buffer *shm = into->shm_buffer;
 	const struct pixel_format_info *fmt = into->pixel_format;
-	void *shm_pixels;
-	int32_t stride;
 	bool ret;
 
 	assert(into->type == WESTON_BUFFER_SHM);
 	assert(shm);
 
-	shm_pixels = wl_shm_buffer_get_data(shm);
-
-	stride = wl_shm_buffer_get_stride(shm);
-	if (stride % 4 != 0)
-		return false;
-
 	wl_shm_buffer_begin_access(shm);
 
-	ret = gl_renderer_do_read_pixels(gr, fmt, shm_pixels, stride, rect);
+	ret = gl_renderer_do_read_pixels(gr, fmt, wl_shm_buffer_get_data(shm),
+					 wl_shm_buffer_get_stride(shm), rect);
 
 	wl_shm_buffer_end_access(shm);
 
@@ -841,7 +834,7 @@ async_capture_handler(void *data)
 	return 0;
 }
 
-static bool
+static void
 gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 				 struct weston_output *output,
 				 struct weston_capture_task *task,
@@ -856,12 +849,8 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 	assert(gr->has_pbo);
 	assert(output->current_mode->refresh > 0);
 	assert(buffer->type == WESTON_BUFFER_SHM);
-	assert(buffer->shm_buffer);
 	assert(fmt->gl_type != 0);
 	assert(fmt->gl_format != 0);
-
-	if (wl_shm_buffer_get_stride(buffer->shm_buffer) % 4 != 0)
-		return false;
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	if (gr->has_pack_reverse)
@@ -892,8 +881,6 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 	wl_event_source_timer_update(gl_task->source, 5 * refresh_msec);
 
 	wl_list_insert(&gr->pending_capture_list, &gl_task->link);
-
-	return true;
 }
 
 static void
@@ -939,9 +926,13 @@ gl_renderer_do_capture_tasks(struct gl_renderer *gr,
 			continue;
 		}
 
+		if (wl_shm_buffer_get_stride(buffer->shm_buffer) % 4 != 0) {
+			weston_capture_task_retire_failed(ct, "GL: buffer stride not multiple of 4");
+			continue;
+		}
+
 		if (gr->has_pbo) {
-			if (!gl_renderer_do_read_pixels_async(gr, output, ct, &rect))
-				weston_capture_task_retire_failed(ct, "GL: capture failed");
+			gl_renderer_do_read_pixels_async(gr, output, ct, &rect);
 			continue;
 		}
 
