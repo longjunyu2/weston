@@ -836,15 +836,16 @@ copy_capture(struct gl_capture_task *gl_task)
 	struct weston_buffer *buffer =
 		weston_capture_task_get_buffer(gl_task->task);
 	struct wl_shm_buffer *shm = buffer->shm_buffer;
+	struct gl_renderer *gr = gl_task->gr;
 	uint8_t *src, *dst;
 	int i;
 
 	assert(shm);
 
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, gl_task->pbo);
-	src = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0,
-			       gl_task->stride * gl_task->height,
-			       GL_MAP_READ_BIT);
+	src = gr->map_buffer_range(GL_PIXEL_PACK_BUFFER, 0,
+				   gl_task->stride * gl_task->height,
+				   GL_MAP_READ_BIT);
 	dst = wl_shm_buffer_get_data(shm);
 	wl_shm_buffer_begin_access(shm);
 
@@ -860,7 +861,7 @@ copy_capture(struct gl_capture_task *gl_task)
 	}
 
 	wl_shm_buffer_end_access(shm);
-	glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+	gr->unmap_buffer(GL_PIXEL_PACK_BUFFER);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
@@ -924,7 +925,7 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, gl_task->pbo);
 	glBufferData(GL_PIXEL_PACK_BUFFER, gl_task->stride * gl_task->height,
-		     NULL, GL_STREAM_READ);
+		     NULL, gr->pbo_usage);
 	glReadPixels(rect->x, rect->y, rect->width, rect->height,
 		     fmt->gl_format, fmt->gl_type, 0);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
@@ -4403,8 +4404,33 @@ gl_renderer_setup(struct weston_compositor *ec)
 	    weston_check_egl_extension(extensions, "GL_OES_rgb8_rgba8"))
 		gr->has_rgb8_rgba8 = true;
 
-	if (gr->gl_version >= gr_gl_version(3, 0))
+	if (gr->gl_version >= gr_gl_version(3, 0)) {
+		gr->map_buffer_range = (void *) eglGetProcAddress("glMapBufferRange");
+		gr->unmap_buffer = (void *) eglGetProcAddress("glUnmapBuffer");
+		assert(gr->map_buffer_range);
+		assert(gr->unmap_buffer);
+		gr->pbo_usage = GL_STREAM_READ;
 		gr->has_pbo = true;
+	} else if (gr->gl_version >= gr_gl_version(2, 0) &&
+		   weston_check_egl_extension(extensions, "GL_NV_pixel_buffer_object") &&
+		   weston_check_egl_extension(extensions, "GL_EXT_map_buffer_range") &&
+		   weston_check_egl_extension(extensions, "GL_OES_mapbuffer")) {
+		gr->map_buffer_range = (void *) eglGetProcAddress("glMapBufferRangeEXT");
+		gr->unmap_buffer = (void *) eglGetProcAddress("glUnmapBufferOES");
+		assert(gr->map_buffer_range);
+		assert(gr->unmap_buffer);
+		/* Reading isn't exposed to BufferData() on ES 2.0 and
+		 * NV_pixel_buffer_object mentions that "glMapBufferOES does not
+		 * allow reading from the mapped pointer". EXT_map_buffer_range
+		 * (which depends on OES_mapbuffer) adds read access support to
+		 * MapBufferRangeEXT() without extending BufferData() so we
+		 * create a PBO with a write usage hint that ends up being
+		 * mapped with a read access. Even though that sounds incorrect,
+		 * EXT_map_buffer_range provides examples doing so. Mesa
+		 * actually ignores PBOs' usage hint assuming read access. */
+		gr->pbo_usage = GL_STREAM_DRAW;
+		gr->has_pbo = true;
+	}
 
 	wl_list_init(&gr->pending_capture_list);
 

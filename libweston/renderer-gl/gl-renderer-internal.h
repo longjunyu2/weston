@@ -188,7 +188,11 @@ struct gl_renderer {
 	bool has_texture_storage;
 	bool has_pack_reverse;
 	bool has_rgb8_rgba8;
+
 	bool has_pbo;
+	GLenum pbo_usage;
+	PFNGLMAPBUFFERRANGEEXTPROC map_buffer_range;
+	PFNGLUNMAPBUFFEROESPROC unmap_buffer;
 
 	struct wl_list pending_capture_list;
 
