@@ -269,6 +269,7 @@ fs_output_destroy(struct fs_output *fsout)
 
 	if (fsout->output)
 		wl_list_remove(&fsout->output_destroyed.link);
+	free(fsout);
 }
 
 static void
