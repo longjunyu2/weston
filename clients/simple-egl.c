@@ -115,7 +115,7 @@ struct window {
 	struct xdg_surface *xdg_surface;
 	struct xdg_toplevel *xdg_toplevel;
 	EGLSurface egl_surface;
-	int fullscreen, maximized, opaque, buffer_bpp, frame_sync, delay;
+	int fullscreen, maximized, opaque, buffer_bpp, interval, delay;
 	struct wp_tearing_control_v1 *tear_control;
 	struct wp_viewport *viewport;
 	struct wp_fractional_scale_v1 *fractional_scale_obj;
@@ -443,8 +443,7 @@ init_gl(struct window *window)
 			     window->egl_surface, window->display->egl.ctx);
 	assert(ret == EGL_TRUE);
 
-	if (!window->frame_sync)
-		eglSwapInterval(window->display->egl.dpy, 0);
+	eglSwapInterval(window->display->egl.dpy, window->interval);
 
 	frag = create_shader(window, frag_shader_text, GL_FRAGMENT_SHADER);
 	vert = create_shader(window, vert_shader_text, GL_VERTEX_SHADER);
@@ -1295,6 +1294,7 @@ usage(int error_code)
 		"  -t\tEnable tearing via the tearing_control protocol\n"
 		"  -T\tEnable and disable tearing every 5 seconds\n"
 		"  -v\tDraw a moving vertical bar instead of a triangle\n"
+		"  -i <interval> \tSet eglSwapInterval to interval\n"
 		"  -h\tThis help text\n\n");
 
 	exit(error_code);
@@ -1317,7 +1317,7 @@ main(int argc, char **argv)
 	window.buffer_transform = WL_OUTPUT_TRANSFORM_NORMAL;
 	window.needs_buffer_geometry_update = false;
 	window.buffer_bpp = 0;
-	window.frame_sync = 1;
+	window.interval = 1;
 	window.delay = 0;
 	window.fullscreen_ratio = false;
 
@@ -1338,7 +1338,7 @@ main(int argc, char **argv)
 		else if (strcmp("-s", argv[i]) == 0)
 			window.buffer_bpp = 16;
 		else if (strcmp("-b", argv[i]) == 0)
-			window.frame_sync = 0;
+			window.interval = 0;
 		else if (strcmp("-t", argv[i]) == 0) {
 			window.tearing = true;
 		} else if (strcmp("-T", argv[i]) == 0) {
@@ -1346,6 +1346,8 @@ main(int argc, char **argv)
 			window.toggled_tearing = true;
 		} else if (strcmp("-v", argv[i]) == 0)
 			window.vertical_bar = true;
+		else if (strcmp("-i", argv[i]) == 0)
+			window.interval = atoi(argv[++i]);
 		else if (strcmp("-h", argv[i]) == 0)
 			usage(EXIT_SUCCESS);
 		else
