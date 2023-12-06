@@ -734,6 +734,8 @@ weston_view_create(struct weston_surface *surface)
 struct weston_presentation_feedback {
 	struct wl_resource *resource;
 
+	struct weston_surface *surface;
+
 	/* XXX: could use just wl_resource_get_link() instead */
 	struct wl_list link;
 
@@ -3601,6 +3603,23 @@ weston_output_take_feedback_list(struct weston_output *output,
 	wl_list_init(&surface->feedback_list);
 }
 
+static void
+weston_output_put_back_feedback_list(struct weston_output *output)
+{
+	struct weston_presentation_feedback *feedback, *tmp;
+
+	if (wl_list_empty(&output->feedback_list))
+		return;
+
+	wl_list_for_each_safe(feedback, tmp, &output->feedback_list, link) {
+		wl_list_remove(&feedback->link);
+		wl_list_insert(&feedback->surface->feedback_list,
+			       &feedback->link);
+	}
+
+	wl_list_init(&output->feedback_list);
+}
+
 WL_EXPORT bool
 weston_output_flush_damage_for_plane(struct weston_output *output,
 				     struct weston_plane *plane,
@@ -3650,6 +3669,7 @@ weston_output_flush_damage_for_primary_plane(struct weston_output *output,
 WL_EXPORT void
 weston_output_schedule_repaint_reset(struct weston_output *output)
 {
+	weston_output_put_back_feedback_list(output);
 	output->repaint_status = REPAINT_NOT_SCHEDULED;
 	TL_POINT(output->compositor, "core_repaint_exit_loop",
 		 TLP_OUTPUT(output), TLP_END);
@@ -8915,6 +8935,8 @@ presentation_feedback(struct wl_client *client,
 	feedback = zalloc(sizeof *feedback);
 	if (feedback == NULL)
 		goto err_calloc;
+
+	feedback->surface = surface;
 
 	feedback->resource = wl_resource_create(client,
 					&wp_presentation_feedback_interface,
