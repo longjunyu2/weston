@@ -1827,9 +1827,6 @@ struct weston_view {
 	 */
 	uint32_t output_mask;
 
-	/* Per-surface Presentation feedback flags, controlled by backend. */
-	uint32_t psf_flags;
-
 	bool is_mapped;
 	struct weston_log_pacer subsurface_parent_log_pacer;
 };

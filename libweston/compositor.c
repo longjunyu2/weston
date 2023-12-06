@@ -3579,18 +3579,19 @@ static void
 weston_output_take_feedback_list(struct weston_output *output,
 				 struct weston_surface *surface)
 {
-	struct weston_view *view;
 	struct weston_presentation_feedback *feedback;
+	struct weston_paint_node *pnode;
 	uint32_t flags = 0xffffffff;
 
 	if (wl_list_empty(&surface->feedback_list))
 		return;
 
 	/* All views must have the flag for the flag to survive. */
-	wl_list_for_each(view, &surface->views, surface_link) {
+	wl_list_for_each(pnode, &surface->paint_node_list, surface_link) {
 		/* ignore views that are not on this output at all */
-		if (view->output_mask & (1u << output->id))
-			flags &= view->psf_flags;
+		if (pnode->output != output)
+			continue;
+		flags &= pnode->psf_flags;
 	}
 
 	wl_list_for_each(feedback, &surface->feedback_list, link)
@@ -3703,7 +3704,7 @@ weston_output_repaint(struct weston_output *output, struct timespec *now)
 		wl_list_for_each(pnode, &output->paint_node_z_order_list,
 				 z_order_link) {
 			weston_paint_node_move_to_plane(pnode, &output->primary_plane);
-			pnode->view->psf_flags = 0;
+			pnode->psf_flags = 0;
 		}
 	}
 
@@ -3733,22 +3734,22 @@ weston_output_repaint(struct weston_output *output, struct timespec *now)
 		/* Note: This operation is safe to do multiple times on the
 		 * same surface.
 		 */
-		if (pnode->surface->output == output) {
+		if (pnode->surface->output != output)
+			continue;
 
-			/*
-			 * avoid adding pnode's frame callbacks/presented
-			 * feedback to the respective lists if pnode/surface is
-			 * occluded
-			 */
-			if (!pixman_region32_not_empty(&pnode->visible))
-				continue;
+		/*
+		 * avoid adding pnode's frame callbacks/presented
+		 * feedback to the respective lists if pnode/surface is
+		 * occluded
+		 */
+		if (!pixman_region32_not_empty(&pnode->visible))
+			continue;
 
-			wl_list_insert_list(&frame_callback_list,
-					    &pnode->surface->frame_callback_list);
-			wl_list_init(&pnode->surface->frame_callback_list);
+		wl_list_insert_list(&frame_callback_list,
+				    &pnode->surface->frame_callback_list);
+		wl_list_init(&pnode->surface->frame_callback_list);
 
-			weston_output_take_feedback_list(output, pnode->surface);
-		}
+		weston_output_take_feedback_list(output, pnode->surface);
 	}
 
 

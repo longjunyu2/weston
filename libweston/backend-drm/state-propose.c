@@ -1076,12 +1076,12 @@ drm_assign_planes(struct weston_output *output_base)
 		if (!target_plane ||
 		    target_plane->type == WDRM_PLANE_TYPE_CURSOR) {
 			/* cursor plane & renderer involve a copy */
-			ev->psf_flags = 0;
+			pnode->psf_flags = 0;
 		} else {
 			/* All other planes are a direct scanout of a
 			 * single client buffer.
 			 */
-			ev->psf_flags = WP_PRESENTATION_FEEDBACK_KIND_ZERO_COPY;
+			pnode->psf_flags = WP_PRESENTATION_FEEDBACK_KIND_ZERO_COPY;
 		}
 	}
 
