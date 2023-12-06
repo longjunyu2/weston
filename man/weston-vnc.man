@@ -62,6 +62,10 @@ When the VNC backend is loaded,
 .B weston
 will understand the following additional command line options.
 .TP
+.B \-\-address\fR=\fIaddress\fR
+The IP address on which the VNC backend will listen for VNC connections. By
+default it listens on 0.0.0.0.
+.TP
 .B \-\-width\fR=\fIwidth\fR
 The width of the framebuffer. It defaults to 640.
 .TP
