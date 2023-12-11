@@ -85,6 +85,7 @@ params_add(struct wl_client *client,
 	   uint32_t modifier_lo)
 {
 	struct linux_dmabuf_buffer *buffer;
+	uint64_t modifier;
 
 	buffer = wl_resource_get_user_data(params_resource);
 	if (!buffer) {
@@ -115,14 +116,23 @@ params_add(struct wl_client *client,
 		return;
 	}
 
+	if (wl_resource_get_version(params_resource) < ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION)
+		modifier = DRM_FORMAT_MOD_INVALID;
+	else
+		modifier = u64_from_u32s(modifier_hi, modifier_lo);
+
+	if (plane_idx > 0 && buffer->attributes.modifier != modifier) {
+		wl_resource_post_error(params_resource,
+			ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT,
+			"modifier mismatch between planes");
+		close(name_fd);
+		return;
+	}
+
+	buffer->attributes.modifier = modifier;
 	buffer->attributes.fd[plane_idx] = name_fd;
 	buffer->attributes.offset[plane_idx] = offset;
 	buffer->attributes.stride[plane_idx] = stride;
-
-	if (wl_resource_get_version(params_resource) < ZWP_LINUX_DMABUF_V1_MODIFIER_SINCE_VERSION)
-		buffer->attributes.modifier[plane_idx] = DRM_FORMAT_MOD_INVALID;
-	else
-		buffer->attributes.modifier[plane_idx] = u64_from_u32s(modifier_hi, modifier_lo);
 
 	buffer->attributes.n_planes++;
 }
@@ -1088,8 +1098,8 @@ linux_dmabuf_setup(struct weston_compositor *compositor)
 
 	/* If we were able to create the default dma-buf feedback for the
 	 * compositor, that means that we are able to advertise dma-buf feedback
-	 * events. In such case we support the version 4 of the protocol. */
-	max_version = compositor->default_dmabuf_feedback ? 4 : 3;
+	 * events. In such case we support the version >=4 of the protocol. */
+	max_version = compositor->default_dmabuf_feedback ? 5 : 3;
 
 	if (!wl_global_create(compositor->wl_display,
 			      &zwp_linux_dmabuf_v1_interface,

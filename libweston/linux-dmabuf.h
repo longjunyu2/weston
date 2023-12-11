@@ -43,7 +43,7 @@ struct dmabuf_attributes {
 	int fd[MAX_DMABUF_PLANES];
 	uint32_t offset[MAX_DMABUF_PLANES];
 	uint32_t stride[MAX_DMABUF_PLANES];
-	uint64_t modifier[MAX_DMABUF_PLANES];
+	uint64_t modifier;
 };
 
 struct linux_dmabuf_buffer {

@@ -2594,7 +2594,7 @@ import_simple_dmabuf(struct gl_renderer *gr,
 	attribs[atti++] = EGL_IMAGE_PRESERVED_KHR;
 	attribs[atti++] = EGL_TRUE;
 
-	if (attributes->modifier[0] != DRM_FORMAT_MOD_INVALID) {
+	if (attributes->modifier != DRM_FORMAT_MOD_INVALID) {
 		if (!gr->has_dmabuf_import_modifiers)
 			return NULL;
 		has_modifier = true;
@@ -2611,9 +2611,9 @@ import_simple_dmabuf(struct gl_renderer *gr,
 		attribs[atti++] = attributes->stride[0];
 		if (has_modifier) {
 			attribs[atti++] = EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT;
-			attribs[atti++] = attributes->modifier[0] & 0xFFFFFFFF;
+			attribs[atti++] = attributes->modifier & 0xFFFFFFFF;
 			attribs[atti++] = EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT;
-			attribs[atti++] = attributes->modifier[0] >> 32;
+			attribs[atti++] = attributes->modifier >> 32;
 		}
 	}
 
@@ -2626,9 +2626,9 @@ import_simple_dmabuf(struct gl_renderer *gr,
 		attribs[atti++] = attributes->stride[1];
 		if (has_modifier) {
 			attribs[atti++] = EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT;
-			attribs[atti++] = attributes->modifier[1] & 0xFFFFFFFF;
+			attribs[atti++] = attributes->modifier & 0xFFFFFFFF;
 			attribs[atti++] = EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT;
-			attribs[atti++] = attributes->modifier[1] >> 32;
+			attribs[atti++] = attributes->modifier >> 32;
 		}
 	}
 
@@ -2641,9 +2641,9 @@ import_simple_dmabuf(struct gl_renderer *gr,
 		attribs[atti++] = attributes->stride[2];
 		if (has_modifier) {
 			attribs[atti++] = EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT;
-			attribs[atti++] = attributes->modifier[2] & 0xFFFFFFFF;
+			attribs[atti++] = attributes->modifier & 0xFFFFFFFF;
 			attribs[atti++] = EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT;
-			attribs[atti++] = attributes->modifier[2] >> 32;
+			attribs[atti++] = attributes->modifier >> 32;
 		}
 	}
 
@@ -2656,9 +2656,9 @@ import_simple_dmabuf(struct gl_renderer *gr,
 			attribs[atti++] = EGL_DMA_BUF_PLANE3_PITCH_EXT;
 			attribs[atti++] = attributes->stride[3];
 			attribs[atti++] = EGL_DMA_BUF_PLANE3_MODIFIER_LO_EXT;
-			attribs[atti++] = attributes->modifier[3] & 0xFFFFFFFF;
+			attribs[atti++] = attributes->modifier & 0xFFFFFFFF;
 			attribs[atti++] = EGL_DMA_BUF_PLANE3_MODIFIER_HI_EXT;
-			attribs[atti++] = attributes->modifier[3] >> 32;
+			attribs[atti++] = attributes->modifier >> 32;
 		}
 	}
 
@@ -2688,7 +2688,7 @@ import_dmabuf_single_plane(struct gl_renderer *gr,
 	plane.fd[0] = attributes->fd[descriptor->plane_index];
 	plane.offset[0] = attributes->offset[descriptor->plane_index];
 	plane.stride[0] = attributes->stride[descriptor->plane_index];
-	plane.modifier[0] = attributes->modifier[descriptor->plane_index];
+	plane.modifier = attributes->modifier;
 
 	image = import_simple_dmabuf(gr, &plane);
 	if (image == EGL_NO_IMAGE_KHR) {
@@ -2822,7 +2822,7 @@ choose_texture_target(struct gl_renderer *gr,
 		int i;
 
 		for (i = 0; i < format->num_modifiers; ++i) {
-			if (format->modifiers[i] == attributes->modifier[0]) {
+			if (format->modifiers[i] == attributes->modifier) {
 				if (format->external_only[i])
 					return GL_TEXTURE_EXTERNAL_OES;
 				else
@@ -2997,21 +2997,13 @@ gl_renderer_import_dmabuf(struct weston_compositor *ec,
 {
 	struct gl_renderer *gr = get_renderer(ec);
 	struct gl_buffer_state *gb;
-	int i;
 
 	assert(gr->has_dmabuf_import);
 
-	for (i = 0; i < dmabuf->attributes.n_planes; i++) {
-		/* return if EGL doesn't support import modifiers */
-		if (dmabuf->attributes.modifier[i] != DRM_FORMAT_MOD_INVALID)
-			if (!gr->has_dmabuf_import_modifiers)
-				return false;
-
-		/* return if modifiers passed are unequal */
-		if (dmabuf->attributes.modifier[i] !=
-		    dmabuf->attributes.modifier[0])
+	/* return if EGL doesn't support import modifiers */
+	if (dmabuf->attributes.modifier != DRM_FORMAT_MOD_INVALID)
+		if (!gr->has_dmabuf_import_modifiers)
 			return false;
-	}
 
 	/* reject all flags we do not recognize or handle */
 	if (dmabuf->attributes.flags & ~ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_Y_INVERT)

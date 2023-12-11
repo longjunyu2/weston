@@ -384,7 +384,7 @@ drm_fb_get_from_dmabuf(struct linux_dmabuf_buffer *dmabuf,
 		.height = dmabuf->attributes.height,
 		.format = dmabuf->attributes.format,
 		.num_fds = dmabuf->attributes.n_planes,
-		.modifier = dmabuf->attributes.modifier[0],
+		.modifier = dmabuf->attributes.modifier,
 	};
 
 	/* We should not import to KMS a buffer that has been allocated using no
@@ -394,7 +394,7 @@ drm_fb_get_from_dmabuf(struct linux_dmabuf_buffer *dmabuf,
 	 * KMS driver can't know. So giving the buffer to KMS is not safe, as
 	 * not knowing its layout can result in garbage being displayed. In
 	 * short, importing a buffer to KMS requires explicit modifiers. */
-	if (dmabuf->attributes.modifier[0] == DRM_FORMAT_MOD_INVALID) {
+	if (dmabuf->attributes.modifier == DRM_FORMAT_MOD_INVALID) {
 		if (try_view_on_plane_failure_reasons)
 			*try_view_on_plane_failure_reasons |=
 				FAILURE_REASONS_DMABUF_MODIFIER_INVALID;
@@ -436,7 +436,7 @@ drm_fb_get_from_dmabuf(struct linux_dmabuf_buffer *dmabuf,
 
 	fb->width = dmabuf->attributes.width;
 	fb->height = dmabuf->attributes.height;
-	fb->modifier = dmabuf->attributes.modifier[0];
+	fb->modifier = dmabuf->attributes.modifier;
 	fb->size = 0;
 	fb->fd = device->drm.fd;
 
