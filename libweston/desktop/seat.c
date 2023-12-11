@@ -532,6 +532,9 @@ weston_desktop_seat_popup_grab_add_surface(struct weston_desktop_seat *seat,
 
 	wl_list_insert(&seat->popup_grab.surfaces, link);
 
+	if (!seat->popup_grab.keyboard.keyboard)
+		return;
+
 	desktop_surface =
 		weston_desktop_seat_popup_grab_get_topmost_surface(seat);
 	surface = weston_desktop_surface_get_surface(desktop_surface);
@@ -551,6 +554,9 @@ weston_desktop_seat_popup_grab_remove_surface(struct weston_desktop_seat *seat,
 	} else {
 		struct weston_desktop_surface *desktop_surface;
 		struct weston_surface *surface;
+
+		if (!seat->popup_grab.keyboard.keyboard)
+			return;
 
 		desktop_surface =
 			weston_desktop_seat_popup_grab_get_topmost_surface(seat);
