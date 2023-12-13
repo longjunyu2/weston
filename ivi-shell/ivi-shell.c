@@ -220,11 +220,18 @@ ivi_shell_surface_get_label(struct weston_surface *surface,
 static void
 layout_surface_cleanup(struct ivi_shell_surface *ivisurf)
 {
+	struct weston_seat *seat;
 	assert(ivisurf->layout_surface != NULL);
 
 	/* destroy weston_surface destroy signal. */
 	if (!ivisurf->layout_surface->weston_desktop_surface)
 		wl_list_remove(&ivisurf->surface_destroy_listener.link);
+
+	wl_list_for_each(seat, &ivisurf->surface->compositor->seat_list, link) {
+		struct ivi_shell_seat *shseat = get_ivi_shell_seat(seat);
+		if (shseat->focused_ivisurf == ivisurf->layout_surface)
+			shseat->focused_ivisurf = NULL;
+	}
 
 	ivi_layout_surface_destroy(ivisurf->layout_surface);
 	ivisurf->layout_surface = NULL;
