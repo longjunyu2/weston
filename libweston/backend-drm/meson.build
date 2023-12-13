@@ -4,14 +4,14 @@ endif
 
 dep_libdisplay_info = dependency(
 	'libdisplay-info',
-	version: ['>= 0.1.1', '< 0.2.0'],
+	version: ['>= 0.1.1', '< 0.3.0'],
 	fallback: ['display-info', 'di_dep'],
 	default_options: [
 		'werror=false',
 	],
-	required: false,
+	required: true,
+	not_found_message: 'Required by DRM-backend.',
 )
-config_h.set10('HAVE_LIBDISPLAY_INFO', dep_libdisplay_info.found())
 
 lib_backlight = static_library(
 	'backlight',

@@ -1439,10 +1439,6 @@ wet_output_set_eotf_mode(struct weston_output *output,
 	if ((weston_output_get_supported_eotf_modes(output) & eotf_mode) == 0) {
 		weston_log("Error: output '%s' does not support EOTF mode %s.\n",
 			   output->name, str);
-#if !HAVE_LIBDISPLAY_INFO
-		weston_log_continue(STAMP_SPACE "Weston was built without libdisplay-info, "
-				    "so HDR capabilities cannot be detected.\n");
-#endif
 		free(str);
 		return -1;
 	}
@@ -1507,10 +1503,6 @@ wet_output_set_colorimetry_mode(struct weston_output *output,
 	if ((weston_output_get_supported_colorimetry_modes(output) & cmode) == 0) {
 		weston_log("Error: output '%s' does not support colorimetry mode %s.\n",
 			   output->name, str);
-#if !HAVE_LIBDISPLAY_INFO
-		weston_log_continue(STAMP_SPACE "Weston was built without libdisplay-info, "
-				    "so colorimetry capabilities cannot be detected.\n");
-#endif
 		free(str);
 		return -1;
 	}

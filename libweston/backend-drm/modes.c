@@ -31,10 +31,7 @@
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
-
-#if HAVE_LIBDISPLAY_INFO
 #include <libdisplay-info/info.h>
-#endif
 
 #include "drm-internal.h"
 #include "shared/weston-drm-fourcc.h"
@@ -230,8 +227,6 @@ parse_modeline(const char *s, drmModeModeInfo *mode)
 	return 0;
 }
 
-#if HAVE_LIBDISPLAY_INFO
-
 static void
 drm_head_info_from_edid(struct drm_head_info *dhi,
 			const uint8_t *data,
@@ -258,138 +253,6 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 	dhi->eotf_mask = WESTON_EOTF_MODE_ALL_MASK;
 	dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_ALL_MASK;
 }
-
-#else /* HAVE_LIBDISPLAY_INFO */
-
-struct drm_edid {
-	char eisa_id[13];
-	char monitor_name[13];
-	char pnp_id[5];
-	char serial_number[13];
-};
-
-static void
-edid_parse_string(const uint8_t *data, char text[])
-{
-	int i;
-	int replaced = 0;
-
-	/* this is always 12 bytes, but we can't guarantee it's null
-	 * terminated or not junk. */
-	strncpy(text, (const char *) data, 12);
-
-	/* guarantee our new string is null-terminated */
-	text[12] = '\0';
-
-	/* remove insane chars */
-	for (i = 0; text[i] != '\0'; i++) {
-		if (text[i] == '\n' ||
-		    text[i] == '\r') {
-			text[i] = '\0';
-			break;
-		}
-	}
-
-	/* ensure string is printable */
-	for (i = 0; text[i] != '\0'; i++) {
-		if (!isprint(text[i])) {
-			text[i] = '-';
-			replaced++;
-		}
-	}
-
-	/* if the string is random junk, ignore the string */
-	if (replaced > 4)
-		text[0] = '\0';
-}
-
-#define EDID_DESCRIPTOR_ALPHANUMERIC_DATA_STRING	0xfe
-#define EDID_DESCRIPTOR_DISPLAY_PRODUCT_NAME		0xfc
-#define EDID_DESCRIPTOR_DISPLAY_PRODUCT_SERIAL_NUMBER	0xff
-#define EDID_OFFSET_DATA_BLOCKS				0x36
-#define EDID_OFFSET_LAST_BLOCK				0x6c
-#define EDID_OFFSET_PNPID				0x08
-#define EDID_OFFSET_SERIAL				0x0c
-
-static int
-edid_parse(struct drm_edid *edid, const uint8_t *data, size_t length)
-{
-	int i;
-	uint32_t serial_number;
-
-	/* check header */
-	if (length < 128)
-		return -1;
-	if (data[0] != 0x00 || data[1] != 0xff)
-		return -1;
-
-	/* decode the PNP ID from three 5 bit words packed into 2 bytes
-	 * /--08--\/--09--\
-	 * 7654321076543210
-	 * |\---/\---/\---/
-	 * R  C1   C2   C3 */
-	edid->pnp_id[0] = 'A' + ((data[EDID_OFFSET_PNPID + 0] & 0x7c) / 4) - 1;
-	edid->pnp_id[1] = 'A' + ((data[EDID_OFFSET_PNPID + 0] & 0x3) * 8) + ((data[EDID_OFFSET_PNPID + 1] & 0xe0) / 32) - 1;
-	edid->pnp_id[2] = 'A' + (data[EDID_OFFSET_PNPID + 1] & 0x1f) - 1;
-	edid->pnp_id[3] = '\0';
-
-	/* maybe there isn't a ASCII serial number descriptor, so use this instead */
-	serial_number = (uint32_t) data[EDID_OFFSET_SERIAL + 0];
-	serial_number += (uint32_t) data[EDID_OFFSET_SERIAL + 1] * 0x100;
-	serial_number += (uint32_t) data[EDID_OFFSET_SERIAL + 2] * 0x10000;
-	serial_number += (uint32_t) data[EDID_OFFSET_SERIAL + 3] * 0x1000000;
-	if (serial_number > 0)
-		sprintf(edid->serial_number, "%lu", (unsigned long) serial_number);
-
-	/* parse EDID data */
-	for (i = EDID_OFFSET_DATA_BLOCKS;
-	     i <= EDID_OFFSET_LAST_BLOCK;
-	     i += 18) {
-		/* ignore pixel clock data */
-		if (data[i] != 0)
-			continue;
-		if (data[i+2] != 0)
-			continue;
-
-		/* any useful blocks? */
-		if (data[i+3] == EDID_DESCRIPTOR_DISPLAY_PRODUCT_NAME) {
-			edid_parse_string(&data[i+5],
-					  edid->monitor_name);
-		} else if (data[i+3] == EDID_DESCRIPTOR_DISPLAY_PRODUCT_SERIAL_NUMBER) {
-			edid_parse_string(&data[i+5],
-					  edid->serial_number);
-		} else if (data[i+3] == EDID_DESCRIPTOR_ALPHANUMERIC_DATA_STRING) {
-			edid_parse_string(&data[i+5],
-					  edid->eisa_id);
-		}
-	}
-	return 0;
-}
-
-static void
-drm_head_info_from_edid(struct drm_head_info *dhi,
-			const uint8_t *data,
-			size_t length)
-{
-	struct drm_edid edid = {};
-	int rc;
-
-	rc = edid_parse(&edid, data, length);
-	if (rc == 0) {
-		if (edid.pnp_id[0] != '\0')
-			dhi->make = xstrdup(edid.pnp_id);
-		if (edid.monitor_name[0] != '\0')
-			dhi->model = xstrdup(edid.monitor_name);
-		if (edid.serial_number[0] != '\0')
-			dhi->serial_number = xstrdup(edid.serial_number);
-	}
-
-	/* This ad hoc code will never parse HDR data. */
-	dhi->eotf_mask = WESTON_EOTF_MODE_SDR;
-	dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_DEFAULT;
-}
-
-#endif /* HAVE_LIBDISPLAY_INFO else */
 
 static void
 drm_head_set_display_data(struct drm_head *head, const void *data, size_t len)
