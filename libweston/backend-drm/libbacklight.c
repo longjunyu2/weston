@@ -41,6 +41,7 @@
 #include <drm.h>
 #include <fcntl.h>
 #include <malloc.h>
+#include <libgen.h>
 #include <string.h>
 #include <errno.h>
 
@@ -167,7 +168,7 @@ struct backlight *backlight_init(struct udev_device *drm_device,
 	DIR *backlights = NULL;
 	struct dirent *entry;
 	enum backlight_type type = 0;
-	char buffer[100];
+	char buffer[100], basename_buffer[100];
 	struct backlight *backlight = NULL;
 	int ret;
 
@@ -186,9 +187,10 @@ struct backlight *backlight_init(struct udev_device *drm_device,
 	free(path);
 	if (ret < 0)
 		return NULL;
-
+	strncpy(basename_buffer, buffer, ret);
 	buffer[ret] = '\0';
-	pci_name = basename(buffer);
+	basename_buffer[ret] = '\0';
+	pci_name = basename(basename_buffer);
 
 	if (connector_type <= 0)
 		return NULL;

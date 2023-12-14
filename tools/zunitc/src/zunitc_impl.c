@@ -27,6 +27,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
