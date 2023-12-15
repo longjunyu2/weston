@@ -30,7 +30,6 @@
 
 #include <libweston/libweston.h>
 #include "libweston-internal.h"
-#include "compositor/weston.h"
 #include "weston-test-runner.h"
 #include "weston-test-fixture-compositor.h"
 
