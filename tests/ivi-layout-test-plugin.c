@@ -36,7 +36,7 @@
 #include <errno.h>
 
 #include <libweston/libweston.h>
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include "weston-test-server-protocol.h"
 #include "ivi-test.h"
 #include "ivi-shell/ivi-layout-export.h"

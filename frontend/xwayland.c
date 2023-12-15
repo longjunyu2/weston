@@ -33,7 +33,7 @@
 #include <fcntl.h>
 
 #include <libweston/libweston.h>
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include <libweston/xwayland-api.h>
 #include "shared/helpers.h"
 #include "shared/os-compatibility.h"

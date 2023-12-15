@@ -34,7 +34,7 @@
 #include <linux/input.h>
 
 #include <libweston/libweston.h>
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include "shared/file-util.h"
 #include "libweston-internal.h"
 

@@ -31,7 +31,7 @@
 
 #include "kiosk-shell.h"
 #include "kiosk-shell-grab.h"
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include "libweston/libweston.h"
 #include "shared/helpers.h"
 #include <libweston/shell-utils.h>

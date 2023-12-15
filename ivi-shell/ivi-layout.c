@@ -61,7 +61,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include <libweston/libweston.h>
 #include "ivi-shell.h"
 #include "ivi-layout-export.h"

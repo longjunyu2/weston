@@ -36,7 +36,7 @@
 #include <math.h>
 #include <sys/types.h>
 
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include <libweston/config-parser.h>
 #include "shared/helpers.h"
 #include <libweston/shell-utils.h>

@@ -50,7 +50,7 @@
 #include "libweston/libweston.h"
 #include "shared/helpers.h"
 #include "shared/xalloc.h"
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 
 /* Representation of ivi_surface protocol object. */
 struct ivi_shell_surface

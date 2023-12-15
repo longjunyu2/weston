@@ -37,7 +37,7 @@
 #include <sys/types.h>
 
 #include "shell.h"
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include "weston-desktop-shell-server-protocol.h"
 #include <libweston/config-parser.h>
 #include "shared/helpers.h"

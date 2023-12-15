@@ -40,7 +40,7 @@
 #include <libweston/weston-log.h>
 #include "backend.h"
 #include "libweston-internal.h"
-#include "compositor/weston.h"
+#include "frontend/weston.h"
 #include "weston-test-server-protocol.h"
 #include "weston.h"
 #include "weston-testsuite-data.h"
