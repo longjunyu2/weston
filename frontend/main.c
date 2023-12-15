@@ -1444,6 +1444,7 @@ wet_output_set_eotf_mode(struct weston_output *output,
 		for (i = 0; i < ARRAY_LENGTH(modes); i++)
 			weston_log_continue(" %s", modes[i].name);
 		weston_log_continue("\n");
+		free(str);
 		return -1;
 	}
 	eotf_mode = modes[i].eotf_mode;
