@@ -574,6 +574,25 @@ log_uname(void)
 						usys.version, usys.machine);
 }
 
+static void
+warn_possible_tty(void)
+{
+	int ret = isatty(fileno(weston_logfile));
+
+	if (ret > 0) {
+		/* isatty returns also if fd is pts */
+		char *tty_name = ttyname(fileno(weston_logfile));
+
+		if (tty_name && !strncmp(tty_name, "/dev/tty", 8)) {
+			weston_log("WARNING: Weston was started from %s. "
+				   "Messages will be dropped if not written to "
+				   "a file.\n", tty_name);
+			weston_log_continue(STAMP_SPACE "Use --log for capturing"
+					" Weston logs to a file.\n");
+		}
+	}
+}
+
 static struct wet_output_config *
 wet_init_parsed_options(struct weston_compositor *ec)
 {
@@ -3067,6 +3086,8 @@ load_drm_backend(struct weston_compositor *c, int *argc, char **argv,
 	config.base.struct_version = WESTON_DRM_BACKEND_CONFIG_VERSION;
 	config.base.struct_size = sizeof(struct weston_drm_backend_config);
 	config.configure_device = configure_input_device;
+
+	warn_possible_tty();
 
 	wb = wet_compositor_load_backend(c, WESTON_BACKEND_DRM, &config.base,
 					 drm_heads_changed, NULL);
