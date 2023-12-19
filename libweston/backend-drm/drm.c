@@ -206,7 +206,7 @@ drm_crtc_find(struct drm_device *device, uint32_t crtc_id)
 }
 
 struct drm_head *
-drm_head_find_by_connector(struct drm_backend *backend, uint32_t connector_id)
+drm_head_find_by_connector(struct drm_backend *backend, struct drm_device *device, uint32_t connector_id)
 {
 	struct weston_head *base;
 	struct drm_head *head;
@@ -216,19 +216,25 @@ drm_head_find_by_connector(struct drm_backend *backend, uint32_t connector_id)
 		head = to_drm_head(base);
 		if (!head)
 			continue;
-		if (head->connector.connector_id == connector_id)
-			return head;
+
+		if (head->connector.device != device)
+			continue;
+
+		if (head->connector.connector_id != connector_id)
+			continue;
+
+		return head;
 	}
 
 	return NULL;
 }
 
 static struct drm_writeback *
-drm_writeback_find_by_connector(struct drm_backend *backend, uint32_t connector_id)
+drm_writeback_find_by_connector(struct drm_device *device, uint32_t connector_id)
 {
 	struct drm_writeback *writeback;
 
-	wl_list_for_each(writeback, &backend->drm->writeback_connector_list, link) {
+	wl_list_for_each(writeback, &device->writeback_connector_list, link) {
 		if (writeback->connector.connector_id == connector_id)
 			return writeback;
 	}
@@ -3111,8 +3117,8 @@ drm_backend_update_connectors(struct drm_device *device,
 		if (!conn)
 			continue;
 
-		head = drm_head_find_by_connector(b, connector_id);
-		writeback = drm_writeback_find_by_connector(b, connector_id);
+		head = drm_head_find_by_connector(b, device, connector_id);
+		writeback = drm_writeback_find_by_connector(device, connector_id);
 
 		/* Connector can't be owned by both a head and a writeback, so
 		 * one of the searches must fail. */
@@ -3189,13 +3195,14 @@ drm_connector_find_property_by_id(struct drm_connector *connector,
 
 static void
 drm_backend_update_conn_props(struct drm_backend *b,
+			      struct drm_device *device,
 			      uint32_t	connector_id,
 			      uint32_t property_id)
 {
 	struct drm_head *head;
 	enum wdrm_connector_property conn_prop;
 
-	head = drm_head_find_by_connector(b, connector_id);
+	head = drm_head_find_by_connector(b, device, connector_id);
 	if (!head) {
 		weston_log("DRM: failed to find head for connector id: %d.\n",
 			   connector_id);
@@ -3269,7 +3276,7 @@ udev_drm_event(int fd, uint32_t mask, void *data)
 
 	if (udev_event_is_hotplug(b->drm, event)) {
 		if (udev_event_is_conn_prop_change(b, event, &conn_id, &prop_id))
-			drm_backend_update_conn_props(b, conn_id, prop_id);
+			drm_backend_update_conn_props(b, b->drm, conn_id, prop_id);
 		else
 			drm_backend_update_connectors(b->drm, event);
 	}
@@ -3277,7 +3284,7 @@ udev_drm_event(int fd, uint32_t mask, void *data)
 	wl_list_for_each(device, &b->kms_list, link) {
 		if (udev_event_is_hotplug(device, event)) {
 			if (udev_event_is_conn_prop_change(b, event, &conn_id, &prop_id))
-				drm_backend_update_conn_props(b, conn_id, prop_id);
+				drm_backend_update_conn_props(b, device, conn_id, prop_id);
 			else
 				drm_backend_update_connectors(device, event);
 		}

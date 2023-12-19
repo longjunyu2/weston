@@ -775,7 +775,7 @@ struct drm_crtc *
 drm_crtc_find(struct drm_device *device, uint32_t crtc_id);
 
 struct drm_head *
-drm_head_find_by_connector(struct drm_backend *backend, uint32_t connector_id);
+drm_head_find_by_connector(struct drm_backend *backend, struct drm_device *device, uint32_t connector_id);
 
 uint64_t
 drm_rotation_from_output_transform(struct drm_plane *plane,

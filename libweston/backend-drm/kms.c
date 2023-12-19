@@ -1099,6 +1099,7 @@ drm_connector_set_max_bpc(struct drm_connector *connector,
 	const struct drm_property_info *info;
 	struct drm_head *head;
 	struct drm_backend *backend = output->device->backend;
+	struct drm_device *device = output->device;
 	uint64_t max_bpc;
 	uint64_t a, b;
 
@@ -1107,7 +1108,7 @@ drm_connector_set_max_bpc(struct drm_connector *connector,
 
 	if (output->max_bpc == 0) {
 		/* A value of 0 means that the current max_bpc must be programmed. */
-		head = drm_head_find_by_connector(backend, connector->connector_id);
+		head = drm_head_find_by_connector(backend, device, connector->connector_id);
 		max_bpc = head->inherited_max_bpc;
 	} else {
 		info = &connector->props[WDRM_CONNECTOR_MAX_BPC];
