@@ -3131,7 +3131,7 @@ drm_backend_update_connectors(struct drm_device *device,
 		} else if (writeback) {
 			ret = drm_writeback_update_info(writeback, conn);
 		} else {
-			ret = drm_backend_add_connector(b->drm, conn, drm_device);
+			ret = drm_backend_add_connector(device, conn, drm_device);
 		}
 
 		if (ret < 0)
