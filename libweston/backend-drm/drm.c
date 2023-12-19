@@ -2293,7 +2293,7 @@ drm_output_deinit(struct weston_output *base)
 {
 	struct drm_output *output = to_drm_output(base);
 	struct drm_backend *b = output->backend;
-	struct drm_device *device = b->drm;
+	struct drm_device *device = output->device;
 	struct drm_pending_state *pending;
 
 	if (!b->compositor->shutting_down) {
