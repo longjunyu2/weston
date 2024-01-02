@@ -48,6 +48,15 @@ struct weston_backend {
 	 */
 	unsigned int supported_presentation_clocks;
 
+	/** True if the output will be repainted in the currently active
+	 *  repaint handler.
+	 *
+	 * This will be set if the same flag for any output of this backend is
+	 * also true. It is used to determine if repaint_begin() and
+	 * repaint_flush()/repaint_cancel() need to be called.
+	 */
+	bool will_repaint;
+
 	/** Prepare for compositor shutdown (optional)
 	 *
 	 * This will be called before weston_compositor_shutdown()

@@ -3606,8 +3606,16 @@ weston_output_flush_damage_for_primary_plane(struct weston_output *output,
 	}
 }
 
+static void
+weston_output_schedule_repaint_reset(struct weston_output *output)
+{
+	output->repaint_status = REPAINT_NOT_SCHEDULED;
+	TL_POINT(output->compositor, "core_repaint_exit_loop",
+		 TLP_OUTPUT(output), TLP_END);
+}
+
 static int
-weston_output_repaint(struct weston_output *output)
+weston_output_repaint(struct weston_output *output, struct timespec *now)
 {
 	struct weston_compositor *ec = output->compositor;
 	struct weston_paint_node *pnode;
@@ -3617,9 +3625,6 @@ weston_output_repaint(struct weston_output *output)
 	int r;
 	uint32_t frame_time_msec;
 	enum weston_hdcp_protection highest_requested = WESTON_HDCP_DISABLE;
-
-	if (output->destroying)
-		return 0;
 
 	TL_POINT(ec, "core_repaint_begin", TLP_OUTPUT(output), TLP_END);
 
@@ -3673,8 +3678,10 @@ weston_output_repaint(struct weston_output *output)
 	r = output->repaint(output);
 
 	output->repaint_needed = false;
-	if (r == 0)
+	if (r == 0) {
 		output->repaint_status = REPAINT_AWAITING_COMPLETION;
+		output->repainted = true;
+	}
 
 	weston_compositor_repick(ec);
 
@@ -3719,66 +3726,58 @@ weston_output_repaint(struct weston_output *output)
 
 	TL_POINT(ec, "core_repaint_posted", TLP_OUTPUT(output), TLP_END);
 
-	return r;
-}
-
-static void
-weston_output_schedule_repaint_reset(struct weston_output *output)
-{
-	output->repaint_status = REPAINT_NOT_SCHEDULED;
-	TL_POINT(output->compositor, "core_repaint_exit_loop",
-		 TLP_OUTPUT(output), TLP_END);
-}
-
-static int
-weston_output_maybe_repaint(struct weston_output *output, struct timespec *now)
-{
-	struct weston_compositor *compositor = output->compositor;
-	int ret = 0;
-	int64_t msec_to_repaint;
-
-	/* We're not ready yet; come back to make a decision later. */
-	if (output->repaint_status != REPAINT_SCHEDULED)
-		return ret;
-
-	msec_to_repaint = timespec_sub_to_msec(&output->next_repaint, now);
-	if (msec_to_repaint > 1)
-		return ret;
-
-	/* If we're sleeping, drop the repaint machinery entirely; we will
-	 * explicitly repaint all outputs when we come back. */
-	if (compositor->state == WESTON_COMPOSITOR_SLEEPING ||
-	    compositor->state == WESTON_COMPOSITOR_OFFSCREEN)
-		goto err;
-
-	/* We don't actually need to repaint this output; drop it from
-	 * repaint until something causes damage. */
-	if (!output->repaint_needed)
-		goto err;
-
-	if (output->power_state == WESTON_OUTPUT_POWER_FORCED_OFF)
-		goto err;
-
-	if (output->repaint_only_on_capture &&
-	    !weston_output_has_renderer_capture_tasks(output))
-		goto err;
-
 	/* If repaint fails, we aren't going to get weston_output_finish_frame
 	 * to trigger a new repaint, so drop it from repaint and hope
 	 * something schedules a successful repaint later. As repainting may
 	 * take some time, re-read our clock as a courtesy to the next
 	 * output. */
-	ret = weston_output_repaint(output);
-	weston_compositor_read_presentation_clock(compositor, now);
-	if (ret != 0)
-		goto err;
+	weston_compositor_read_presentation_clock(ec, now);
+	if (r != 0)
+		weston_output_schedule_repaint_reset(output);
 
-	output->repainted = true;
-	return ret;
+	return r;
+}
 
-err:
+static bool
+weston_output_check_repaint(struct weston_output *output, struct timespec *now)
+{
+	struct weston_compositor *compositor = output->compositor;
+	int64_t msec_to_repaint;
+
+	/* We're not ready yet; come back to make a decision later. */
+	if (output->repaint_status != REPAINT_SCHEDULED)
+		return false;
+
+	msec_to_repaint = timespec_sub_to_msec(&output->next_repaint, now);
+	if (msec_to_repaint > 1)
+		return false;
+
+	/* If we're sleeping, drop the repaint machinery entirely; we will
+	 * explicitly repaint all outputs when we come back. */
+	if (compositor->state == WESTON_COMPOSITOR_SLEEPING ||
+	    compositor->state == WESTON_COMPOSITOR_OFFSCREEN)
+		goto out;
+
+	/* We don't actually need to repaint this output; drop it from
+	 * repaint until something causes damage. */
+	if (!output->repaint_needed)
+		goto out;
+
+	if (output->power_state == WESTON_OUTPUT_POWER_FORCED_OFF)
+		goto out;
+
+	if (output->repaint_only_on_capture &&
+	    !weston_output_has_renderer_capture_tasks(output))
+		goto out;
+
+	if (output->destroying)
+		goto out;
+
+	return true;
+
+out:
 	weston_output_schedule_repaint_reset(output);
-	return ret;
+	return false;
 }
 
 static void
@@ -3846,36 +3845,55 @@ output_repaint_timer_handler(void *data)
 	weston_compositor_read_presentation_clock(compositor, &now);
 	compositor->last_repaint_start = now;
 
+	wl_list_for_each(output, &compositor->output_list, link) {
+		if (!weston_output_check_repaint(output, &now))
+			continue;
+
+		output->will_repaint = true;
+		output->backend->will_repaint = true;
+
+		if (output->prepare_repaint)
+			output->prepare_repaint(output);
+	}
+
 	wl_list_for_each(backend, &compositor->backend_list, link) {
+		if (!backend->will_repaint)
+			continue;
+
+		backend->will_repaint = false;
+
 		if (backend->repaint_begin)
 			backend->repaint_begin(backend);
-	}
 
-	wl_list_for_each(output, &compositor->output_list, link) {
-		ret = weston_output_maybe_repaint(output, &now);
-		if (ret)
-			break;
-	}
+		wl_list_for_each(output, &compositor->output_list, link) {
+			if (output->backend != backend)
+				continue;
 
-	if (ret == 0) {
-		wl_list_for_each(backend, &compositor->backend_list, link) {
+			if (!output->will_repaint)
+				continue;
+
+			output->will_repaint = false;
+			ret = weston_output_repaint(output, &now);
+			if (ret)
+				break;
+		}
+		if (ret == 0) {
 			if (backend->repaint_flush)
 				ret = backend->repaint_flush(backend);
-		}
-	} else {
-		wl_list_for_each(backend, &compositor->backend_list, link) {
+		} else {
 			if (backend->repaint_cancel)
 				backend->repaint_cancel(backend);
-		}
-	}
 
-	if (ret != 0) {
-		wl_list_for_each(output, &compositor->output_list, link) {
-			if (output->repainted) {
-				if (ret == -EBUSY)
-					weston_output_schedule_repaint_restart(output);
-				else
-					weston_output_schedule_repaint_reset(output);
+			wl_list_for_each(output, &compositor->output_list, link) {
+				if (output->backend != backend)
+					continue;
+
+				if (output->repainted) {
+					if (ret == -EBUSY)
+						weston_output_schedule_repaint_restart(output);
+					else
+						weston_output_schedule_repaint_reset(output);
+				}
 			}
 		}
 	}

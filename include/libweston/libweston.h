@@ -579,6 +579,10 @@ struct weston_output {
 	/** True if the entire contents of the output should be redrawn */
 	bool full_repaint_needed;
 
+	/** True if the output will be repainted in the currently active
+	 *  repaint handler. */
+	bool will_repaint;
+
 	/** Used only between repaint_begin and repaint_cancel. */
 	bool repainted;
 
@@ -632,6 +636,7 @@ struct weston_output {
 	struct weston_log_pacer pixman_overdraw_pacer;
 
 	int (*start_repaint_loop)(struct weston_output *output);
+	void (*prepare_repaint)(struct weston_output *output);
 	int (*repaint)(struct weston_output *output);
 	void (*destroy)(struct weston_output *output);
 	void (*assign_planes)(struct weston_output *output);
