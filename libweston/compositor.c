@@ -3606,7 +3606,7 @@ weston_output_flush_damage_for_primary_plane(struct weston_output *output,
 	}
 }
 
-static void
+WL_EXPORT void
 weston_output_schedule_repaint_reset(struct weston_output *output)
 {
 	output->repaint_status = REPAINT_NOT_SCHEDULED;
@@ -3819,7 +3819,7 @@ output_repaint_timer_arm(struct weston_compositor *compositor)
 	wl_event_source_timer_update(compositor->repaint_timer, msec_to_next);
 }
 
-static void
+WL_EXPORT void
 weston_output_schedule_repaint_restart(struct weston_output *output)
 {
 	assert(output->repaint_status == REPAINT_AWAITING_COMPLETION);
@@ -3879,7 +3879,7 @@ output_repaint_timer_handler(void *data)
 		}
 		if (ret == 0) {
 			if (backend->repaint_flush)
-				ret = backend->repaint_flush(backend);
+				backend->repaint_flush(backend);
 		} else {
 			if (backend->repaint_cancel)
 				backend->repaint_cancel(backend);
@@ -3888,12 +3888,8 @@ output_repaint_timer_handler(void *data)
 				if (output->backend != backend)
 					continue;
 
-				if (output->repainted) {
-					if (ret == -EBUSY)
-						weston_output_schedule_repaint_restart(output);
-					else
-						weston_output_schedule_repaint_reset(output);
-				}
+				if (output->repainted)
+					weston_output_schedule_repaint_reset(output);
 			}
 		}
 	}

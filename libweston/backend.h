@@ -89,7 +89,7 @@ struct weston_backend {
 	 * Called on successful completion of a repaint sequence; see
 	 * repaint_begin.
 	 */
-	int (*repaint_flush)(struct weston_backend *backend);
+	void (*repaint_flush)(struct weston_backend *backend);
 
 	/** Allocate a new output
 	 *

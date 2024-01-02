@@ -941,16 +941,17 @@ drm_repaint_begin(struct weston_backend *backend)
 	}
 }
 
-static int
+static void
 drm_repaint_flush_device(struct drm_device *device)
 {
 	struct drm_backend *b = device->backend;
 	struct drm_pending_state *pending_state;
+	struct weston_output *base;
 	int ret;
 
 	pending_state = device->repaint_data;
 	if (!pending_state)
-		return 0;
+		return;
 
 	ret = drm_pending_state_apply(pending_state);
 	if (ret != 0)
@@ -960,7 +961,19 @@ drm_repaint_flush_device(struct drm_device *device)
 		  device->drm.filename, pending_state);
 	device->repaint_data = NULL;
 
-	return (ret == -EACCES || ret == -EBUSY) ? ret : 0;
+	if (ret == 0)
+		return;
+
+	wl_list_for_each(base, &b->compositor->output_list, link) {
+		struct drm_output *tmp = to_drm_output(base);
+		if (!tmp || tmp->device != device)
+			continue;
+
+		if (ret == -EBUSY)
+			weston_output_schedule_repaint_restart(base);
+		else
+			weston_output_schedule_repaint_reset(base);
+	}
 }
 
 /**
@@ -972,19 +985,16 @@ drm_repaint_flush_device(struct drm_device *device)
  * the update completes (see drm_output_update_complete), the output
  * state will be freed.
  */
-static int
+static void
 drm_repaint_flush(struct weston_backend *backend)
 {
 	struct drm_backend *b = container_of(backend, struct drm_backend, base);
 	struct drm_device *device;
-	int ret;
 
-	ret= drm_repaint_flush_device(b->drm);
+	drm_repaint_flush_device(b->drm);
 
 	wl_list_for_each(device, &b->kms_list, link)
-		ret = drm_repaint_flush_device(device);
-
-	return ret;
+		drm_repaint_flush_device(device);
 }
 
 static void
