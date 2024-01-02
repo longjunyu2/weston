@@ -684,6 +684,14 @@ cursor_bo_update(struct drm_output *output, struct weston_view *ev)
 }
 #endif
 
+static void
+drm_output_prepare_repaint(struct weston_output *output_base)
+{
+	struct drm_output *output = to_drm_output(output_base);
+
+	output->device->will_repaint = true;
+}
+
 static int
 drm_output_repaint(struct weston_output *output_base)
 {
@@ -699,6 +707,7 @@ drm_output_repaint(struct weston_output *output_base)
 
 	device = output->device;
 	pending_state = device->repaint_data;
+	assert(pending_state);
 
 	if (output->disable_pending || output->destroy_pending)
 		goto err;
@@ -889,6 +898,21 @@ finish_frame:
 	return 0;
 }
 
+static void
+drm_repaint_begin_device(struct drm_device *device)
+{
+	struct drm_backend *b = device->backend;
+	struct drm_pending_state *pending_state;
+
+	device->will_repaint = false;
+	pending_state = drm_pending_state_alloc(device);
+	device->repaint_data = pending_state;
+
+	if (weston_log_scope_is_enabled(b->debug))
+		drm_debug(b, "[repaint] Beginning repaint (%s); pending_state %p\n",
+			  device->drm.filename, device->repaint_data);
+}
+
 /**
  * Begin a new repaint cycle
  *
@@ -901,32 +925,42 @@ drm_repaint_begin(struct weston_backend *backend)
 {
 	struct drm_backend *b = container_of(backend, struct drm_backend, base);
 	struct drm_device *device;
-	struct drm_pending_state *pending_state;
 
-	device = b->drm;
-	pending_state = drm_pending_state_alloc(device);
-	device->repaint_data = pending_state;
+	if (b->drm->will_repaint)
+		drm_repaint_begin_device(b->drm);
+
+	wl_list_for_each(device, &b->kms_list, link) {
+		if (device->will_repaint)
+			drm_repaint_begin_device(device);
+	}
 
 	if (weston_log_scope_is_enabled(b->debug)) {
 		char *dbg = weston_compositor_print_scene_graph(b->compositor);
-		drm_debug(b, "[repaint] Beginning repaint; pending_state %p\n",
-			  device->repaint_data);
 		drm_debug(b, "%s", dbg);
 		free(dbg);
 	}
+}
 
-	wl_list_for_each(device, &b->kms_list, link) {
-		pending_state = drm_pending_state_alloc(device);
-		device->repaint_data = pending_state;
+static int
+drm_repaint_flush_device(struct drm_device *device)
+{
+	struct drm_backend *b = device->backend;
+	struct drm_pending_state *pending_state;
+	int ret;
 
-		if (weston_log_scope_is_enabled(b->debug)) {
-			char *dbg = weston_compositor_print_scene_graph(b->compositor);
-			drm_debug(b, "[repaint] Beginning repaint; pending_state %p\n",
-				  pending_state);
-			drm_debug(b, "%s", dbg);
-			free(dbg);
-		}
-	}
+	pending_state = device->repaint_data;
+	if (!pending_state)
+		return 0;
+
+	ret = drm_pending_state_apply(pending_state);
+	if (ret != 0)
+		weston_log("repaint-flush failed: %s\n", strerror(errno));
+
+	drm_debug(b, "[repaint] flushed (%s) pending_state %p\n",
+		  device->drm.filename, pending_state);
+	device->repaint_data = NULL;
+
+	return (ret == -EACCES || ret == -EBUSY) ? ret : 0;
 }
 
 /**
@@ -943,29 +977,29 @@ drm_repaint_flush(struct weston_backend *backend)
 {
 	struct drm_backend *b = container_of(backend, struct drm_backend, base);
 	struct drm_device *device;
-	struct drm_pending_state *pending_state;
 	int ret;
 
-	device = b->drm;
+	ret= drm_repaint_flush_device(b->drm);
+
+	wl_list_for_each(device, &b->kms_list, link)
+		ret = drm_repaint_flush_device(device);
+
+	return ret;
+}
+
+static void
+drm_repaint_cancel_device(struct drm_device *device)
+{
+	struct drm_backend *b = device->backend;
+	struct drm_pending_state *pending_state;
+
+	device->will_repaint = false;
 	pending_state = device->repaint_data;
-	ret = drm_pending_state_apply(pending_state);
-	if (ret != 0)
-		weston_log("repaint-flush failed: %s\n", strerror(errno));
-
-	drm_debug(b, "[repaint] flushed pending_state %p\n", pending_state);
-	device->repaint_data = NULL;
-
-	wl_list_for_each(device, &b->kms_list, link) {
-		pending_state = device->repaint_data;
-		ret = drm_pending_state_apply(pending_state);
-		if (ret != 0)
-			weston_log("repaint-flush failed: %s\n", strerror(errno));
-
-		drm_debug(b, "[repaint] flushed pending_state %p\n", pending_state);
+	if (pending_state) {
+		drm_pending_state_free(pending_state);
+		drm_debug(b, "[repaint] cancel pending_state %p\n", pending_state);
 		device->repaint_data = NULL;
 	}
-
-	return (ret == -EACCES || ret == -EBUSY) ? ret : 0;
 }
 
 /**
@@ -979,20 +1013,11 @@ drm_repaint_cancel(struct weston_backend *backend)
 {
 	struct drm_backend *b = container_of(backend, struct drm_backend, base);
 	struct drm_device *device;
-	struct drm_pending_state *pending_state;
 
-	device = b->drm;
-	pending_state = device->repaint_data;
-	drm_pending_state_free(pending_state);
-	drm_debug(b, "[repaint] cancel pending_state %p\n", pending_state);
-	device->repaint_data = NULL;
+	drm_repaint_cancel_device(b->drm);
 
-	wl_list_for_each(device, &b->kms_list, link) {
-		pending_state = device->repaint_data;
-		drm_pending_state_free(pending_state);
-		drm_debug(b, "[repaint] cancel pending_state %p\n", pending_state);
-		device->repaint_data = NULL;
-	}
+	wl_list_for_each(device, &b->kms_list, link)
+		drm_repaint_cancel_device(b->drm);
 }
 
 static int
@@ -2290,6 +2315,7 @@ drm_output_enable(struct weston_output *base)
 	drm_output_init_backlight(output);
 
 	output->base.start_repaint_loop = drm_output_start_repaint_loop;
+	output->base.prepare_repaint = drm_output_prepare_repaint;
 	output->base.repaint = drm_output_repaint;
 	output->base.assign_planes = drm_assign_planes;
 	output->base.set_dpms = drm_set_dpms;

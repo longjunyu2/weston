@@ -203,6 +203,8 @@ struct drm_device {
 	/* drm_writeback::link */
 	struct wl_list writeback_connector_list;
 
+	bool will_repaint;
+
 	bool state_invalid;
 
 	bool atomic_modeset;
