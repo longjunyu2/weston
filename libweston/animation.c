@@ -343,7 +343,7 @@ fade_frame(struct weston_view_animation *animation)
 
 WL_EXPORT struct weston_view_animation *
 weston_fade_run(struct weston_view *view,
-		float start, float end, float k,
+		float start, float end,
 		weston_view_animation_done_func_t done, void *data)
 {
 	struct weston_view_animation *fade;

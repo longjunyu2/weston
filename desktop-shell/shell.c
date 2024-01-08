@@ -658,7 +658,7 @@ animate_focus_change(struct desktop_shell *shell, struct workspace *ws,
 		weston_view_move_to_layer(front, &ws->layer.view_list);
 		weston_view_move_to_layer(back, NULL);
 		ws->focus_animation =
-			weston_fade_run(front, front->alpha, 0.0, 300,
+			weston_fade_run(front, front->alpha, 0.0,
 					focus_animation_done, ws);
 	}
 }
@@ -2192,7 +2192,7 @@ desktop_surface_removed(struct weston_desktop_surface *desktop_surface,
 			/* unmap the "original" view, which is owned by
 			 * libweston-desktop */
 			weston_view_move_to_layer(shsurf->view, NULL);
-			weston_fade_run(shsurf->wview_anim_fade, 1.0, 0.0, 300.0,
+			weston_fade_run(shsurf->wview_anim_fade, 1.0, 0.0,
 					fade_out_done, shsurf);
 
 			return;
@@ -2283,7 +2283,7 @@ map(struct desktop_shell *shell, struct shell_surface *shsurf)
 	if (!shsurf->state.fullscreen && !shsurf->state.maximized) {
 		switch (shell->win_animation_type) {
 		case ANIMATION_FADE:
-			weston_fade_run(shsurf->view, 0.0, 1.0, 300.0, NULL, NULL);
+			weston_fade_run(shsurf->view, 0.0, 1.0, NULL, NULL);
 			break;
 		case ANIMATION_ZOOM:
 			weston_zoom_run(shsurf->view, 0.5, 1.0, NULL, NULL);
@@ -3906,7 +3906,7 @@ shell_fade(struct desktop_shell *shell, enum fade_type type)
 	} else {
 		shell->fade.animation =
 			weston_fade_run(shell->fade.curtain->view,
-					1.0 - tint, tint, 300.0,
+					1.0 - tint, tint,
 					shell_fade_done, shell);
 	}
 }

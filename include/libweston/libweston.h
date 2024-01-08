@@ -2411,8 +2411,7 @@ weston_zoom_run(struct weston_view *view, float start, float stop,
 		weston_view_animation_done_func_t done, void *data);
 
 struct weston_view_animation *
-weston_fade_run(struct weston_view *view,
-		float start, float end, float k,
+weston_fade_run(struct weston_view *view, float start, float end,
 		weston_view_animation_done_func_t done, void *data);
 
 struct weston_view_animation *
