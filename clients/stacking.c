@@ -156,7 +156,8 @@ button_handler(struct widget *widget,
                uint32_t button,
                enum wl_pointer_button_state state, void *data)
 {
-	struct stacking_window *stacking_window = data;
+	struct window *window = data;
+	struct stacking_window *stacking_window = window_get_user_data(window);
 
 	switch (button) {
 	case BTN_RIGHT:
@@ -296,12 +297,11 @@ set_window_background_colour(cairo_t *cr, struct window *window)
 static void
 redraw_handler(struct widget *widget, void *data)
 {
-	struct window *window;
+	struct window *window = data;
 	struct rectangle allocation;
 	cairo_t *cr;
 
 	widget_get_allocation(widget, &allocation);
-	window = widget_get_user_data(widget);
 
 	cr = widget_cairo_create(widget);
 	cairo_translate(cr, allocation.x, allocation.y);
