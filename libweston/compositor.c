@@ -3377,6 +3377,12 @@ weston_output_flush_damage_for_plane(struct weston_output *output,
 			continue;
 		changed = true;
 
+		/* We can safely clip paint node damage to visible region
+		 * here, as we're only dealing with nodes on this output,
+		 * and the visibility regions for paint nodes on this
+		 * output are up to date.
+		 */
+		pixman_region32_intersect(&pnode->damage, &pnode->damage, &pnode->visible);
 		pixman_region32_union(damage, damage, &pnode->damage);
 		pixman_region32_clear(&pnode->damage);
 	}
