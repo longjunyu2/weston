@@ -103,8 +103,6 @@ if get_option('deprecated-color-management-static')
 		error('cms-static requires lcms2 which was not found. Or, you can use \'-Ddeprecated-color-management-static=false\'.')
 	endif
 
-	config_h.set('HAVE_LCMS', '1')
-
 	plugin_lcms = shared_library(
 		'cms-static',
 		srcs_lcms,

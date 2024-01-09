@@ -145,6 +145,9 @@ dep_libdrm_headers = dep_libdrm.partial_dependency(compile_args: true)
 dep_threads = dependency('threads')
 
 dep_lcms2 = dependency('lcms2', version: '>= 2.9', required: false)
+if dep_lcms2.found()
+	config_h.set('HAVE_LCMS', '1')
+endif
 
 prog_python = import('python').find_installation('python3')
 files_xxd_py = files('tools/xxd.py')
