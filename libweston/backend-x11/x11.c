@@ -429,17 +429,23 @@ x11_output_start_repaint_loop(struct weston_output *output)
 }
 
 static int
-x11_output_repaint_gl(struct weston_output *output_base,
-		      pixman_region32_t *damage)
+x11_output_repaint_gl(struct weston_output *output_base)
 {
 	struct x11_output *output = to_x11_output(output_base);
 	struct weston_compositor *ec;
+	pixman_region32_t damage;
 
 	assert(output);
 
 	ec = output->base.compositor;
 
-	ec->renderer->repaint_output(output_base, damage, NULL);
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(output_base, &damage);
+
+	ec->renderer->repaint_output(output_base, &damage, NULL);
+
+	pixman_region32_fini(&damage);
 
 	weston_output_arm_frame_timer(output_base, output->finish_frame_timer);
 	return 0;
@@ -498,8 +504,7 @@ set_clip_for_output(struct weston_output *output_base, pixman_region32_t *region
 
 
 static int
-x11_output_repaint_shm(struct weston_output *output_base,
-		       pixman_region32_t *damage)
+x11_output_repaint_shm(struct weston_output *output_base)
 {
 	struct x11_output *output = to_x11_output(output_base);
 	const struct weston_renderer *renderer;
@@ -508,6 +513,7 @@ x11_output_repaint_shm(struct weston_output *output_base,
 	struct x11_backend *b;
 	xcb_void_cookie_t cookie;
 	xcb_generic_error_t *err;
+	pixman_region32_t damage;
 
 	assert(output);
 
@@ -517,9 +523,16 @@ x11_output_repaint_shm(struct weston_output *output_base,
 
 	image = renderer->pixman->renderbuffer_get_image(output->renderbuffer);
 
-	ec->renderer->repaint_output(output_base, damage, output->renderbuffer);
+	pixman_region32_init(&damage);
 
-	set_clip_for_output(output_base, damage);
+	weston_output_flush_damage_for_primary_plane(output_base, &damage);
+
+	ec->renderer->repaint_output(output_base, &damage, output->renderbuffer);
+
+	set_clip_for_output(output_base, &damage);
+
+	pixman_region32_fini(&damage);
+
 	cookie = xcb_shm_put_image_checked(b->conn, output->window, output->gc,
 					pixman_image_get_width(image),
 					pixman_image_get_height(image),

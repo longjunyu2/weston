@@ -965,7 +965,7 @@ bool
 drm_plane_is_available(struct drm_plane *plane, struct drm_output *output);
 
 void
-drm_output_render(struct drm_output_state *state, pixman_region32_t *damage);
+drm_output_render(struct drm_output_state *state);
 
 int
 parse_gbm_format(const char *s, const struct pixel_format_info *default_format,

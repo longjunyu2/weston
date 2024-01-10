@@ -725,19 +725,24 @@ pipewire_submit_buffer(struct pipewire_output *output,
 }
 
 static int
-pipewire_output_repaint(struct weston_output *base, pixman_region32_t *damage)
+pipewire_output_repaint(struct weston_output *base)
 {
 	struct pipewire_output *output = to_pipewire_output(base);
 	struct weston_compositor *ec = output->base.compositor;
 	struct pw_buffer *buffer;
 	struct pipewire_frame_data *frame_data;
+	pixman_region32_t damage;
 
 	assert(output);
 
 	if (pw_stream_get_state(output->stream, NULL) != PW_STREAM_STATE_STREAMING)
 		goto out;
 
-	if (!pixman_region32_not_empty(damage))
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(base, &damage);
+
+	if (!pixman_region32_not_empty(&damage))
 		goto out;
 
 	buffer = pw_stream_dequeue_buffer(output->stream);
@@ -748,11 +753,13 @@ pipewire_output_repaint(struct weston_output *base, pixman_region32_t *damage)
 	pipewire_output_debug(output, "dequeued buffer: %p", buffer);
 
 	frame_data = buffer->user_data;
-	ec->renderer->repaint_output(&output->base, damage, frame_data->renderbuffer);
+	ec->renderer->repaint_output(&output->base, &damage, frame_data->renderbuffer);
 
 	pipewire_submit_buffer(output, buffer);
 
 out:
+
+	pixman_region32_fini(&damage);
 
 	weston_output_arm_frame_timer(base, output->finish_frame_timer);
 

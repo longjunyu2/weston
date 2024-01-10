@@ -272,24 +272,29 @@ rdp_output_start_repaint_loop(struct weston_output *output)
 }
 
 static int
-rdp_output_repaint(struct weston_output *output_base, pixman_region32_t *damage)
+rdp_output_repaint(struct weston_output *output_base)
 {
 	struct rdp_output *output = container_of(output_base, struct rdp_output, base);
 	struct weston_compositor *ec = output->base.compositor;
 	struct rdp_backend *b = output->backend;
 	struct rdp_peers_item *peer;
+	pixman_region32_t damage;
 
 	assert(output);
 
-	ec->renderer->repaint_output(&output->base, damage,
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(output_base, &damage);
+
+	ec->renderer->repaint_output(&output->base, &damage,
 				     output->renderbuffer);
 
-	if (pixman_region32_not_empty(damage)) {
+	if (pixman_region32_not_empty(&damage)) {
 		pixman_region32_t transformed_damage;
 		pixman_region32_init(&transformed_damage);
 		weston_region_global_to_output(&transformed_damage,
 					       output_base,
-					       damage);
+					       &damage);
 		wl_list_for_each(peer, &b->peers, link) {
 			if ((peer->flags & RDP_PEER_ACTIVATED) &&
 			    (peer->flags & RDP_PEER_OUTPUT_ENABLED)) {
@@ -298,6 +303,8 @@ rdp_output_repaint(struct weston_output *output_base, pixman_region32_t *damage)
 		}
 		pixman_region32_fini(&transformed_damage);
 	}
+
+	pixman_region32_fini(&damage);
 
 	weston_output_arm_frame_timer(output_base, output->finish_frame_timer);
 

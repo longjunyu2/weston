@@ -498,22 +498,28 @@ wayland_output_start_repaint_loop(struct weston_output *output_base)
 
 #ifdef ENABLE_EGL
 static int
-wayland_output_repaint_gl(struct weston_output *output_base,
-			  pixman_region32_t *damage)
+wayland_output_repaint_gl(struct weston_output *output_base)
 {
 	struct wayland_output *output = to_wayland_output(output_base);
 	struct weston_compositor *ec;
+	pixman_region32_t damage;
 
 	assert(output);
 
 	ec = output->base.compositor;
+
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(output_base, &damage);
 
 	output->frame_cb = wl_surface_frame(output->parent.surface);
 	wl_callback_add_listener(output->frame_cb, &frame_listener, output);
 
 	wayland_output_update_gl_border(output);
 
-	ec->renderer->repaint_output(&output->base, damage, NULL);
+	ec->renderer->repaint_output(&output->base, &damage, NULL);
+
+	pixman_region32_fini(&damage);
 
 	return 0;
 }
@@ -604,16 +610,20 @@ wayland_shm_buffer_attach(struct wayland_shm_buffer *sb,
 }
 
 static int
-wayland_output_repaint_pixman(struct weston_output *output_base,
-			      pixman_region32_t *damage)
+wayland_output_repaint_pixman(struct weston_output *output_base)
 {
 	struct wayland_output *output = to_wayland_output(output_base);
 	struct wayland_backend *b;
 	struct wayland_shm_buffer *sb;
+	pixman_region32_t damage;
 
 	assert(output);
 
 	b = output->backend;
+
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(output_base, &damage);
 
 	if (output->frame) {
 		if (frame_status(output->frame) & FRAME_STATUS_REPAINT)
@@ -624,10 +634,12 @@ wayland_output_repaint_pixman(struct weston_output *output_base,
 	sb = wayland_output_get_shm_buffer(output);
 
 	wayland_output_update_shm_border(sb);
-	b->compositor->renderer->repaint_output(output_base, damage,
+	b->compositor->renderer->repaint_output(output_base, &damage,
 						sb->renderbuffer);
 
-	wayland_shm_buffer_attach(sb, damage);
+	wayland_shm_buffer_attach(sb, &damage);
+
+	pixman_region32_fini(&damage);
 
 	output->frame_cb = wl_surface_frame(output->parent.surface);
 	wl_callback_add_listener(output->frame_cb, &frame_listener, output);

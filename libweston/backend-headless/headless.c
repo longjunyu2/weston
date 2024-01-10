@@ -152,11 +152,11 @@ headless_output_update_gl_border(struct headless_output *output)
 }
 
 static int
-headless_output_repaint(struct weston_output *output_base,
-		       pixman_region32_t *damage)
+headless_output_repaint(struct weston_output *output_base)
 {
 	struct headless_output *output = to_headless_output(output_base);
 	struct weston_compositor *ec;
+	pixman_region32_t damage;
 
 	assert(output);
 
@@ -164,8 +164,14 @@ headless_output_repaint(struct weston_output *output_base,
 
 	headless_output_update_gl_border(output);
 
-	ec->renderer->repaint_output(&output->base, damage,
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(output_base, &damage);
+
+	ec->renderer->repaint_output(&output->base, &damage,
 				     output->renderbuffer);
+
+	pixman_region32_fini(&damage);
 
 	wl_event_source_timer_update(output->finish_frame_timer, 16);
 

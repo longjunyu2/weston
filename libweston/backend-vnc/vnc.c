@@ -1004,10 +1004,11 @@ vnc_output_start_repaint_loop(struct weston_output *output)
 }
 
 static int
-vnc_output_repaint(struct weston_output *base, pixman_region32_t *damage)
+vnc_output_repaint(struct weston_output *base)
 {
 	struct vnc_output *output = to_vnc_output(base);
 	struct vnc_backend *backend = output->backend;
+	pixman_region32_t damage;
 
 	assert(output);
 
@@ -1016,9 +1017,15 @@ vnc_output_repaint(struct weston_output *base, pixman_region32_t *damage)
 
 	vnc_output_update_cursor(output);
 
-	if (pixman_region32_not_empty(damage)) {
-		vnc_update_buffer(output->display, damage);
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(base, &damage);
+
+	if (pixman_region32_not_empty(&damage)) {
+		vnc_update_buffer(output->display, &damage);
 	}
+
+	pixman_region32_fini(&damage);
 
 	/*
 	 * Make sure damage of this (or previous) damage is handled

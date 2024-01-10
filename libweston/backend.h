@@ -327,4 +327,8 @@ weston_output_flush_damage_for_plane(struct weston_output *output,
 				     struct weston_plane *plane,
 				     pixman_region32_t *damage);
 
+void
+weston_output_flush_damage_for_primary_plane(struct weston_output *output,
+					     pixman_region32_t *damage);
+
 #endif

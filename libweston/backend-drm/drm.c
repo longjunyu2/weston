@@ -355,7 +355,7 @@ drm_output_render_pixman(struct drm_output_state *state,
 }
 
 void
-drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
+drm_output_render(struct drm_output_state *state)
 {
 	struct drm_output *output = state->output;
 	struct drm_device *device = output->device;
@@ -365,7 +365,7 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 	struct drm_property_info *damage_info =
 		&scanout_plane->props[WDRM_PLANE_FB_DAMAGE_CLIPS];
 	struct drm_fb *fb;
-	pixman_region32_t scanout_damage;
+	pixman_region32_t damage, scanout_damage;
 	pixman_box32_t *rects;
 	int n_rects;
 
@@ -375,6 +375,10 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 	if (scanout_state->fb)
 		return;
 
+	pixman_region32_init(&damage);
+
+	weston_output_flush_damage_for_primary_plane(&output->base, &damage);
+
 	/*
 	 * If we don't have any damage on the primary plane, and we already
 	 * have a renderer buffer active, we can reuse it; else we pass
@@ -382,7 +386,7 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 	 * area. But, we still have to call the renderer anyway if any screen
 	 * capture is pending, otherwise the capture will not complete.
 	 */
-	if (!pixman_region32_not_empty(damage) &&
+	if (!pixman_region32_not_empty(&damage) &&
 	    wl_list_empty(&output->base.frame_signal.listener_list) &&
 	    !weston_output_has_renderer_capture_tasks(&output->base) &&
 	    scanout_plane->state_cur->fb &&
@@ -390,14 +394,14 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 	     scanout_plane->state_cur->fb->type == BUFFER_PIXMAN_DUMB)) {
 		fb = drm_fb_ref(scanout_plane->state_cur->fb);
 	} else if (c->renderer->type == WESTON_RENDERER_PIXMAN) {
-		fb = drm_output_render_pixman(state, damage);
+		fb = drm_output_render_pixman(state, &damage);
 	} else {
-		fb = drm_output_render_gl(state, damage);
+		fb = drm_output_render_gl(state, &damage);
 	}
 
 	if (!fb) {
 		drm_plane_state_put_back(scanout_state);
-		return;
+		goto out;
 	}
 
 	scanout_state->fb = fb;
@@ -417,13 +421,13 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 
 	/* Don't bother calculating plane damage if the plane doesn't support it */
 	if (damage_info->prop_id == 0)
-		return;
+		goto out;
 
 	pixman_region32_init(&scanout_damage);
 
 	weston_region_global_to_output(&scanout_damage,
 				       &output->base,
-				       damage);
+				       &damage);
 
 	assert(scanout_state->damage_blob_id == 0);
 
@@ -440,6 +444,8 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 				  &scanout_state->damage_blob_id);
 
 	pixman_region32_fini(&scanout_damage);
+out:
+	pixman_region32_fini(&damage);
 }
 
 static uint32_t
@@ -651,7 +657,7 @@ cursor_bo_update(struct drm_output *output, struct weston_view *ev)
 #endif
 
 static int
-drm_output_repaint(struct weston_output *output_base, pixman_region32_t *damage)
+drm_output_repaint(struct weston_output *output_base)
 {
 	struct drm_output *output = to_drm_output(output_base);
 	struct drm_output_state *state = NULL;
@@ -718,7 +724,7 @@ drm_output_repaint(struct weston_output *output_base, pixman_region32_t *damage)
 	if (device->atomic_modeset)
 		drm_output_pick_writeback_capture_task(output);
 
-	drm_output_render(state, damage);
+	drm_output_render(state);
 	scanout_state = drm_output_state_get_plane(state,
 						   output->scanout_plane);
 	if (!scanout_state || !scanout_state->fb)

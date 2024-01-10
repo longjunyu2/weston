@@ -202,8 +202,7 @@ drm_virtual_output_submit_frame(struct drm_output *output,
 }
 
 static int
-drm_virtual_output_repaint(struct weston_output *output_base,
-			   pixman_region32_t *damage)
+drm_virtual_output_repaint(struct weston_output *output_base)
 {
 	struct drm_output_state *state = NULL;
 	struct drm_output *output = to_drm_output(output_base);
@@ -237,7 +236,7 @@ drm_virtual_output_repaint(struct weston_output *output_base,
 						   pending_state,
 						   DRM_OUTPUT_STATE_CLEAR_PLANES);
 
-	drm_output_render(state, damage);
+	drm_output_render(state);
 	scanout_state = drm_output_state_get_plane(state, scanout_plane);
 	if (!scanout_state || !scanout_state->fb)
 		goto err;

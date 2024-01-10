@@ -3384,6 +3384,20 @@ weston_output_flush_damage_for_plane(struct weston_output *output,
 	return changed;
 }
 
+WL_EXPORT void
+weston_output_flush_damage_for_primary_plane(struct weston_output *output,
+					     pixman_region32_t *damage)
+{
+	weston_output_flush_damage_for_plane(output,
+					     &output->primary_plane,
+					     damage);
+
+	if (output->full_repaint_needed) {
+		pixman_region32_copy(damage, &output->region);
+		output->full_repaint_needed = false;
+	}
+}
+
 static int
 weston_output_repaint(struct weston_output *output)
 {
@@ -3392,7 +3406,6 @@ weston_output_repaint(struct weston_output *output)
 	struct weston_animation *animation, *next;
 	struct wl_resource *cb, *cnext;
 	struct wl_list frame_callback_list;
-	pixman_region32_t output_damage;
 	int r;
 	uint32_t frame_time_msec;
 	enum weston_hdcp_protection highest_requested = WESTON_HDCP_DISABLE;
@@ -3464,19 +3477,7 @@ weston_output_repaint(struct weston_output *output)
 
 	output_accumulate_damage(output);
 
-	pixman_region32_init(&output_damage);
-
-	weston_output_flush_damage_for_plane(output, &output->primary_plane,
-					     &output_damage);
-
-	if (output->full_repaint_needed) {
-		pixman_region32_copy(&output_damage, &output->region);
-		output->full_repaint_needed = false;
-	}
-
-	r = output->repaint(output, &output_damage);
-
-	pixman_region32_fini(&output_damage);
+	r = output->repaint(output);
 
 	output->repaint_needed = false;
 	if (r == 0)

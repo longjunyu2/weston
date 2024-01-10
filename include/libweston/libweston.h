@@ -548,7 +548,7 @@ struct weston_output {
 	struct weston_log_pacer pixman_overdraw_pacer;
 
 	int (*start_repaint_loop)(struct weston_output *output);
-	int (*repaint)(struct weston_output *output, pixman_region32_t *damage);
+	int (*repaint)(struct weston_output *output);
 	void (*destroy)(struct weston_output *output);
 	void (*assign_planes)(struct weston_output *output);
 	int (*switch_mode)(struct weston_output *output, struct weston_mode *mode);
