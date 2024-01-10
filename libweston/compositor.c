@@ -80,6 +80,7 @@
 #include "backend.h"
 #include "libweston-internal.h"
 #include "color.h"
+#include "id-number-allocator.h"
 #include "output-capture.h"
 #include "pixman-renderer.h"
 #include "renderer-gl/gl-renderer.h"
@@ -9171,6 +9172,11 @@ weston_compositor_shutdown(struct weston_compositor *ec)
 		ec->color_manager = NULL;
 	}
 
+	/* Already destroyed color manager, now we can safely destroy the color
+	 * profile id generator. */
+	weston_idalloc_destroy(ec->color_profile_id_generator);
+	ec->color_profile_id_generator = NULL;
+
 	if (ec->renderer)
 		ec->renderer->destroy(ec);
 
@@ -9283,6 +9289,9 @@ weston_compositor_backends_loaded(struct weston_compositor *compositor)
 
 	if (!compositor->color_manager)
 		return -1;
+
+	/* Create id generator before initing the color manager. */
+	compositor->color_profile_id_generator = weston_idalloc_create(compositor);
 
 	if (!compositor->color_manager->init(compositor->color_manager))
 		return -1;

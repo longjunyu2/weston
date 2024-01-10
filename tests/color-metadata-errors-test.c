@@ -36,6 +36,7 @@
 #include "libweston-internal.h"
 #include "backend.h"
 #include "color.h"
+#include "id-number-allocator.h"
 #include "shared/xalloc.h"
 
 struct config_testcase {
@@ -178,6 +179,7 @@ mock_cm_get_stock_sRGB_color_profile(struct weston_color_manager *mock_cm)
 	mock_cprof->cm = mock_cm;
 	mock_cprof->ref_count = 1;
 	mock_cprof->description = xstrdup("mock cprof");
+	mock_cprof->id = weston_idalloc_get_id(mock_cm->compositor->color_profile_id_generator);
 
 	return mock_cprof;
 }
@@ -209,8 +211,11 @@ TEST_P(color_characteristics_config_error, config_cases)
 	};
 	struct weston_compositor mock_compositor = {
 		.color_manager = &mock_cm.base,
+		.color_profile_id_generator = weston_idalloc_create(&mock_compositor),
 	};
 	struct weston_output mock_output = {};
+
+	mock_cm.base.compositor = &mock_compositor;
 
 	wl_list_init(&mock_compositor.plane_list);
 	weston_output_init(&mock_output, &mock_compositor, "mockoutput");
@@ -235,6 +240,7 @@ TEST_P(color_characteristics_config_error, config_cases)
 	weston_config_destroy(wc);
 	free(logbuf);
 	weston_output_release(&mock_output);
+	weston_idalloc_destroy(mock_compositor.color_profile_id_generator);
 }
 
 /* Setting NULL resets group_mask */
@@ -247,8 +253,11 @@ TEST(weston_output_set_color_characteristics_null)
 	};
 	struct weston_compositor mock_compositor = {
 		.color_manager = &mock_cm.base,
+		.color_profile_id_generator = weston_idalloc_create(&mock_compositor),
 	};
 	struct weston_output mock_output = {};
+
+	mock_cm.base.compositor = &mock_compositor;
 
 	wl_list_init(&mock_compositor.plane_list);
 	weston_output_init(&mock_output, &mock_compositor, "mockoutput");
@@ -258,6 +267,7 @@ TEST(weston_output_set_color_characteristics_null)
 	assert(mock_output.color_characteristics.group_mask == 0);
 
 	weston_output_release(&mock_output);
+	weston_idalloc_destroy(mock_compositor.color_profile_id_generator);
 }
 
 struct value_testcase {
@@ -325,11 +335,14 @@ TEST_P(hdr_metadata_type1_errors, value_cases)
 	};
 	struct weston_compositor mock_compositor = {
 		.color_manager = &mock_cm.base,
+		.color_profile_id_generator = weston_idalloc_create(&mock_compositor),
 	};
 	struct weston_output mock_output = {};
 	bool ret;
 
 	weston_log_set_handler(no_logger, no_logger);
+
+	mock_cm.base.compositor = &mock_compositor;
 
 	wl_list_init(&mock_compositor.plane_list);
 	weston_output_init(&mock_output, &mock_compositor, "mockoutput");
@@ -341,6 +354,7 @@ TEST_P(hdr_metadata_type1_errors, value_cases)
 
 	weston_output_color_outcome_destroy(&mock_output.color_outcome);
 	weston_output_release(&mock_output);
+	weston_idalloc_destroy(mock_compositor.color_profile_id_generator);
 }
 
 /* Unflagged members are ignored in validity check */
@@ -366,9 +380,12 @@ TEST(hdr_metadata_type1_ignore_unflagged)
 	};
 	struct weston_compositor mock_compositor = {
 		.color_manager = &mock_cm.base,
+		.color_profile_id_generator = weston_idalloc_create(&mock_compositor),
 	};
 	struct weston_output mock_output = {};
 	bool ret;
+
+	mock_cm.base.compositor = &mock_compositor;
 
 	wl_list_init(&mock_compositor.plane_list);
 	weston_log_set_handler(no_logger, no_logger);
@@ -380,4 +397,5 @@ TEST(hdr_metadata_type1_ignore_unflagged)
 
 	weston_output_color_outcome_destroy(&mock_output.color_outcome);
 	weston_output_release(&mock_output);
+	weston_idalloc_destroy(mock_compositor.color_profile_id_generator);
 }

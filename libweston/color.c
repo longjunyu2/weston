@@ -37,6 +37,7 @@
 #include <string.h>
 
 #include "color.h"
+#include "id-number-allocator.h"
 #include "libweston-internal.h"
 #include <libweston/weston-log.h>
 #include "shared/xalloc.h"
@@ -72,6 +73,9 @@ weston_color_profile_unref(struct weston_color_profile *cprof)
 	assert(cprof->ref_count > 0);
 	if (--cprof->ref_count > 0)
 		return;
+
+	weston_idalloc_put_id(cprof->cm->compositor->color_profile_id_generator,
+			      cprof->id);
 
 	cprof->cm->destroy_color_profile(cprof);
 }
@@ -109,6 +113,7 @@ weston_color_profile_init(struct weston_color_profile *cprof,
 {
 	cprof->cm = cm;
 	cprof->ref_count = 1;
+	cprof->id = weston_idalloc_get_id(cm->compositor->color_profile_id_generator);
 }
 
 /**

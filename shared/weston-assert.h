@@ -74,6 +74,13 @@ weston_assert_fail_(const struct weston_compositor *compositor, const char *fmt,
 	cond;									\
 })
 
+#define weston_assert_not_reached(compositor, reason)				\
+do {										\
+	struct weston_compositor *ec = compositor;				\
+	custom_assert_fail_(ec, "%s:%u: Assertion failed! This should not be reached: %s\n",	\
+			    __FILE__, __LINE__, reason);					\
+} while (0)
+
 #define weston_assert_true(compositor, a) \
 	weston_assert_(compositor, a, true, bool, "%d", ==)
 
@@ -88,6 +95,12 @@ weston_assert_fail_(const struct weston_compositor *compositor, const char *fmt,
 
 #define weston_assert_double_eq(compositor, a, b) \
 	weston_assert_(compositor, a, b, double, "%.10g", ==)
+
+#define weston_assert_uint32_neq(compositor, a, b) \
+	weston_assert_(compositor, a, b, uint32_t, "%u", !=)
+
+#define weston_assert_uint32_lt(compositor, a, b) \
+	weston_assert_(compositor, a, b, uint32_t, "%u", <)
 
 #define weston_assert_str_eq(compositor, a, b) \
 	weston_assert_fn_(compositor, strcmp, a, b, const char *, "%s", ==)

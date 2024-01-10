@@ -1438,6 +1438,8 @@ struct weston_compositor {
 	uint32_t capabilities; /* combination of enum weston_capability */
 
 	struct weston_color_manager *color_manager;
+	struct weston_idalloc *color_profile_id_generator;
+
 	struct weston_renderer *renderer;
 	const struct pixel_format_info *read_format;
 

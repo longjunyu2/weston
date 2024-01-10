@@ -40,6 +40,9 @@ struct weston_color_profile {
 	struct weston_color_manager *cm;
 	int ref_count;
 	char *description;
+
+	/* Unique id to be used by the CM&HDR protocol extension. */
+	uint32_t id;
 };
 
 /** Type or formula for a curve */
