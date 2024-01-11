@@ -508,6 +508,7 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
 			/* if the view covers the whole output, put it in the
 			 * scanout plane, not overlay */
 			if (view_matches_entire_output &&
+			    weston_view_is_opaque(ev, &ev->transform.boundingbox) &&
 			    !scanout_has_view_assigned)
 				continue;
 			break;
