@@ -310,6 +310,14 @@ if get_option('color-management-lcms')
 			'link_with': plugin_color_lcms,
 			'dep_objs': [ dep_lcms_util ]
 		},
+		{	'name': 'color-management',
+			'sources': [
+				'color-management-test.c',
+				color_management_v1_client_protocol_h,
+				color_management_v1_protocol_c,
+			],
+			'dep_objs': [ dep_lcms_util ]
+		},
 		{	'name': 'color-metadata-parsing' },
 		{
 			'name': 'lcms-util',
