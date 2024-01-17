@@ -409,14 +409,8 @@ weston_eotf_mode_to_str(enum weston_eotf_mode e)
 	return "???";
 }
 
-/** A list of EOTF modes as a string
- *
- * \param eotf_mask Bitwise-or'd enum weston_eotf_mode values.
- * \return Comma separated names of the listed EOTF modes. Must be free()'d by
- * the caller.
- */
-WL_EXPORT char *
-weston_eotf_mask_to_str(uint32_t eotf_mask)
+static char *
+bits_to_str(uint32_t bits, const char *(*map)(uint32_t))
 {
 	FILE *fp;
 	char *str = NULL;
@@ -428,18 +422,29 @@ weston_eotf_mask_to_str(uint32_t eotf_mask)
 	if (!fp)
 		return NULL;
 
-	for (i = 0; eotf_mask; i++) {
+	for (i = 0; bits; i++) {
 		uint32_t bitmask = 1u << i;
 
-		if (eotf_mask & bitmask) {
-			fprintf(fp, "%s%s", sep,
-				weston_eotf_mode_to_str(bitmask));
+		if (bits & bitmask) {
+			fprintf(fp, "%s%s", sep, map(bitmask));
 			sep = ", ";
 		}
 
-		eotf_mask &= ~bitmask;
+		bits &= ~bitmask;
 	}
 	fclose(fp);
 
 	return str;
+}
+
+/** A list of EOTF modes as a string
+ *
+ * \param eotf_mask Bitwise-or'd enum weston_eotf_mode values.
+ * \return Comma separated names of the listed EOTF modes. Must be free()'d by
+ * the caller.
+ */
+WL_EXPORT char *
+weston_eotf_mask_to_str(uint32_t eotf_mask)
+{
+	return bits_to_str(eotf_mask, weston_eotf_mode_to_str);
 }
