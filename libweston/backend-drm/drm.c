@@ -75,56 +75,78 @@ static void
 drm_backend_create_faked_zpos(struct drm_device *device)
 {
 	struct drm_backend *b = device->backend;
-	struct drm_plane *plane;
+	struct drm_plane *plane, *tmp;
+	struct wl_list tmp_list;
 	uint64_t zpos = 0ULL;
 	uint64_t zpos_min_primary;
 	uint64_t zpos_min_overlay;
 	uint64_t zpos_min_cursor;
 
-	zpos_min_primary = zpos;
+	/* if the property is there, bail out sooner */
 	wl_list_for_each(plane, &device->plane_list, link) {
-		/* if the property is there, bail out sooner */
 		if (plane->props[WDRM_PLANE_ZPOS].prop_id != 0)
 			return;
-
-		if (plane->type != WDRM_PLANE_TYPE_PRIMARY)
-			continue;
-		zpos++;
-	}
-
-	zpos_min_overlay = zpos;
-	wl_list_for_each(plane, &device->plane_list, link) {
-		if (plane->type != WDRM_PLANE_TYPE_OVERLAY)
-			continue;
-		zpos++;
-	}
-
-	zpos_min_cursor = zpos;
-	wl_list_for_each(plane, &device->plane_list, link) {
-		if (plane->type != WDRM_PLANE_TYPE_CURSOR)
-			continue;
-		zpos++;
 	}
 
 	drm_debug(b, "[drm-backend] zpos property not found. "
 		     "Using invented immutable zpos values:\n");
-	/* assume that invented zpos values are immutable */
-	wl_list_for_each(plane, &device->plane_list, link) {
-		if (plane->type == WDRM_PLANE_TYPE_PRIMARY) {
-			plane->zpos_min = zpos_min_primary;
-			plane->zpos_max = zpos_min_primary;
-		} else if (plane->type == WDRM_PLANE_TYPE_OVERLAY) {
-			plane->zpos_min = zpos_min_overlay;
-			plane->zpos_max = zpos_min_overlay;
-		} else if (plane->type == WDRM_PLANE_TYPE_CURSOR) {
-			plane->zpos_min = zpos_min_cursor;
-			plane->zpos_max = zpos_min_cursor;
-		}
+
+	wl_list_init(&tmp_list);
+	wl_list_insert_list(&tmp_list, &device->plane_list);
+	wl_list_init(&device->plane_list);
+
+	zpos_min_primary = zpos;
+	wl_list_for_each_safe(plane, tmp, &tmp_list, link) {
+		if (plane->type != WDRM_PLANE_TYPE_PRIMARY)
+			continue;
+
+		plane->zpos_min = zpos_min_primary;
+		plane->zpos_max = zpos_min_primary;
+		wl_list_remove(&plane->link);
+		wl_list_insert(&device->plane_list, &plane->link);
+		zpos++;
+
 		drm_debug(b, "\t[plane] %s plane %d, zpos_min %"PRIu64", "
 			      "zpos_max %"PRIu64"\n",
 			      drm_output_get_plane_type_name(plane),
 			      plane->plane_id, plane->zpos_min, plane->zpos_max);
 	}
+
+	zpos_min_overlay = zpos;
+	wl_list_for_each_safe(plane, tmp, &tmp_list, link) {
+		if (plane->type != WDRM_PLANE_TYPE_OVERLAY)
+			continue;
+
+		plane->zpos_min = zpos_min_overlay;
+		plane->zpos_max = zpos_min_overlay;
+		wl_list_remove(&plane->link);
+		wl_list_insert(&device->plane_list, &plane->link);
+		zpos++;
+
+		drm_debug(b, "\t[plane] %s plane %d, zpos_min %"PRIu64", "
+			      "zpos_max %"PRIu64"\n",
+			      drm_output_get_plane_type_name(plane),
+			      plane->plane_id, plane->zpos_min, plane->zpos_max);
+	}
+
+	zpos_min_cursor = zpos;
+	wl_list_for_each_safe(plane, tmp, &tmp_list, link) {
+		if (plane->type != WDRM_PLANE_TYPE_CURSOR)
+			continue;
+
+		plane->zpos_min = zpos_min_cursor;
+		plane->zpos_max = zpos_min_cursor;
+		wl_list_remove(&plane->link);
+		wl_list_insert(&device->plane_list, &plane->link);
+		zpos++;
+
+		drm_debug(b, "\t[plane] %s plane %d, zpos_min %"PRIu64", "
+			      "zpos_max %"PRIu64"\n",
+			      drm_output_get_plane_type_name(plane),
+			      plane->plane_id, plane->zpos_min, plane->zpos_max);
+	}
+
+	assert(wl_list_empty(&tmp_list));
 }
 
 static int
