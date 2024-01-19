@@ -33,6 +33,12 @@ export PATH=$HOME/.local/bin:$PATH
 # Breathe (a bridge between Doxygen and Sphinx), and we use the Read the Docs
 # theme for the final presentation.
 pip3 install $PIP_ARGS sphinx==4.2.0
+pip3 install $PIP_ARGS sphinxcontrib-applehelp==1.0.4
+pip3 install $PIP_ARGS sphinxcontrib-devhelp==1.0.2
+pip3 install $PIP_ARGS sphinxcontrib-htmlhelp==2.0.0
+pip3 install $PIP_ARGS sphinxcontrib-jsmath==1.0.1
+pip3 install $PIP_ARGS sphinxcontrib-qthelp==1.0.3
+pip3 install $PIP_ARGS sphinxcontrib-serializinghtml==1.1.5
 pip3 install $PIP_ARGS breathe==4.31.0
 pip3 install $PIP_ARGS sphinx_rtd_theme==1.0.0
 
@@ -117,7 +123,7 @@ rm -rf wayland
 # Keep this version in sync with our dependency in meson.build. If you wish to
 # raise a MR against custom protocol, please change this reference to clone
 # your relevant tree, and make sure you bump $FDO_DISTRIBUTION_TAG.
-git clone --branch 1.31 --depth=1 https://gitlab.freedesktop.org/wayland/wayland-protocols
+git clone --branch 1.33 --depth=1 https://gitlab.freedesktop.org/wayland/wayland-protocols
 cd wayland-protocols
 git show -s HEAD
 meson build --wrap-mode=nofallback
