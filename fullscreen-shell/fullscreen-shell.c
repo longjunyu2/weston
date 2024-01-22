@@ -876,6 +876,8 @@ fullscreen_shell_destroy(struct wl_listener *listener, void *data)
 	wl_list_for_each_safe(fs_output, fs_output_next, &shell->output_list, link)
 		fs_output_destroy(fs_output);
 
+	wl_list_remove(&shell->output_created_listener.link);
+
 	if (!wl_list_empty(&shell->default_surface_list)) {
 		surf = container_of(shell->default_surface_list.prev,
 				struct fs_client_surface, link);
