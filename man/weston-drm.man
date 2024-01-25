@@ -169,7 +169,7 @@ detailed mode line specified.
 \fBmax-bpc\fR=\fIN\fR
 .RB "Set \(dq" "max bpc" "\(dq KMS property to value"
 .IR N ,
-silenty clamped to the hardware driver supported range. This artificially
+silently clamped to the hardware driver supported range. This artificially
 limits the driver chosen link bits-per-channel which may be useful for working
 around sink hardware (e.g. monitor) limitations. The default is 16 which is
 practically unlimited. If you need to work around hardware issues, try a lower
