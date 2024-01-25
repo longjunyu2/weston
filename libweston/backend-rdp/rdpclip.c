@@ -921,7 +921,7 @@ clipboard_data_source_write(int fd, uint32_t mask, void *arg)
 	assert(source->refcount > 1);
 	if (source->inflight_data_to_write) {
 		assert(source->inflight_data_size);
-		rdp_debug_clipboard_verbose(b, "RDP %s (%p:%s) transfer in chunck, count:%d\n",
+		rdp_debug_clipboard_verbose(b, "RDP %s (%p:%s) transfer in chunk, count:%d\n",
 					    __func__, source,
 					    clipboard_data_source_state_to_string(source),
 					    source->inflight_write_count);
