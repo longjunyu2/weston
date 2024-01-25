@@ -653,11 +653,11 @@ usage(int error_code)
 	FILE *out = error_code == EXIT_SUCCESS ? stdout : stderr;
 
 	fprintf(out,
-		"Usage: weston [OPTIONS]\n\n"
+		"Usage: weston [OPTIONS] [-- program [arguments]]\n\n"
 		"This is weston version " VERSION ", the Wayland reference compositor.\n"
 		"Weston supports multiple backends, and depending on which backend is in use\n"
-		"different options will be accepted.\n\n"
-
+		"different options will be accepted. When '--' is used, Weston executes\n"
+		"program when it starts. Weston terminates when the program exits.\n\n"
 
 		"Core options:\n\n"
 		"  --version\t\tPrint weston version\n"

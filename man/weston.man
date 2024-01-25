@@ -366,6 +366,17 @@ The directory for Weston's socket and lock files.
 Wayland clients will automatically use this.
 .
 .\" ***************************************************************
+.SH PROGRAM EXECUTION
+It is possible to execute a program that will be run by Weston.
+.TP
+By using this syntax :
+weston [options] -- [program [arguments]]
+.PP
+The '--' here is mandatory to execute a program. There are examples in the
+.BR EXAMPLES
+section.
+.
+.\" ***************************************************************
 .SH BUGS
 Bugs should be reported to
 .BR https://gitlab.freedesktop.org/wayland/weston/ "."
@@ -384,6 +395,12 @@ weston --xwayland
 WAYLAND_DISPLAY=wayland-0 weston -Swayland-1
 .IP "From an X terminal, launch Weston with the x11 backend"
 weston
+.IP "Launch Weston and make it start weston-terminal"
+weston -- /usr/local/bin/weston-terminal
+.IP "Launch Weston with the kiosk shell and make it start weston-simple-egl"
+weston --shell=kiosk-shell.so -- /usr/local/bin/weston-simple-egl
+.IP "Launch Weston with the kiosk shell and open a pdf document with mupdf"
+weston --shell=kiosk-shell.so -- mupdf /home/user/Documents/krh/wayland.pdf
 .
 .\" ***************************************************************
 .SH "SEE ALSO"
