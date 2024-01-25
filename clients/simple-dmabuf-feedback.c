@@ -848,7 +848,7 @@ egl_setup(struct window *window)
 	assert(egl->display && "error: could not create EGL display");
 
 	ret = eglInitialize(egl->display, &major, &minor);
-	assert(ret != EGL_FALSE && "error: failed to intialized EGL display");
+	assert(ret != EGL_FALSE && "error: failed to initialized EGL display");
 
 	ret = eglBindAPI(EGL_OPENGL_ES_API);
 	assert(ret != EGL_FALSE && "error: failed to set EGL API");
