@@ -892,6 +892,8 @@ weston_desktop_surface_foreach_child(struct weston_desktop_surface *surface,
 {
 	struct weston_desktop_surface *child;
 
-	wl_list_for_each(child, &surface->children_list, children_link)
-		callback(child, user_data);
+	wl_list_for_each(child, &surface->children_list, children_link) {
+		if (weston_desktop_surface_get_user_data(child))
+			callback(child, user_data);
+	}
 }
