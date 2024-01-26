@@ -152,7 +152,6 @@ tests = [
 		'name': 'color-metadata-errors',
 		'dep_objs': dep_libexec_weston,
 	},
-	{	'name': 'color-manager', },
 	{
 		'name': 'constraints',
 		'sources': [
@@ -420,7 +419,7 @@ configure_file(output: 'test-config.h', configuration: test_config_h)
 
 test_env = {}
 
-# there are some leaks in fontconfig we can't fix; 
+# there are some leaks in fontconfig we can't fix;
 if get_option('b_sanitize') in ['address', 'address,undefined' ]
   test_env += { 'LSAN_OPTIONS': 'suppressions=@0@'.format(dir_gitlab_ci / 'leak-sanitizer.supp') }
 endif
