@@ -1,4 +1,7 @@
-if not get_option('color-management-lcms')
+build_color_lcms = get_option('color-management-lcms')
+config_h.set10('BUILD_COLOR_LCMS', build_color_lcms)
+
+if not build_color_lcms
 	subdir_done()
 endif
 

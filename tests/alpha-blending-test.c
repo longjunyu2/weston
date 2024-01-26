@@ -73,6 +73,10 @@ fixture_setup(struct weston_test_harness *harness, const struct setup_args *arg)
 	setup.shell = SHELL_TEST_DESKTOP;
 
 	if (arg->color_management) {
+#if !BUILD_COLOR_LCMS
+		return RESULT_SKIP;
+#endif
+
 		weston_ini_setup(&setup,
 				 cfgln("[core]"),
 				 cfgln("color-management=true"));
