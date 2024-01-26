@@ -72,6 +72,7 @@
 #include "shared/string-helpers.h"
 #include "shared/timespec-util.h"
 #include "shared/xalloc.h"
+#include "shared/weston-assert.h"
 #include "tearing-control-v1-server-protocol.h"
 #include "git-version.h"
 #include <libweston/version.h>
@@ -80,6 +81,7 @@
 #include "backend.h"
 #include "libweston-internal.h"
 #include "color.h"
+#include "color-management.h"
 #include "id-number-allocator.h"
 #include "output-capture.h"
 #include "pixman-renderer.h"
@@ -779,6 +781,9 @@ weston_surface_state_init(struct weston_surface *surface,
 
 	state->desired_protection = WESTON_HDCP_DISABLE;
 	state->protection_mode = WESTON_SURFACE_PROTECTION_MODE_RELAXED;
+
+	state->color_profile = NULL;
+	state->render_intent = NULL;
 }
 
 static void
@@ -802,6 +807,10 @@ weston_surface_state_fini(struct weston_surface_state *state)
 
 	fd_clear(&state->acquire_fence_fd);
 	weston_buffer_release_reference(&state->buffer_release_ref, NULL);
+
+	weston_color_profile_unref(state->color_profile);
+	state->color_profile = NULL;
+	state->render_intent = NULL;
 }
 
 static void
@@ -817,6 +826,55 @@ weston_surface_state_set_buffer(struct weston_surface_state *state,
 	if (state->buffer)
 		wl_signal_add(&state->buffer->destroy_signal,
 			      &state->buffer_destroy_listener);
+}
+
+static void
+weston_surface_update_preferred_color_profile(struct weston_surface *surface)
+{
+	struct weston_compositor *compositor = surface->compositor;
+	struct weston_color_manager *cm = compositor->color_manager;
+	struct weston_color_profile *old, *new;
+
+	old = surface->preferred_color_profile;
+
+	if (surface->output) {
+		/* The surface preferred color profile is the same color profile
+		 * of its primary output. */
+		new = weston_color_profile_ref(surface->output->color_profile);
+	} else if (!wl_list_empty(&compositor->output_list)) {
+		/* Surface is still unmapped, with no primary output. To map the
+		 * surface, clients need to draw, and in order to do that they
+		 * should ask the preferred color profile for the surface (at
+		 * least for color-aware clients). So in order to maximize the
+		 * changes of the first frame being correct, we arbitrarily pick
+		 * an output and use its color profile as the preferred. The
+		 * most common scenario is a system with a single monitor (and
+		 * output), so when the surface gets mapped this output will
+		 * become the surface primary one, and the preferred color
+		 * profile will stay the same. */
+                struct weston_output *output;
+                output = wl_container_of(surface->compositor->output_list.next,
+                                         output, link);
+		new = weston_color_profile_ref(output->color_profile);
+	} else {
+		/* Unmapped surface and no outputs available, so let's pick
+		 * stock sRGB color profile. */
+		new = cm->get_stock_sRGB_color_profile(cm);
+	}
+
+	/* Nothing to do. */
+	if (new == old) {
+		weston_color_profile_unref(new);
+		return;
+	}
+
+	weston_color_profile_unref(old);
+
+	/* Update the preferred color profile and notify color-aware clients
+	 * that the surface preferred image description changed. Part of the
+	 * CM&HDR protocol extension implementation. */
+	surface->preferred_color_profile = new;
+	weston_surface_send_preferred_image_description_changed(surface);
 }
 
 WL_EXPORT struct weston_surface *
@@ -866,6 +924,17 @@ weston_surface_create(struct weston_compositor *compositor)
 	surface->desired_protection = WESTON_HDCP_DISABLE;
 	surface->current_protection = WESTON_HDCP_DISABLE;
 	surface->protection_mode = WESTON_SURFACE_PROTECTION_MODE_RELAXED;
+
+	wl_list_init(&surface->cm_surface_resource_list);
+
+	/* The surfaces start with no color profile and render intent. It's up
+	 * to the color manager what to do with that. Later, clients are able to
+	 * define these values using the CM&HDR protocol extension. */
+	surface->color_profile = NULL;
+	surface->render_intent = NULL;
+
+	/* Also part of the CM&HDR protocol extension implementation. */
+	weston_surface_update_preferred_color_profile(surface);
 
 	return surface;
 }
@@ -1129,6 +1198,46 @@ weston_surface_send_enter_leave(struct weston_surface *surface,
 	}
 }
 
+/** Set the color profile and render intent of a surface.
+ *
+ * \param surface The surface to update
+ * \param cprof The new color profile, or NULL
+ * \param render_intent The render intent info object, or NULL
+ *
+ * It is forbidden to pass a valid cprof and a NULL render intent, and
+ * vice-versa. But both NULL is valid.
+ */
+void
+weston_surface_set_color_profile(struct weston_surface *surface,
+				 struct weston_color_profile *cprof,
+				 const struct weston_render_intent_info *render_intent)
+{
+	struct weston_color_manager *cm = surface->compositor->color_manager;
+	struct weston_paint_node *pnode;
+
+	/* Nothing to do. */
+	if (surface->color_profile == cprof &&
+	    surface->render_intent == render_intent)
+		return;
+
+	if (!!cprof ^ !!render_intent)
+		weston_assert_not_reached(cm->compositor,
+					  "received valid cprof and NULL render intent, " \
+					  "or vice versa; invalid for this function");
+
+	/* Remove outdated cached color transformations */
+	wl_list_for_each(pnode, &surface->paint_node_list, surface_link) {
+		weston_surface_color_transform_fini(&pnode->surf_xform);
+		pnode->surf_xform_valid = false;
+	}
+
+	/* Caller gave us a color profile and render intent (or NULL for both,
+	 * which is also valid), so update the surface with them. */
+	weston_color_profile_unref(surface->color_profile);
+	surface->color_profile = weston_color_profile_ref(cprof);
+	surface->render_intent = render_intent;
+}
+
 static void
 weston_surface_compute_protection(struct protected_surface *psurface)
 {
@@ -1378,6 +1487,11 @@ weston_surface_assign_output(struct weston_surface *es)
 
 	es->output = new_output;
 	weston_surface_update_output_mask(es, mask);
+
+	/* Surface primary output may have changed, and that may change the
+	 * surface preferred color profile. Part of the CM&HDR protocol
+	 * extension implementation. */
+	weston_surface_update_preferred_color_profile(es);
 }
 
 /** Recalculate which output(s) the view is displayed on
@@ -2487,6 +2601,7 @@ weston_surface_unref(struct weston_surface *surface)
 	struct wl_resource *cb, *next;
 	struct weston_view *ev, *nv;
 	struct weston_pointer_constraint *constraint, *next_constraint;
+	struct wl_resource *cm_surface_res, *cm_surface_res_tmp;
 	struct weston_paint_node *pnode, *pntmp;
 
 	if (!surface)
@@ -2538,6 +2653,16 @@ weston_surface_unref(struct weston_surface *surface)
 
 	if (surface->tear_control)
 		surface->tear_control->surface = NULL;
+
+	weston_color_profile_unref(surface->color_profile);
+	weston_color_profile_unref(surface->preferred_color_profile);
+
+        wl_resource_for_each_safe(cm_surface_res, cm_surface_res_tmp,
+				  &surface->cm_surface_resource_list) {
+                wl_list_remove(wl_resource_get_link(cm_surface_res));
+                wl_list_init(wl_resource_get_link(cm_surface_res));
+                wl_resource_set_user_data(cm_surface_res, NULL);
+        }
 
 	free(surface);
 }
@@ -4549,6 +4674,11 @@ weston_surface_commit_state(struct weston_surface *surface,
 	/* weston_protected_surface.set_type */
 	weston_surface_set_desired_protection(surface, state->desired_protection);
 
+	/* color_management_surface_v1_interface.set_image_description or
+	 * color_management_surface_v1_interface.unset_image_description */
+	weston_surface_set_color_profile(surface, state->color_profile,
+					 state->render_intent);
+
 	wl_signal_emit(&surface->commit_signal, surface);
 
 	/* Surface is now quiescent */
@@ -4878,6 +5008,10 @@ weston_subsurface_commit_to_cache(struct weston_subsurface *sub)
 			      &surface->pending.damage_buffer);
 	pixman_region32_clear(&surface->pending.damage_buffer);
 
+	sub->cached.render_intent = surface->pending.render_intent;
+	weston_color_profile_unref(sub->cached.color_profile);
+	sub->cached.color_profile =
+		weston_color_profile_ref(surface->pending.color_profile);
 
 	if (surface->pending.status & WESTON_SURFACE_DIRTY_BUFFER) {
 		weston_surface_state_set_buffer(&sub->cached,
@@ -6014,6 +6148,12 @@ weston_head_remove_global(struct weston_head *head)
 		wl_resource_set_destructor(resource, NULL);
 	}
 	wl_list_init(&head->xdg_output_resource_list);
+
+        wl_resource_for_each_safe(resource, tmp, &head->cm_output_resource_list) {
+                wl_list_remove(wl_resource_get_link(resource));
+                wl_list_init(wl_resource_get_link(resource));
+                wl_resource_set_user_data(resource, NULL);
+        }
 }
 
 /** Get the backing object of wl_output
@@ -6059,6 +6199,7 @@ weston_head_init(struct weston_head *head, const char *name)
 	wl_list_init(&head->output_link);
 	wl_list_init(&head->resource_list);
 	wl_list_init(&head->xdg_output_resource_list);
+	wl_list_init(&head->cm_output_resource_list);
 	head->name = xstrdup(name);
 	head->supported_eotf_mask = WESTON_EOTF_MODE_SDR;
 	head->current_protection = WESTON_HDCP_DISABLE;
@@ -7430,17 +7571,23 @@ WL_EXPORT bool
 weston_output_set_color_profile(struct weston_output *output,
 				struct weston_color_profile *cprof)
 {
-	struct weston_color_manager *cm = output->compositor->color_manager;
-	struct weston_color_profile *old;
+	struct weston_compositor *compositor = output->compositor;
+	struct weston_color_manager *cm = compositor->color_manager;
+	struct weston_color_profile *old, *new;
 	struct weston_paint_node *pnode;
+	struct weston_view *view;
 
 	old = output->color_profile;
+	new = cprof ? weston_color_profile_ref(cprof) :
+		      cm->get_stock_sRGB_color_profile(cm);
 
-	if (!cprof) {
-		output->color_profile = cm->get_stock_sRGB_color_profile(cm);
-	} else {
-		output->color_profile = weston_color_profile_ref(cprof);
+	/* Nothing to do. */
+	if (new == old) {
+		weston_color_profile_unref(new);
+		return true;
 	}
+
+	output->color_profile = new;
 
 	if (output->enabled) {
 		if (!weston_output_set_color_outcome(output)) {
@@ -7455,9 +7602,21 @@ weston_output_set_color_profile(struct weston_output *output,
 			weston_surface_color_transform_fini(&pnode->surf_xform);
 			pnode->surf_xform_valid = false;
 		}
+
+		/* The preferred color profile of a surface is its primary
+		 * output color profile. For each surface that has this output
+		 * as primary, we may need to update their preferred color
+		 * profile. Part of the CM&HDR protocol extension
+		 * implementation. */
+		wl_list_for_each(view, &compositor->view_list, link)
+			weston_surface_update_preferred_color_profile(view->surface);
 	}
 
 	weston_color_profile_unref(old);
+
+	/* Output color profile has changed, so we need to notify clients about
+	 * that. Part of the CM&HDR protocol extension implementation. */
+	weston_output_send_image_description_changed(output);
 
 	return true;
 }

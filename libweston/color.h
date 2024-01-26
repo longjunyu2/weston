@@ -243,6 +243,8 @@ struct weston_surface_color_transform {
 	bool identity_pipeline;
 };
 
+struct cm_image_desc_info;
+
 struct weston_color_manager {
 	/** Identifies this CMS component */
 	const char *name;
@@ -252,6 +254,22 @@ struct weston_color_manager {
 
 	/** Supports the Wayland CM&HDR protocol extension? */
 	bool supports_client_protocol;
+
+	/**
+	 * Supported color features from Wayland CM&HDR protocol extension.
+	 *
+	 * If v (v being enum weston_color_feature v) is a supported color
+	 * feature, the bit v of this will be set to 1.
+	 */
+	uint32_t supported_color_features;
+
+	/**
+	 * Supported rendering intents from Wayland CM&HDR protocol extension.
+	 *
+	 * If v (v being enum weston_render_intent v) is a supported rendering
+	 * intent, the bit v of this will be set to 1.
+	 */
+	uint32_t supported_rendering_intents;
 
 	/** Initialize color manager */
 	bool
@@ -297,6 +315,23 @@ struct weston_color_manager {
 				      const char *name_part,
 				      struct weston_color_profile **cprof_out,
 				      char **errmsg);
+
+	/** Send image description to clients.
+	 *
+	 * \param cm_image_desc_info The image description info object
+	 * \param cprof_base The color profile that backs the image description
+	 * \return True on success, false on failure
+	 *
+	 * This should be used only by the CM&HDR protocol extension
+	 * implementation.
+	 *
+	 * The color manager implementing this function should use the helpers
+	 * from color-management.c (weston_cm_send_primaries(), etc) to send the
+	 * information to clients.
+	 */
+	bool
+	(*send_image_desc_info)(struct cm_image_desc_info *cm_image_desc_info,
+				struct weston_color_profile *cprof_base);
 
 	/** Destroy a color transform after refcount fell to zero */
 	void

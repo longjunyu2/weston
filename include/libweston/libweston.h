@@ -410,6 +410,12 @@ struct weston_head {
 
 	/** Current content protection status */
 	enum weston_hdcp_protection current_protection;
+
+        /* xx_color_manager_v1.get_color_management_output
+	 *
+	 * When a client uses this request, we add the wl_resource we create to
+	 * this list. */
+        struct wl_list cm_output_resource_list;
 };
 
 /** Output properties derived from its color characteristics and profile
@@ -1804,6 +1810,11 @@ struct weston_surface_state {
 
 	/* weston_protected_surface.enforced/relaxed */
 	enum weston_surface_protection_mode protection_mode;
+
+	/* color_management_surface_v1_interface.set_image_description or
+	 * color_management_surface_v1_interface.unset_image_description */
+	struct weston_color_profile *color_profile;
+	const struct weston_render_intent_info *render_intent;
 };
 
 struct weston_surface_activation_data {
@@ -1949,6 +1960,16 @@ struct weston_surface {
 	enum weston_surface_protection_mode protection_mode;
 
 	struct weston_tearing_control *tear_control;
+
+	struct weston_color_profile *color_profile;
+	struct weston_color_profile *preferred_color_profile;
+	const struct weston_render_intent_info *render_intent;
+
+        /* xx_color_manager_v1.get_color_management_surface
+	 *
+	 * When a client uses this request, we add the wl_resource we create to
+	 * this list. */
+        struct wl_list cm_surface_resource_list;
 };
 
 struct weston_subsurface {
@@ -2189,6 +2210,11 @@ weston_compositor_set_default_pointer_grab(struct weston_compositor *compositor,
 
 struct weston_surface *
 weston_surface_create(struct weston_compositor *compositor);
+
+void
+weston_surface_set_color_profile(struct weston_surface *surface,
+				 struct weston_color_profile *cprof,
+				 const struct weston_render_intent_info *intent_info);
 
 struct weston_view *
 weston_view_create(struct weston_surface *surface);

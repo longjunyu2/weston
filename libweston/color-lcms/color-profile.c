@@ -26,16 +26,17 @@
 
 #include "config.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <libweston/libweston.h>
 
 #include "color.h"
 #include "color-lcms.h"
+#include "color-management.h"
 #include "shared/helpers.h"
 #include "shared/string-helpers.h"
 #include "shared/xalloc.h"
+#include "shared/weston-assert.h"
 
 struct xyz_arr_flt {
 	float v[3];
@@ -350,6 +351,10 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 	cmsFreeToneCurveTriple(cprof->output_inv_eotf_vcgt);
 	cmsCloseProfile(cprof->profile);
 
+	/* Only profiles created from ICC files have these. */
+	if (cprof->prof_rofile)
+		os_ro_anonymous_file_destroy(cprof->prof_rofile);
+
 	weston_log_scope_printf(cm->profiles_scope, "Destroyed color profile %p. " \
 				"Description: %s\n", cprof, cprof->base.description);
 
@@ -464,7 +469,7 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
 	cmsHPROFILE profile;
 	struct cmlcms_md5_sum md5sum;
-	struct cmlcms_color_profile *cprof;
+	struct cmlcms_color_profile *cprof = NULL;
 	char *desc = NULL;
 
 	if (!icc_data || icc_len < 1) {
@@ -506,13 +511,83 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 	if (!cprof)
 		goto err_close;
 
+	cprof->prof_rofile = os_ro_anonymous_file_create(icc_len, icc_data);
+	if (!cprof->prof_rofile)
+		goto err_close;
+
 	*cprof_out = &cprof->base;
 	return true;
 
 err_close:
+	if (cprof)
+		cmlcms_color_profile_destroy(cprof);
 	free(desc);
 	cmsCloseProfile(profile);
 	return false;
+}
+
+bool
+cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
+			    struct weston_color_profile *cprof_base)
+{
+	struct weston_color_manager_lcms *cm = get_cmlcms(cprof_base->cm);
+	struct weston_compositor *compositor = cm->base.compositor;
+	struct cmlcms_color_profile *cprof = get_cprof(cprof_base);
+	const struct weston_color_primaries_info *primaries_info;
+	const struct weston_color_tf_info *tf_info;
+        int32_t fd;
+        uint32_t len;
+
+	if (cprof->prof_rofile) {
+		/* ICC-based color profile, so just send the ICC file fd. If we
+		 * get an error (negative fd), the helper will send the proper
+		 * error to the client. */
+		fd = os_ro_anonymous_file_get_fd(cprof->prof_rofile,
+						 RO_ANONYMOUS_FILE_MAPMODE_PRIVATE);
+		if (fd < 0) {
+			weston_cm_send_icc_file(cm_image_desc_info, -1, 0);
+			return false;
+		}
+
+		len = os_ro_anonymous_file_size(cprof->prof_rofile);
+		weston_assert_uint32_gt(compositor, len, 0);
+
+		weston_cm_send_icc_file(cm_image_desc_info, fd, len);
+
+		os_ro_anonymous_file_put_fd(fd);
+	} else {
+		/* TODO: we still don't support parametric color profiles that
+		 * are not the stock one. This should change when we start
+		 * advertising parametric image description support in our
+		 * color-management protocol implementation. */
+		if (cprof != cm->sRGB_profile)
+			weston_assert_not_reached(compositor, "we don't support parametric " \
+						  "cprof's that are not the stock sRGB one");
+
+		/* Stock sRGB color profile. TODO: when we add support for
+		 * parametric color profiles, the stock sRGB will be crafted
+		 * using parameters, instead of cmsCreate_sRGBProfileTHR()
+		 * (which we currently use). So we'll get the parameters
+		 * directly from it, instead of hardcoding as we are doing here.
+		 * We don't get the parameters from the stock sRGB color profile
+		 * because it is not trivial to retrieve that from LittleCMS. */
+
+		/* Send the H.273 ColourPrimaries code point that matches the
+		 * Rec709 primaries and the D65 white point. */
+		primaries_info = weston_color_primaries_info_from(compositor,
+								  WESTON_PRIMARIES_CICP_SRGB);
+		weston_cm_send_primaries_named(cm_image_desc_info, primaries_info);
+
+		/* These are the Rec709 primaries and D65 white point. */
+		weston_cm_send_primaries(cm_image_desc_info,
+					 &primaries_info->color_gamut);
+
+		/* sRGB transfer function. */
+		tf_info = weston_color_tf_info_from(compositor, WESTON_TF_GAMMA22);
+		weston_cm_send_tf_named(cm_image_desc_info, tf_info);
+	}
+
+	return true;
 }
 
 void

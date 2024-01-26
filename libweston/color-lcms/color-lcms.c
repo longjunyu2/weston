@@ -35,6 +35,7 @@
 #include "color-properties.h"
 #include "shared/helpers.h"
 #include "shared/xalloc.h"
+#include "shared/weston-assert.h"
 
 const char *
 cmlcms_category_name(enum cmlcms_category cat)
@@ -56,17 +57,22 @@ cmlcms_get_render_intent(enum cmlcms_category cat,
 			 struct weston_surface *surface,
 			 struct weston_output *output)
 {
-	const struct weston_render_intent_info *render_intent;
+	struct weston_color_manager *cm = output->compositor->color_manager;
 
-	/*
-	 * TODO: Take into account client provided content profile,
-	 * output profile, and the category of the wanted color
-	 * transformation.
-	 */
-	render_intent =
-		weston_render_intent_info_from(output->compositor,
-					       WESTON_RENDER_INTENT_RELATIVE);
-	return render_intent;
+	/* TODO: take into account the cmlcms_category. */
+
+	/* Use default render intent. TODO: default should be
+	 * WESTON_RENDER_INTENT_PERCEPTUAL. That requires tweaking the tests. */
+	if (!surface || !surface->render_intent) {
+		weston_assert_true(output->compositor, (cm->supported_rendering_intents >>
+							WESTON_RENDER_INTENT_RELATIVE) & 1);
+
+		return weston_render_intent_info_from(output->compositor,
+						      WESTON_RENDER_INTENT_RELATIVE);
+	}
+
+	weston_assert_ptr(surface->compositor, surface->color_profile);
+	return surface->render_intent;
 }
 
 static struct cmlcms_color_profile *
@@ -100,7 +106,7 @@ cmlcms_get_surface_color_transform(struct weston_color_manager *cm_base,
 
 	struct cmlcms_color_transform_search_param param = {
 		.category = CMLCMS_CATEGORY_INPUT_TO_BLEND,
-		.input_profile = get_cprof_or_stock_sRGB(cm, NULL /* TODO: surface->color_profile */),
+		.input_profile = get_cprof_or_stock_sRGB(cm, surface->color_profile),
 		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
 	param.render_intent = cmlcms_get_render_intent(param.category,
@@ -373,8 +379,28 @@ cmlcms_destroy(struct weston_color_manager *cm_base)
 	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
 
 	if (cm->sRGB_profile) {
-		assert(cm->sRGB_profile->base.ref_count == 1);
+		/* TODO: when we fix the ugly bug described below, we should
+		 * change this assert to == 1. */
+		weston_assert_true(cm->base.compositor,
+				   cm->sRGB_profile->base.ref_count >= 1);
 		unref_cprof(cm->sRGB_profile);
+	}
+
+	/* TODO: this is an ugly hack. Remove it when we stop leaking surfaces
+	 * when shutting down Weston with client surfaces alive. */
+	if (!wl_list_empty(&cm->color_profile_list)) {
+		struct cmlcms_color_profile *cprof, *tmp;
+
+		weston_log("BUG: When Weston is shutting down with client surfaces alive, it may\n" \
+			   "leak them. This is a bug that needs to be fixed. At this point (in which\n" \
+			   "we are destroying the color manager), we expect all the objects referencing\n" \
+			   "color profiles to be already gone and, consequently, the color profiles\n" \
+			   "themselves should have been already destroyed. But because of this other\n" \
+			   "bug, this didn't happen, and now we destroy the color profiles and leave\n" \
+			   "dangling pointers around.");
+
+		wl_list_for_each_safe(cprof, tmp, &cm->color_profile_list, link)
+			cmlcms_color_profile_destroy(cprof);
 	}
 
 	assert(wl_list_empty(&cm->color_transform_list));
@@ -450,9 +476,20 @@ weston_color_manager_create(struct weston_compositor *compositor)
 	cm->base.destroy_color_profile = cmlcms_destroy_color_profile;
 	cm->base.get_stock_sRGB_color_profile = cmlcms_get_stock_sRGB_color_profile;
 	cm->base.get_color_profile_from_icc = cmlcms_get_color_profile_from_icc;
+	cm->base.send_image_desc_info = cmlcms_send_image_desc_info;
 	cm->base.destroy_color_transform = cmlcms_destroy_color_transform;
 	cm->base.get_surface_color_transform = cmlcms_get_surface_color_transform;
 	cm->base.create_output_color_outcome = cmlcms_create_output_color_outcome;
+
+	/* We still do not support creating parametric color profiles. */
+	cm->base.supported_color_features = (1 << WESTON_COLOR_FEATURE_ICC);
+
+	/* We support all rendering intents. */
+	cm->base.supported_rendering_intents = (1 << WESTON_RENDER_INTENT_PERCEPTUAL) |
+					       (1 << WESTON_RENDER_INTENT_SATURATION) |
+					       (1 << WESTON_RENDER_INTENT_ABSOLUTE) |
+					       (1 << WESTON_RENDER_INTENT_RELATIVE) |
+					       (1 << WESTON_RENDER_INTENT_RELATIVE_BPC);
 
 	wl_list_init(&cm->color_transform_list);
 	wl_list_init(&cm->color_profile_list);

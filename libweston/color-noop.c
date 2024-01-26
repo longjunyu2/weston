@@ -30,6 +30,7 @@
 #include "color.h"
 #include "shared/helpers.h"
 #include "shared/xalloc.h"
+#include "shared/weston-assert.h"
 
 struct cmnoop_color_profile {
 	struct weston_color_profile base;
@@ -146,12 +147,18 @@ cmnoop_get_surface_color_transform(struct weston_color_manager *cm_base,
 				   struct weston_output *output,
 				   struct weston_surface_color_transform *surf_xform)
 {
+	struct weston_compositor *compositor = output->compositor;
 	struct weston_color_manager_noop *cmnoop = get_cmnoop(cm_base);
 
-	/* TODO: Assert that, if the surface has a cprof, it is the stock one */
+	/* If surface has a cprof, it has to be the stock one. */
+	if (surface->color_profile)
+		weston_assert_ptr_eq(compositor, get_cprof(surface->color_profile),
+				     cmnoop->stock_cprof);
 
-	assert(output->color_profile &&
-	       get_cprof(output->color_profile) == cmnoop->stock_cprof);
+	/* The output must have a cprof, and it has to be the stock one. */
+	weston_assert_ptr(compositor, output->color_profile);
+	weston_assert_ptr_eq(compositor, get_cprof(output->color_profile),
+			     cmnoop->stock_cprof);
 
 	if (!check_output_eotf_mode(output))
 		return false;
@@ -242,9 +249,14 @@ weston_color_manager_noop_create(struct weston_compositor *compositor)
 	cm->base.destroy_color_profile = cmnoop_destroy_color_profile;
 	cm->base.get_stock_sRGB_color_profile = cmnoop_get_stock_sRGB_color_profile;
 	cm->base.get_color_profile_from_icc = cmnoop_get_color_profile_from_icc;
+	cm->base.send_image_desc_info = NULL;
 	cm->base.destroy_color_transform = cmnoop_destroy_color_transform;
 	cm->base.get_surface_color_transform = cmnoop_get_surface_color_transform;
 	cm->base.create_output_color_outcome = cmnoop_create_output_color_outcome;
+
+	/* We don't support anything related to the CM&HDR protocol extension */
+	cm->base.supported_color_features = 0;
+	cm->base.supported_rendering_intents = 0;
 
 	return &cm->base;
 }

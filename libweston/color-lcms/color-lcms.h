@@ -33,6 +33,7 @@
 
 #include "color.h"
 #include "shared/helpers.h"
+#include "shared/os-compatibility.h"
 
 struct weston_color_manager_lcms {
 	struct weston_color_manager base;
@@ -64,6 +65,9 @@ struct cmlcms_color_profile {
 
 	cmsHPROFILE profile;
 	struct cmlcms_md5_sum md5sum;
+
+	/* Only for profiles created from an ICC file. */
+	struct ro_anonymous_file *prof_rofile;
 
 	/** The curves to decode an electrical signal
 	 *
@@ -137,6 +141,10 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm,
 				  const char *name_part,
 				  struct weston_color_profile **cprof_out,
 				  char **errmsg);
+
+bool
+cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
+			    struct weston_color_profile *cprof_base);
 
 void
 cmlcms_destroy_color_profile(struct weston_color_profile *cprof_base);
