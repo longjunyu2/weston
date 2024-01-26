@@ -32,6 +32,7 @@
 
 #include "color.h"
 #include "color-lcms.h"
+#include "color-properties.h"
 #include "shared/helpers.h"
 #include "shared/xalloc.h"
 
@@ -50,18 +51,22 @@ cmlcms_category_name(enum cmlcms_category cat)
 	return category_names[cat] ?: "[undocumented category value]";
 }
 
-static cmsUInt32Number
+static const struct weston_render_intent_info *
 cmlcms_get_render_intent(enum cmlcms_category cat,
 			 struct weston_surface *surface,
 			 struct weston_output *output)
 {
+	const struct weston_render_intent_info *render_intent;
+
 	/*
 	 * TODO: Take into account client provided content profile,
 	 * output profile, and the category of the wanted color
 	 * transformation.
 	 */
-	cmsUInt32Number intent = INTENT_RELATIVE_COLORIMETRIC;
-	return intent;
+	render_intent =
+		weston_render_intent_info_from(output->compositor,
+					       WESTON_RENDER_INTENT_RELATIVE);
+	return render_intent;
 }
 
 static struct cmlcms_color_profile *
@@ -98,7 +103,7 @@ cmlcms_get_surface_color_transform(struct weston_color_manager *cm_base,
 		.input_profile = get_cprof_or_stock_sRGB(cm, NULL /* TODO: surface->color_profile */),
 		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
-	param.intent_output = cmlcms_get_render_intent(param.category,
+	param.render_intent = cmlcms_get_render_intent(param.category,
 						       surface, output);
 
 	xform = cmlcms_color_transform_get(cm, &param);
@@ -133,7 +138,7 @@ cmlcms_get_blend_to_output_color_transform(struct weston_color_manager_lcms *cm,
 		.input_profile = NULL,
 		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
-	param.intent_output = cmlcms_get_render_intent(param.category,
+	param.render_intent = cmlcms_get_render_intent(param.category,
 						       NULL, output);
 
 	xform = cmlcms_color_transform_get(cm, &param);
@@ -158,7 +163,7 @@ cmlcms_get_sRGB_to_output_color_transform(struct weston_color_manager_lcms *cm,
 		.input_profile = cm->sRGB_profile,
 		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
-	param.intent_output = cmlcms_get_render_intent(param.category,
+	param.render_intent = cmlcms_get_render_intent(param.category,
 						       NULL, output);
 
 	/*
@@ -191,7 +196,7 @@ cmlcms_get_sRGB_to_blend_color_transform(struct weston_color_manager_lcms *cm,
 		.input_profile = cm->sRGB_profile,
 		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
-	param.intent_output = cmlcms_get_render_intent(param.category,
+	param.render_intent = cmlcms_get_render_intent(param.category,
 						       NULL, output);
 
 	xform = cmlcms_color_transform_get(cm, &param);

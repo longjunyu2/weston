@@ -14,6 +14,7 @@ srcs_libweston = [
 	'bindings.c',
 	'clipboard.c',
 	'color.c',
+	'color-properties.c',
 	'color-noop.c',
 	'compositor.c',
 	'content-protection.c',

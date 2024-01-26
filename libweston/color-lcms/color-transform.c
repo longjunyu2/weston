@@ -33,6 +33,7 @@
 #include "color.h"
 #include "color-curve-segments.h"
 #include "color-lcms.h"
+#include "color-properties.h"
 #include "shared/helpers.h"
 #include "shared/string-helpers.h"
 #include "shared/xalloc.h"
@@ -884,6 +885,7 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 	cmsHPROFILE chain[5];
 	unsigned chain_len = 0;
 	cmsHPROFILE extra = NULL;
+	cmsUInt32Number dwFlags;
 
 	chain[chain_len++] = xform->search_key.input_profile->profile;
 	chain[chain_len++] = output_profile->profile;
@@ -920,13 +922,14 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 
 	assert(xform->status == CMLCMS_TRANSFORM_FAILED);
 	/* transform_factory() is invoked by this call. */
+	dwFlags = xform->search_key.render_intent->bps ? cmsFLAGS_BLACKPOINTCOMPENSATION : 0;
 	xform->cmap_3dlut = cmsCreateMultiprofileTransformTHR(xform->lcms_ctx,
 							      chain,
 							      chain_len,
 							      TYPE_RGB_FLT,
 							      TYPE_RGB_FLT,
-							      xform->search_key.intent_output,
-							      0);
+							      xform->search_key.render_intent->lcms_intent,
+							      dwFlags);
 	cmsCloseProfile(extra);
 
 	if (!xform->cmap_3dlut)
@@ -969,11 +972,11 @@ cmlcms_color_transform_search_param_string(const struct cmlcms_color_transform_s
 	str_printf(&str, "  catergory: %s\n" \
 			 "  input profile: %s\n" \
 			 "  output profile: %s\n" \
-			 "  selected intent from output profile: %u\n",
+			 "  selected intent from output profile: %s\n",
 			 cmlcms_category_name(search_key->category),
 			 input_prof_desc,
 			 output_prof_desc,
-			 search_key->intent_output);
+			 search_key->render_intent->desc);
 
 	abort_oom_if_null(str);
 
@@ -1059,7 +1062,7 @@ transform_matches_params(const struct cmlcms_color_transform *xform,
 	if (xform->search_key.category != param->category)
 		return false;
 
-	if (xform->search_key.intent_output  != param->intent_output ||
+	if (xform->search_key.render_intent != param->render_intent ||
 	    xform->search_key.output_profile != param->output_profile ||
 	    xform->search_key.input_profile != param->input_profile)
 		return false;

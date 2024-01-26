@@ -146,7 +146,7 @@ struct cmlcms_color_transform_search_param {
 	enum cmlcms_category category;
 	struct cmlcms_color_profile *input_profile;
 	struct cmlcms_color_profile *output_profile;
-	cmsUInt32Number intent_output;	/* selected intent from output profile */
+	const struct weston_render_intent_info *render_intent;
 };
 
 struct cmlcms_color_transform {
