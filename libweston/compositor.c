@@ -127,11 +127,17 @@ weston_view_dirty_paint_nodes(struct weston_view *view)
 		 * planes, and those planes are positioned within the
 		 * scene graph based on geometry.
 		 *
-		 * That means we don't have to propagate damage to the
-		 * plane for visibility changes, so don't set that
-		 * bit here.
+		 * When an opaque surface moves, even if it's on a
+		 * plane, we need to post damage beneath it as it has
+		 * been occluding updates from lower surfaces.
+		 *
+		 * However, a surface on a plane that is not opaque has
+		 * not been hiding updates below it, so we can make a
+		 * small optimization here to prevent wasteful draws
+		 * when moving a non-opaque surface on a plane, like
+		 * the mouse cursor.
 		 */
-		if (node->plane == &node->output->primary_plane)
+		if (node->plane == &node->output->primary_plane || node->is_opaque)
 			node->status |= PAINT_NODE_VISIBILITY_DIRTY;
 	}
 }
@@ -175,9 +181,6 @@ paint_node_damage_below(struct weston_paint_node *pnode)
 		if (lower_node == pnode)
 			break;
 
-		if (lower_node->plane != pnode->plane)
-			continue;
-
 		pixman_region32_union(&lower_node->damage, &lower_node->damage,
 				      &pnode->visible);
 	}
@@ -204,6 +207,8 @@ paint_node_update_early(struct weston_paint_node *pnode)
 
 		pnode->valid_transform = weston_matrix_to_transform(mat,
 								    &pnode->transform);
+		pnode->is_opaque = weston_view_is_opaque(pnode->view,
+							 &pnode->view->transform.boundingbox);
 	}
 
 	pnode->status &= ~(PAINT_NODE_VIEW_DIRTY | PAINT_NODE_OUTPUT_DIRTY);
@@ -3240,29 +3245,21 @@ view_update_visible(struct weston_view *view,
 static void
 output_update_visibility(struct weston_output *output)
 {
-	struct weston_compositor *ec = output->compositor;
-	struct weston_plane *plane, *pnode_plane;
 	struct weston_paint_node *pnode;
 	pixman_region32_t opaque, clip;
 
 	pixman_region32_init(&clip);
 
-	wl_list_for_each(plane, &ec->plane_list, link) {
-		pixman_region32_init(&opaque);
+	pixman_region32_init(&opaque);
 
-		wl_list_for_each(pnode, &output->paint_node_z_order_list,
-				 z_order_link) {
-			pnode_plane = pnode->plane_next ?: pnode->plane;
-			if (pnode_plane != plane)
-				continue;
-
-			view_update_visible(pnode->view, &opaque);
-		}
+	wl_list_for_each(pnode, &output->paint_node_z_order_list,
+			 z_order_link) {
+		view_update_visible(pnode->view, &opaque);
 
 		pixman_region32_union(&clip, &clip, &opaque);
-		pixman_region32_fini(&opaque);
 	}
 
+	pixman_region32_fini(&opaque);
 	pixman_region32_fini(&clip);
 }
 
