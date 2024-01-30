@@ -276,8 +276,8 @@ input_method_keyboard_modifiers(void *data,
 		keyboard->modifiers |= MOD_SHIFT_MASK;
 
 	zwp_input_method_context_v1_modifiers(context, serial,
-					      mods_depressed, mods_depressed,
-					      mods_latched, group);
+					      mods_depressed, mods_latched,
+					      mods_locked, group);
 }
 
 static const struct wl_keyboard_listener input_method_keyboard_listener = {
