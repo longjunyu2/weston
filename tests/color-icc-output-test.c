@@ -196,35 +196,19 @@ build_lcms_profile_output(const struct setup_args *arg)
 	return NULL;
 }
 
-static char *
-build_output_icc_profile(const struct setup_args *arg)
+static void
+build_output_icc_profile(const struct setup_args *arg, const char *filename)
 {
-	char *profile_name = NULL;
 	cmsHPROFILE profile = NULL;
-	char *wd;
-	int ret;
 	bool saved;
-
-	wd = realpath(".", NULL);
-	assert(wd);
-	if (arg->type == PTYPE_MATRIX_SHAPER)
-		ret = asprintf(&profile_name, "%s/matrix-shaper-test-%s.icm", wd,
-			       arg->pipeline->color_space);
-	else
-		ret = asprintf(&profile_name, "%s/cLUT-test-%s.icm", wd,
-			       arg->pipeline->color_space);
-	assert(ret > 0);
 
 	profile = build_lcms_profile_output(arg);
 	assert(profile);
 
-	saved = cmsSaveProfileToFile(profile, profile_name);
+	saved = cmsSaveProfileToFile(profile, filename);
 	assert(saved);
 
 	cmsCloseProfile(profile);
-	free(wd);
-
-	return profile_name;
 }
 
 static void
@@ -251,9 +235,9 @@ fixture_setup(struct weston_test_harness *harness, const struct setup_args *arg)
 	setup.shell = SHELL_TEST_DESKTOP;
 	setup.logging_scopes = "log,color-lcms-profiles,color-lcms-transformations,color-lcms-optimizer";
 
-	file_name = build_output_icc_profile(arg);
-	if (!file_name)
-		return RESULT_HARD_ERROR;
+	file_name = output_filename_for_fixture(THIS_TEST_NAME, harness,
+						arg->meta.name, "icm");
+	build_output_icc_profile(arg, file_name);
 
 	weston_ini_setup(&setup,
 		cfgln("[core]"),

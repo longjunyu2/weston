@@ -1142,17 +1142,6 @@ output_path(void)
 	return path;
 }
 
-char*
-screenshot_output_filename(const char *basename, uint32_t seq)
-{
-	char *filename;
-
-	if (asprintf(&filename, "%s/%s-%02d.png",
-				 output_path(), basename, seq) < 0)
-		return NULL;
-	return filename;
-}
-
 static const char*
 reference_path(void)
 {
@@ -1891,25 +1880,18 @@ static void
 write_visual_diff(pixman_image_t *ref_image,
 		  pixman_image_t *shot,
 		  const struct rectangle *clip,
-		  const char *test_name,
 		  int seq_no,
 		  const struct range *fuzz)
 {
 	char *fname;
-	char *ext_test_name;
 	pixman_image_t *diff;
-	int ret;
 
-	ret = asprintf(&ext_test_name, "%s-diff", test_name);
-	assert(ret >= 0);
-
-	fname = screenshot_output_filename(ext_test_name, seq_no);
+	fname = output_filename_for_test_case("diff", seq_no, "png");
 	diff = visualize_image_difference(ref_image, shot, clip, fuzz);
 	write_image_as_png(diff, fname);
 
 	pixman_image_unref(diff);
 	free(fname);
-	free(ext_test_name);
 }
 
 /**
@@ -1949,14 +1931,13 @@ verify_image(pixman_image_t *shot,
 	     const struct rectangle *clip,
 	     int seq_no)
 {
-	const char *test_name = get_test_name();
 	const struct range gl_fuzz = { -3, 4 };
 	pixman_image_t *ref = NULL;
 	char *ref_fname = NULL;
 	char *shot_fname;
 	bool match = false;
 
-	shot_fname = screenshot_output_filename(test_name, seq_no);
+	shot_fname = output_filename_for_test_case("shot", seq_no, "png");
 
 	if (ref_image) {
 		ref_fname = screenshot_reference_filename(ref_image, ref_seq_no);
@@ -1969,8 +1950,7 @@ verify_image(pixman_image_t *shot,
 			ref_fname, shot_fname, match ? "PASS" : "FAIL");
 
 		if (!match) {
-			write_visual_diff(ref, shot, clip,
-					  test_name, seq_no, &gl_fuzz);
+			write_visual_diff(ref, shot, clip, seq_no, &gl_fuzz);
 		}
 
 		pixman_image_unref(ref);
