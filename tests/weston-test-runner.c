@@ -212,6 +212,22 @@ struct weston_test_harness {
 	struct wet_testsuite_data data;
 };
 
+/** Get the current fixture number from test harness
+ *
+ * \param harness The test harness.
+ *
+ * Similar to get_test_fixture_index(), but get the fixture number (index + 1)
+ * directly from the test harness. Can be called from fixture_setup() functions.
+ *
+ * \sa DECLARE_FIXTURE_SETUP(), DECLARE_FIXTURE_SETUP_WITH_ARG()
+ * \ingroup testharness
+ */
+int
+get_test_fixture_number_from_harness(struct weston_test_harness *harness)
+{
+	return harness->data.fixture_iteration + 1;
+}
+
 typedef void (*weston_test_cb)(struct wet_testsuite_data *suite_data,
 			       const struct weston_test_entry *t,
 			       const void *test_data,

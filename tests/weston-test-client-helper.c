@@ -1184,6 +1184,99 @@ image_filename(const char *basename)
 	return filename;
 }
 
+/** Helper to create filenames for test programs.
+ *
+ * \param test_program The test program name.
+ * \param suffix Arbitrary suffix to append after the test program name.
+ * Optional, NULL is valid as well.
+ * \param file_ext The file extension (without '.').
+ * \return The ICC filename.
+ */
+char *
+output_filename_for_test_program(const char *test_program, const char *suffix,
+				 const char *file_ext)
+{
+	char *filename;
+
+	assert(test_program);
+	assert(file_ext);
+
+	if (suffix)
+		str_printf(&filename, "%s/%s-%s.%s", output_path(), test_program,
+						     suffix, file_ext);
+	else
+		str_printf(&filename, "%s/%s.%s", output_path(), test_program,
+						  file_ext);
+
+	assert(filename);
+	return filename;
+}
+
+/** Helper to create filenames for fixtures.
+ *
+ * \param test_program The test program name.
+ * \param harness The test harness, from which we get the fixture number.
+ * \param suffix Arbitrary suffix to append after the fixture number. Optional,
+ * NULL is valid as well.
+ * \param file_ext The file extension (without '.').
+ * \return The ICC filename.
+ */
+char *
+output_filename_for_fixture(const char *test_program,
+			    struct weston_test_harness *harness,
+			    const char *suffix, const char *file_ext)
+{
+	int fixture_number;
+	char *filename;
+
+	assert(test_program);
+	assert(harness);
+	assert(file_ext);
+
+	fixture_number = get_test_fixture_number_from_harness(harness);
+
+	if (suffix)
+		str_printf(&filename, "%s/%s-f%02d-%s.%s", output_path(), test_program,
+							   fixture_number, suffix, file_ext);
+	else
+		str_printf(&filename, "%s/%s-f%02d.%s", output_path(), test_program,
+							fixture_number, file_ext);
+
+	assert(filename);
+	return filename;
+}
+
+/** Helper to create filenames for test cases.
+ *
+ * \param suffix Arbitrary suffix to append after the test case name. Optional,
+ * NULL is valid as well.
+ * \param seq_number To differentiate filenames created from a loop. Simply use
+ * 0 if not in a loop.
+ * \param file_ext The file extension (without '.').
+ * \return The ICC filename.
+ *
+ * This is only usable from code paths inside TEST(), TEST_P(), PLUGIN_TEST()
+ * etc. defined functions.
+ */
+char *
+output_filename_for_test_case(const char *suffix, uint32_t seq_number,
+			      const char *file_ext)
+{
+	char *filename;
+
+	assert(file_ext);
+
+	if (suffix)
+		str_printf(&filename, "%s/%s-%s-%02d.%s", output_path(), get_test_name(),
+							  suffix, seq_number, file_ext);
+	else
+		str_printf(&filename, "%s/%s-%02d.%s", output_path(), get_test_name(),
+						       seq_number, file_ext);
+
+	assert(filename);
+	return filename;
+}
+
 /** Open a writable file
  *
  * \param suffix Custom file name suffix.

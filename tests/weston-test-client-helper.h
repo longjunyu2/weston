@@ -258,6 +258,19 @@ screenshot_reference_filename(const char *basename, uint32_t seq);
 char *
 image_filename(const char *basename);
 
+char *
+output_filename_for_test_program(const char *test_program, const char *suffix,
+				 const char *file_ext);
+
+char *
+output_filename_for_fixture(const char *test_program,
+			    struct weston_test_harness *harness,
+			    const char *suffix, const char *file_ext);
+
+char *
+output_filename_for_test_case(const char *suffix, uint32_t seq_number,
+			      const char *file_ext);
+
 FILE *
 fopen_dump_file(const char *suffix);
 

@@ -41,6 +41,12 @@
 #error "Tests must not be built with NDEBUG defined, they rely on assert()."
 #endif
 
+/** Test harness context
+ *
+ * \ingroup testharness
+ */
+struct weston_test_harness;
+
 /** Test program entry
  *
  * Each invocation of TEST(), TEST_P(), or PLUGIN_TEST() will create one
@@ -163,6 +169,9 @@ get_test_name(void);
 int
 get_test_fixture_index(void);
 
+int
+get_test_fixture_number_from_harness(struct weston_test_harness *harness);
+
 /** Metadata for fixture setup array elements
  *
  * Every type used as a fixture setup array's elements needs one member of
@@ -193,12 +202,6 @@ struct fixture_setup_array {
 
 const struct fixture_setup_array *
 fixture_setup_array_get_(void);
-
-/** Test harness context
- *
- * \ingroup testharness
- */
-struct weston_test_harness;
 
 enum test_result_code
 fixture_setup_run_(struct weston_test_harness *harness, const void *arg_);
