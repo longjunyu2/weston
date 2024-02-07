@@ -2786,8 +2786,11 @@ remoted_output_init(struct weston_compositor *c,
 		return;
 
 	weston_config_section_get_string(section, "mode", &modeline, "off");
-	if (strcmp(modeline, "off") == 0)
+	if (strcmp(modeline, "off") == 0) {
+		weston_log("Would not create a remoted output \"%s\". "
+				"mode option has not been set or it is set to off.\n", output->name);
 		goto err;
+	}
 
 	output = api->create_output(c, output_name);
 	if (!output) {
@@ -2919,8 +2922,11 @@ pipewire_output_init(struct weston_compositor *c,
 		return;
 
 	weston_config_section_get_string(section, "mode", &modeline, "off");
-	if (strcmp(modeline, "off") == 0)
+	if (strcmp(modeline, "off") == 0) {
+		weston_log("Would not create a pipewire output \"%s\". "
+				"mode option has not been set or it is set to off.\n", output->name);
 		goto err;
+	}
 
 	output = api->create_output(c, output_name);
 	if (!output) {
