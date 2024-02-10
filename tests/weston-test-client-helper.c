@@ -913,6 +913,23 @@ static const struct wl_registry_listener registry_listener = {
 	handle_global_remove,
 };
 
+/**
+ * Expect protocol error
+ *
+ * @param client A client instance, as created by create_client().
+ * @param intf The interface where the error should occur. NULL is also valid,
+ * when the error should come from an unknown object.
+ * @param code The error code that is expected.
+ *
+ * To exercise our protocol implementations, tests can use this function when
+ * they do something on purpose expecting a protocol error.
+ *
+ * When tests know that their wl_proxy would get destroyed before they have a
+ * chance to call this, they should pass a NULL intf to expect the error from an
+ * unknown object. When wl_display.error event comes, it will refer to an object
+ * id that has already been marked as deleted in the client's object map, so
+ * the protocol error interface will be set to NULL and the object id to 0.
+ */
 void
 expect_protocol_error(struct client *client,
 		      const struct wl_interface *intf,
@@ -940,10 +957,15 @@ expect_protocol_error(struct client *client,
 		failed = 1;
 	}
 
-	/* this should be definitely set */
-	assert(interface);
-
-	if (strcmp(intf->name, interface->name) != 0) {
+	if (intf && !interface) {
+		testlog("Should get interface '%s' but got error from unknown object\n",
+			intf->name);
+		failed = 1;
+	} else if (!intf && interface) {
+		testlog("Should get error from unknown object but got it from interface '%s'\n",
+			interface->name);
+		failed = 1;
+	} else if (intf && interface && strcmp(intf->name, interface->name) != 0) {
 		testlog("Should get interface '%s' but got '%s'\n",
 			intf->name, interface->name);
 		failed = 1;
@@ -955,8 +977,12 @@ expect_protocol_error(struct client *client,
 	}
 
 	/* all OK */
-	testlog("Got expected protocol error on '%s' (object id: %d) "
-		"with code %d\n", interface->name, id, errcode);
+	if (intf)
+		testlog("Got expected protocol error on '%s' (object id: %d) " \
+			"with code %d\n", intf->name, id, errcode);
+	else
+		testlog("Got expected protocol error on unknown object " \
+			"with code %d\n", errcode);
 
 	client->errored_ok = true;
 }
