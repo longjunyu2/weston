@@ -113,7 +113,7 @@ cmnoop_color_profile_create(struct weston_color_manager_noop *cm, char *desc)
 }
 
 static struct weston_color_profile *
-cmnoop_get_stock_sRGB_color_profile(struct weston_color_manager *cm_base)
+cmnoop_ref_stock_sRGB_color_profile(struct weston_color_manager *cm_base)
 {
 	struct weston_color_manager_noop *cm = to_cmnoop(cm_base);
 	struct cmnoop_color_profile *cprof;
@@ -253,7 +253,7 @@ weston_color_manager_noop_create(struct weston_compositor *compositor)
 	cm->base.init = cmnoop_init;
 	cm->base.destroy = cmnoop_destroy;
 	cm->base.destroy_color_profile = cmnoop_destroy_color_profile;
-	cm->base.get_stock_sRGB_color_profile = cmnoop_get_stock_sRGB_color_profile;
+	cm->base.ref_stock_sRGB_color_profile = cmnoop_ref_stock_sRGB_color_profile;
 	cm->base.get_color_profile_from_icc = cmnoop_get_color_profile_from_icc;
 	cm->base.send_image_desc_info = NULL;
 	cm->base.destroy_color_transform = cmnoop_destroy_color_transform;

@@ -448,7 +448,7 @@ err_close:
 }
 
 struct weston_color_profile *
-cmlcms_get_stock_sRGB_color_profile(struct weston_color_manager *cm_base)
+cmlcms_ref_stock_sRGB_color_profile(struct weston_color_manager *cm_base)
 {
 	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 	struct cmlcms_color_profile *cprof;

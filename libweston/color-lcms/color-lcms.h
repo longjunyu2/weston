@@ -132,7 +132,7 @@ to_cmlcms_cprof(struct weston_color_profile *cprof_base)
 }
 
 struct weston_color_profile *
-cmlcms_get_stock_sRGB_color_profile(struct weston_color_manager *cm_base);
+cmlcms_ref_stock_sRGB_color_profile(struct weston_color_manager *cm_base);
 
 bool
 cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm,

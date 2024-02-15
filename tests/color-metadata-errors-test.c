@@ -170,7 +170,7 @@ mock_create_output_color_outcome(struct weston_color_manager *cm_base,
 }
 
 static struct weston_color_profile *
-mock_cm_get_stock_sRGB_color_profile(struct weston_color_manager *mock_cm)
+mock_cm_ref_stock_sRGB_color_profile(struct weston_color_manager *mock_cm)
 {
 	struct weston_color_profile *mock_cprof;
 
@@ -206,7 +206,7 @@ TEST_P(color_characteristics_config_error, config_cases)
 	size_t logsize;
 	struct mock_color_manager mock_cm = {
 		.base.create_output_color_outcome = mock_create_output_color_outcome,
-		.base.get_stock_sRGB_color_profile = mock_cm_get_stock_sRGB_color_profile,
+		.base.ref_stock_sRGB_color_profile = mock_cm_ref_stock_sRGB_color_profile,
 		.base.destroy_color_profile = mock_cm_destroy_color_profile,
 	};
 	struct weston_compositor mock_compositor = {
@@ -248,7 +248,7 @@ TEST(weston_output_set_color_characteristics_null)
 {
 	struct mock_color_manager mock_cm = {
 		.base.create_output_color_outcome = mock_create_output_color_outcome,
-		.base.get_stock_sRGB_color_profile = mock_cm_get_stock_sRGB_color_profile,
+		.base.ref_stock_sRGB_color_profile = mock_cm_ref_stock_sRGB_color_profile,
 		.base.destroy_color_profile = mock_cm_destroy_color_profile,
 	};
 	struct weston_compositor mock_compositor = {
@@ -329,7 +329,7 @@ TEST_P(hdr_metadata_type1_errors, value_cases)
 	};
 	struct mock_color_manager mock_cm = {
 		.base.create_output_color_outcome = mock_create_output_color_outcome,
-		.base.get_stock_sRGB_color_profile = mock_cm_get_stock_sRGB_color_profile,
+		.base.ref_stock_sRGB_color_profile = mock_cm_ref_stock_sRGB_color_profile,
 		.base.destroy_color_profile = mock_cm_destroy_color_profile,
 		.test_hdr_meta = &meta,
 	};
@@ -374,7 +374,7 @@ TEST(hdr_metadata_type1_ignore_unflagged)
 	};
 	struct mock_color_manager mock_cm = {
 		.base.create_output_color_outcome = mock_create_output_color_outcome,
-		.base.get_stock_sRGB_color_profile = mock_cm_get_stock_sRGB_color_profile,
+		.base.ref_stock_sRGB_color_profile = mock_cm_ref_stock_sRGB_color_profile,
 		.base.destroy_color_profile = mock_cm_destroy_color_profile,
 		.test_hdr_meta = &meta,
 	};

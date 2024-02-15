@@ -859,7 +859,7 @@ weston_surface_update_preferred_color_profile(struct weston_surface *surface)
 	} else {
 		/* Unmapped surface and no outputs available, so let's pick
 		 * stock sRGB color profile. */
-		new = cm->get_stock_sRGB_color_profile(cm);
+		new = cm->ref_stock_sRGB_color_profile(cm);
 	}
 
 	/* Nothing to do. */
@@ -7583,7 +7583,7 @@ weston_output_set_color_profile(struct weston_output *output,
 
 	old = output->color_profile;
 	new = cprof ? weston_color_profile_ref(cprof) :
-		      cm->get_stock_sRGB_color_profile(cm);
+		      cm->ref_stock_sRGB_color_profile(cm);
 
 	/* Nothing to do. */
 	if (new == old) {
@@ -7824,7 +7824,7 @@ weston_output_init(struct weston_output *output,
 	/* Set the stock sRGB color profile for the output. Libweston users are
 	 * free to set the color profile to whatever they want later on. */
 	cm = compositor->color_manager;
-	output->color_profile = cm->get_stock_sRGB_color_profile(cm);
+	output->color_profile = cm->ref_stock_sRGB_color_profile(cm);
 }
 
 /** Adds weston_output object to pending output list.
