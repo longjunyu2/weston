@@ -343,7 +343,7 @@ cmlcms_color_profile_create(struct weston_color_manager_lcms *cm,
 void
 cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cprof->base.cm);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cprof->base.cm);
 
 	wl_list_remove(&cprof->link);
 	cmsFreeToneCurveTriple(cprof->vcgt);
@@ -450,7 +450,7 @@ err_close:
 struct weston_color_profile *
 cmlcms_get_stock_sRGB_color_profile(struct weston_color_manager *cm_base)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 	struct cmlcms_color_profile *cprof;
 
 	cprof = ref_cprof(cm->sRGB_profile);
@@ -466,7 +466,7 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 				  struct weston_color_profile **cprof_out,
 				  char **errmsg)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 	cmsHPROFILE profile;
 	struct cmlcms_md5_sum md5sum;
 	struct cmlcms_color_profile *cprof = NULL;
@@ -530,7 +530,7 @@ bool
 cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
 			    struct weston_color_profile *cprof_base)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cprof_base->cm);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cprof_base->cm);
 	struct weston_compositor *compositor = cm->base.compositor;
 	struct cmlcms_color_profile *cprof = get_cprof(cprof_base);
 	const struct weston_color_primaries_info *primaries_info;

@@ -99,7 +99,7 @@ cmlcms_get_surface_color_transform(struct weston_color_manager *cm_base,
 				   struct weston_output *output,
 				   struct weston_surface_color_transform *surf_xform)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 	struct cmlcms_color_transform *xform;
 
 	/* TODO: take weston_output::eotf_mode into account */
@@ -305,7 +305,7 @@ static struct weston_output_color_outcome *
 cmlcms_create_output_color_outcome(struct weston_color_manager *cm_base,
 				   struct weston_output *output)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 	struct weston_output_color_outcome *co;
 
 	co = zalloc(sizeof *co);
@@ -349,7 +349,7 @@ lcms_error_logger(cmsContext context_id,
 static bool
 cmlcms_init(struct weston_color_manager *cm_base)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 
 	if (!(cm->base.compositor->capabilities & WESTON_CAP_COLOR_OPS)) {
 		weston_log("color-lcms: error: color operations capability missing. Is GL-renderer not in use?\n");
@@ -376,7 +376,7 @@ cmlcms_init(struct weston_color_manager *cm_base)
 static void
 cmlcms_destroy(struct weston_color_manager *cm_base)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(cm_base);
+	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 
 	if (cm->sRGB_profile) {
 		/* TODO: when we fix the ugly bug described below, we should

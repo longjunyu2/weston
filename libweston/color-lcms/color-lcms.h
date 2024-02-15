@@ -48,7 +48,7 @@ struct weston_color_manager_lcms {
 };
 
 static inline struct weston_color_manager_lcms *
-get_cmlcms(struct weston_color_manager *cm_base)
+to_cmlcms(struct weston_color_manager *cm_base)
 {
 	return container_of(cm_base, struct weston_color_manager_lcms, base);
 }

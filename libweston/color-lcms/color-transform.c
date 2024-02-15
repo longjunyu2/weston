@@ -166,7 +166,7 @@ cmlcms_fill_in_3dlut(struct weston_color_transform *xform_base,
 void
 cmlcms_color_transform_destroy(struct cmlcms_color_transform *xform)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(xform->base.cm);
+	struct weston_color_manager_lcms *cm = to_cmlcms(xform->base.cm);
 
 	wl_list_remove(&xform->link);
 
@@ -813,7 +813,7 @@ transform_factory(_cmsTransform2Fn *xform_fn,
 	xform = cmsGetContextUserData(context_id);
 	assert(xform);
 
-	cm = get_cmlcms(xform->base.cm);
+	cm = to_cmlcms(xform->base.cm);
 
 	/* Print pipeline before optimization */
 	weston_log_scope_printf(cm->optimizer_scope,
@@ -880,7 +880,7 @@ profile_from_rgb_curves(cmsContext ctx, cmsToneCurve *const curveset[3])
 static bool
 xform_realize_chain(struct cmlcms_color_transform *xform)
 {
-	struct weston_color_manager_lcms *cm = get_cmlcms(xform->base.cm);
+	struct weston_color_manager_lcms *cm = to_cmlcms(xform->base.cm);
 	struct cmlcms_color_profile *output_profile = xform->search_key.output_profile;
 	cmsHPROFILE chain[5];
 	unsigned chain_len = 0;
