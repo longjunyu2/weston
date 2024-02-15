@@ -208,7 +208,7 @@ struct cmlcms_color_transform {
 };
 
 static inline struct cmlcms_color_transform *
-get_xform(struct weston_color_transform *xform_base)
+to_cmlcms_xform(struct weston_color_transform *xform_base)
 {
 	return container_of(xform_base, struct cmlcms_color_transform, base);
 }

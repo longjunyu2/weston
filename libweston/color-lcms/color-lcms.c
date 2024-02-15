@@ -88,7 +88,7 @@ get_cprof_or_stock_sRGB(struct weston_color_manager_lcms *cm,
 static void
 cmlcms_destroy_color_transform(struct weston_color_transform *xform_base)
 {
-	struct cmlcms_color_transform *xform = get_xform(xform_base);
+	struct cmlcms_color_transform *xform = to_cmlcms_xform(xform_base);
 
 	cmlcms_color_transform_destroy(xform);
 }

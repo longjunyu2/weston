@@ -91,7 +91,7 @@ static void
 cmlcms_fill_in_output_inv_eotf_vcgt(struct weston_color_transform *xform_base,
 				    float *values, unsigned len)
 {
-	struct cmlcms_color_transform *xform = get_xform(xform_base);
+	struct cmlcms_color_transform *xform = to_cmlcms_xform(xform_base);
 	struct cmlcms_color_profile *p = xform->search_key.output_profile;
 
 	assert(p && "output_profile");
@@ -102,7 +102,7 @@ static void
 cmlcms_fill_in_pre_curve(struct weston_color_transform *xform_base,
 			 float *values, unsigned len)
 {
-	struct cmlcms_color_transform *xform = get_xform(xform_base);
+	struct cmlcms_color_transform *xform = to_cmlcms_xform(xform_base);
 
 	fill_in_curves(xform->pre_curve, values, len);
 }
@@ -111,7 +111,7 @@ static void
 cmlcms_fill_in_post_curve(struct weston_color_transform *xform_base,
 			 float *values, unsigned len)
 {
-	struct cmlcms_color_transform *xform = get_xform(xform_base);
+	struct cmlcms_color_transform *xform = to_cmlcms_xform(xform_base);
 
 	fill_in_curves(xform->post_curve, values, len);
 }
@@ -135,7 +135,7 @@ static void
 cmlcms_fill_in_3dlut(struct weston_color_transform *xform_base,
 		     float *lut, unsigned int len)
 {
-	struct cmlcms_color_transform *xform = get_xform(xform_base);
+	struct cmlcms_color_transform *xform = to_cmlcms_xform(xform_base);
 	float rgb_in[3];
 	float rgb_out[3];
 	unsigned int index;
