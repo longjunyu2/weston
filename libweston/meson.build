@@ -87,6 +87,8 @@ srcs_libweston = [
 subdir('desktop')
 subdir('shell-utils')
 
+dep_gbm = dependency('gbm', required: false, version: '>= 21.1.1')
+
 if get_option('backend-vnc')
 	dep_pam = dependency('pam', required: false)
 	if not dep_pam.found()
