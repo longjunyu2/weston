@@ -126,7 +126,7 @@ const char *
 cmlcms_category_name(enum cmlcms_category cat);
 
 static inline struct cmlcms_color_profile *
-get_cprof(struct weston_color_profile *cprof_base)
+to_cmlcms_cprof(struct weston_color_profile *cprof_base)
 {
 	return container_of(cprof_base, struct cmlcms_color_profile, base);
 }

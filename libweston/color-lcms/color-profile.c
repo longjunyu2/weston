@@ -532,7 +532,7 @@ cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
 {
 	struct weston_color_manager_lcms *cm = to_cmlcms(cprof_base->cm);
 	struct weston_compositor *compositor = cm->base.compositor;
-	struct cmlcms_color_profile *cprof = get_cprof(cprof_base);
+	struct cmlcms_color_profile *cprof = to_cmlcms_cprof(cprof_base);
 	const struct weston_color_primaries_info *primaries_info;
 	const struct weston_color_tf_info *tf_info;
         int32_t fd;
@@ -593,7 +593,7 @@ cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
 void
 cmlcms_destroy_color_profile(struct weston_color_profile *cprof_base)
 {
-	struct cmlcms_color_profile *cprof = get_cprof(cprof_base);
+	struct cmlcms_color_profile *cprof = to_cmlcms_cprof(cprof_base);
 
 	cmlcms_color_profile_destroy(cprof);
 }

@@ -80,7 +80,7 @@ get_cprof_or_stock_sRGB(struct weston_color_manager_lcms *cm,
 			struct weston_color_profile *cprof_base)
 {
 	if (cprof_base)
-		return get_cprof(cprof_base);
+		return to_cmlcms_cprof(cprof_base);
 	else
 		return cm->sRGB_profile;
 }
