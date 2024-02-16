@@ -28,6 +28,8 @@
 
 #include "color-properties.h"
 
+struct cm_image_desc_info;
+
 int
 weston_compositor_enable_color_management_protocol(struct weston_compositor *compositor);
 
