@@ -36,6 +36,7 @@
 #include "color-properties.h"
 #include "shared/helpers.h"
 #include "shared/string-helpers.h"
+#include "shared/weston-assert.h"
 #include "shared/xalloc.h"
 
 /**
@@ -910,6 +911,7 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 	}
 
 	assert(chain_len <= ARRAY_LENGTH(chain));
+	weston_assert_ptr(cm->base.compositor, xform->search_key.render_intent);
 
 	/**
 	 * Binding to our LittleCMS plug-in occurs here.
@@ -960,7 +962,9 @@ failed:
 char *
 cmlcms_color_transform_search_param_string(const struct cmlcms_color_transform_search_param *search_key)
 {
-	const char *input_prof_desc = "none", *output_prof_desc = "none";
+	const char *input_prof_desc = "none";
+	const char *output_prof_desc = "none";
+	const char *intent_desc = "none";
 	char *str;
 
 	if (search_key->input_profile)
@@ -969,14 +973,17 @@ cmlcms_color_transform_search_param_string(const struct cmlcms_color_transform_s
 	if (search_key->output_profile)
 		output_prof_desc = search_key->output_profile->base.description;
 
-	str_printf(&str, "  catergory: %s\n" \
+	if (search_key->render_intent)
+		intent_desc = search_key->render_intent->desc;
+
+	str_printf(&str, "  category: %s\n" \
 			 "  input profile: %s\n" \
 			 "  output profile: %s\n" \
-			 "  selected intent from output profile: %s\n",
+			 "  render intent: %s\n",
 			 cmlcms_category_name(search_key->category),
 			 input_prof_desc,
 			 output_prof_desc,
-			 search_key->render_intent->desc);
+			 intent_desc);
 
 	abort_oom_if_null(str);
 
