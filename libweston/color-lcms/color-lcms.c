@@ -339,6 +339,50 @@ out_fail:
 }
 
 static void
+transforms_scope_new_sub(struct weston_log_subscription *subs, void *data)
+{
+	struct weston_color_manager_lcms *cm = data;
+	struct cmlcms_color_transform *xform;
+	char *str;
+
+	if (wl_list_empty(&cm->color_transform_list))
+		return;
+
+	weston_log_subscription_printf(subs, "Existent:\n");
+	wl_list_for_each(xform, &cm->color_transform_list, link) {
+		weston_log_subscription_printf(subs, "Color transformation %p:\n", xform);
+
+		str = cmlcms_color_transform_search_param_string(&xform->search_key);
+		weston_log_subscription_printf(subs, "%s", str);
+		free(str);
+
+		str = weston_color_transform_string(&xform->base);
+		weston_log_subscription_printf(subs, "  %s", str);
+		free(str);
+	}
+}
+
+static void
+profiles_scope_new_sub(struct weston_log_subscription *subs, void *data)
+{
+	struct weston_color_manager_lcms *cm = data;
+	struct cmlcms_color_profile *cprof;
+	char *str;
+
+	if (wl_list_empty(&cm->color_profile_list))
+		return;
+
+	weston_log_subscription_printf(subs, "Existent:\n");
+	wl_list_for_each(cprof, &cm->color_profile_list, link) {
+		weston_log_subscription_printf(subs, "Color profile %p:\n", cprof);
+
+		str = cmlcms_color_profile_print(cprof);
+		weston_log_subscription_printf(subs, "%s", str);
+		free(str);
+	}
+}
+
+static void
 lcms_error_logger(cmsContext context_id,
 		  cmsUInt32Number error_code,
 		  const char *text)
@@ -413,50 +457,6 @@ cmlcms_destroy(struct weston_color_manager *cm_base)
 	weston_log_scope_destroy(cm->profiles_scope);
 
 	free(cm);
-}
-
-static void
-transforms_scope_new_sub(struct weston_log_subscription *subs, void *data)
-{
-	struct weston_color_manager_lcms *cm = data;
-	struct cmlcms_color_transform *xform;
-	char *str;
-
-	if (wl_list_empty(&cm->color_transform_list))
-		return;
-
-	weston_log_subscription_printf(subs, "Existent:\n");
-	wl_list_for_each(xform, &cm->color_transform_list, link) {
-		weston_log_subscription_printf(subs, "Color transformation %p:\n", xform);
-
-		str = cmlcms_color_transform_search_param_string(&xform->search_key);
-		weston_log_subscription_printf(subs, "%s", str);
-		free(str);
-
-		str = weston_color_transform_string(&xform->base);
-		weston_log_subscription_printf(subs, "  %s", str);
-		free(str);
-	}
-}
-
-static void
-profiles_scope_new_sub(struct weston_log_subscription *subs, void *data)
-{
-	struct weston_color_manager_lcms *cm = data;
-	struct cmlcms_color_profile *cprof;
-	char *str;
-
-	if (wl_list_empty(&cm->color_profile_list))
-		return;
-
-	weston_log_subscription_printf(subs, "Existent:\n");
-	wl_list_for_each(cprof, &cm->color_profile_list, link) {
-		weston_log_subscription_printf(subs, "Color profile %p:\n", cprof);
-
-		str = cmlcms_color_profile_print(cprof);
-		weston_log_subscription_printf(subs, "%s", str);
-		free(str);
-	}
 }
 
 WL_EXPORT struct weston_color_manager *
