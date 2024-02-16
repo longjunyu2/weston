@@ -1105,7 +1105,7 @@ bind_color_management(struct wl_client *client, void *data, uint32_t version,
  * \param compositor The compositor to init for.
  * \return Zero on success, -1 on failure.
  */
-WL_EXPORT int
+int
 weston_compositor_enable_color_management_protocol(struct weston_compositor *compositor)
 {
         uint32_t version = 1;

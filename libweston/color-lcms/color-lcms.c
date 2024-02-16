@@ -32,7 +32,7 @@
 
 #include "color.h"
 #include "color-lcms.h"
-#include "color-management.h"
+#include "color-properties.h"
 #include "shared/helpers.h"
 #include "shared/xalloc.h"
 #include "shared/weston-assert.h"
@@ -470,6 +470,7 @@ weston_color_manager_create(struct weston_compositor *compositor)
 
 	cm->base.name = "work-in-progress";
 	cm->base.compositor = compositor;
+	cm->base.supports_client_protocol = true;
 	cm->base.init = cmlcms_init;
 	cm->base.destroy = cmlcms_destroy;
 	cm->base.destroy_color_profile = cmlcms_destroy_color_profile;
@@ -479,10 +480,6 @@ weston_color_manager_create(struct weston_compositor *compositor)
 	cm->base.destroy_color_transform = cmlcms_destroy_color_transform;
 	cm->base.get_surface_color_transform = cmlcms_get_surface_color_transform;
 	cm->base.create_output_color_outcome = cmlcms_create_output_color_outcome;
-
-	/* We support the CM&HDR protocol extension when using LittleCMS. */
-	if (weston_compositor_enable_color_management_protocol(compositor) < 0)
-		goto err;
 
 	/* We still do not support creating parametric color profiles. */
 	cm->base.supported_color_features = (1 << WESTON_COLOR_FEATURE_ICC);

@@ -252,6 +252,9 @@ struct weston_color_manager {
 	/** This compositor instance */
 	struct weston_compositor *compositor;
 
+	/** Supports the Wayland CM&HDR protocol extension? */
+	bool supports_client_protocol;
+
 	/**
 	 * Supported color features from Wayland CM&HDR protocol extension.
 	 *

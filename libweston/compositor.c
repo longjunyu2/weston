@@ -9455,6 +9455,17 @@ weston_compositor_backends_loaded(struct weston_compositor *compositor)
 		return -1;
 
 	weston_log("Color manager: %s\n", compositor->color_manager->name);
+	weston_log_continue(STAMP_SPACE "  protocol support: %s\n",
+			    yesno(compositor->color_manager->supports_client_protocol));
+
+	if (compositor->color_manager->supports_client_protocol &&
+	    weston_compositor_enable_color_management_protocol(compositor) < 0) {
+		/*
+		 * The only way out is to quit the compositor,
+		 * and that will clean up.
+		 */
+		return -1;
+	}
 
 	return 0;
 }
