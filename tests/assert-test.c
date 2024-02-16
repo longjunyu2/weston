@@ -126,4 +126,10 @@ TEST(asserts)
 	abort_if_not(ret);
 	ret = weston_assert_my_type_lt(compositor, &a, &b);
 	abort_if_not(ret == false);
+
+	uint32_t bitfield = 0xffff;
+	ret = weston_assert_bit_is_set(compositor, bitfield, 2);
+	abort_if_not(ret);
+	ret = weston_assert_bit_is_set(compositor, bitfield, 57);
+	abort_if_not(ret == false);
 }
