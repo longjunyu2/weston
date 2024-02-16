@@ -394,27 +394,57 @@ static bool
 cmlcms_init(struct weston_color_manager *cm_base)
 {
 	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
+	struct weston_compositor *compositor = cm->base.compositor;
 
-	if (!(cm->base.compositor->capabilities & WESTON_CAP_COLOR_OPS)) {
+	if (!(compositor->capabilities & WESTON_CAP_COLOR_OPS)) {
 		weston_log("color-lcms: error: color operations capability missing. Is GL-renderer not in use?\n");
 		return false;
 	}
 
+	cm->transforms_scope =
+		weston_compositor_add_log_scope(compositor, "color-lcms-transformations",
+						"Color transformation creation and destruction.\n",
+						transforms_scope_new_sub, NULL, cm);
+	weston_assert_ptr(compositor, cm->transforms_scope);
+
+	cm->optimizer_scope =
+		weston_compositor_add_log_scope(compositor, "color-lcms-optimizer",
+						"Color transformation pipeline optimizer. It's best " \
+						"used together with the color-lcms-transformations " \
+						"log scope.\n", NULL, NULL, NULL);
+	weston_assert_ptr(compositor, cm->optimizer_scope);
+
+	cm->profiles_scope =
+		weston_compositor_add_log_scope(compositor, "color-lcms-profiles",
+						"Color profile creation and destruction.\n",
+						profiles_scope_new_sub, NULL, cm);
+	weston_assert_ptr(compositor, cm->profiles_scope);
+
 	cm->lcms_ctx = cmsCreateContext(NULL, cm);
 	if (!cm->lcms_ctx) {
 		weston_log("color-lcms error: creating LittCMS context failed.\n");
-		return false;
+		goto out_err;
 	}
 
 	cmsSetLogErrorHandlerTHR(cm->lcms_ctx, lcms_error_logger);
 
 	if (!cmlcms_create_stock_profile(cm)) {
 		weston_log("color-lcms: error: cmlcms_create_stock_profile failed\n");
-		return false;
+		goto out_err;
 	}
 	weston_log("LittleCMS %d initialized.\n", cmsGetEncodedCMMversion());
 
 	return true;
+
+out_err:
+	weston_log_scope_destroy(cm->transforms_scope);
+	cm->transforms_scope = NULL;
+	weston_log_scope_destroy(cm->optimizer_scope);
+	cm->optimizer_scope = NULL;
+	weston_log_scope_destroy(cm->profiles_scope);
+	cm->profiles_scope = NULL;
+
+	return false;
 }
 
 static void
@@ -494,29 +524,5 @@ weston_color_manager_create(struct weston_compositor *compositor)
 	wl_list_init(&cm->color_transform_list);
 	wl_list_init(&cm->color_profile_list);
 
-	cm->transforms_scope =
-		weston_compositor_add_log_scope(compositor, "color-lcms-transformations",
-						"Color transformation creation and destruction.\n",
-						transforms_scope_new_sub, NULL, cm);
-	cm->optimizer_scope =
-		weston_compositor_add_log_scope(compositor, "color-lcms-optimizer",
-						"Color transformation pipeline optimizer. It's best " \
-						"used together with the color-lcms-transformations " \
-						"log scope.\n", NULL, NULL, NULL);
-	cm->profiles_scope =
-		weston_compositor_add_log_scope(compositor, "color-lcms-profiles",
-						"Color profile creation and destruction.\n",
-						profiles_scope_new_sub, NULL, cm);
-
-	if (!cm->profiles_scope || !cm->transforms_scope || !cm->optimizer_scope)
-		goto err;
-
 	return &cm->base;
-
-err:
-	weston_log_scope_destroy(cm->transforms_scope);
-	weston_log_scope_destroy(cm->optimizer_scope);
-	weston_log_scope_destroy(cm->profiles_scope);
-	free(cm);
-	return NULL;
 }
