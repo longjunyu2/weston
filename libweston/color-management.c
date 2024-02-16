@@ -1110,6 +1110,10 @@ weston_compositor_enable_color_management_protocol(struct weston_compositor *com
 {
         uint32_t version = 1;
 
+	weston_assert_bit_is_set(compositor,
+				 compositor->color_manager->supported_rendering_intents,
+				 WESTON_RENDER_INTENT_PERCEPTUAL);
+
         if (!wl_global_create(compositor->wl_display,
                               &xx_color_manager_v2_interface,
                               version, compositor, bind_color_management))
