@@ -76,8 +76,8 @@ cmlcms_get_render_intent(enum cmlcms_category cat,
 }
 
 static struct cmlcms_color_profile *
-get_cprof_or_stock_sRGB(struct weston_color_manager_lcms *cm,
-			struct weston_color_profile *cprof_base)
+to_cprof_or_stock_sRGB(struct weston_color_manager_lcms *cm,
+		       struct weston_color_profile *cprof_base)
 {
 	if (cprof_base)
 		return to_cmlcms_cprof(cprof_base);
@@ -106,8 +106,8 @@ cmlcms_get_surface_color_transform(struct weston_color_manager *cm_base,
 
 	struct cmlcms_color_transform_search_param param = {
 		.category = CMLCMS_CATEGORY_INPUT_TO_BLEND,
-		.input_profile = get_cprof_or_stock_sRGB(cm, surface->color_profile),
-		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
+		.input_profile = to_cprof_or_stock_sRGB(cm, surface->color_profile),
+		.output_profile = to_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
 	param.render_intent = cmlcms_get_render_intent(param.category,
 						       surface, output);
@@ -142,7 +142,7 @@ cmlcms_get_blend_to_output_color_transform(struct weston_color_manager_lcms *cm,
 	struct cmlcms_color_transform_search_param param = {
 		.category = CMLCMS_CATEGORY_BLEND_TO_OUTPUT,
 		.input_profile = NULL,
-		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
+		.output_profile = to_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
 	param.render_intent = cmlcms_get_render_intent(param.category,
 						       NULL, output);
@@ -167,7 +167,7 @@ cmlcms_get_sRGB_to_output_color_transform(struct weston_color_manager_lcms *cm,
 	struct cmlcms_color_transform_search_param param = {
 		.category = CMLCMS_CATEGORY_INPUT_TO_OUTPUT,
 		.input_profile = cm->sRGB_profile,
-		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
+		.output_profile = to_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
 	param.render_intent = cmlcms_get_render_intent(param.category,
 						       NULL, output);
@@ -200,7 +200,7 @@ cmlcms_get_sRGB_to_blend_color_transform(struct weston_color_manager_lcms *cm,
 	struct cmlcms_color_transform_search_param param = {
 		.category = CMLCMS_CATEGORY_INPUT_TO_BLEND,
 		.input_profile = cm->sRGB_profile,
-		.output_profile = get_cprof_or_stock_sRGB(cm, output->color_profile),
+		.output_profile = to_cprof_or_stock_sRGB(cm, output->color_profile),
 	};
 	param.render_intent = cmlcms_get_render_intent(param.category,
 						       NULL, output);
