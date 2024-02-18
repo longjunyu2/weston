@@ -967,7 +967,7 @@ main(int argc, char **argv)
 	while (running && ret != -1)
 		ret = wl_display_dispatch(display->display);
 
-	fprintf(stderr, "simple-shm exiting\n");
+	fprintf(stderr, "simple-damage exiting\n");
 	destroy_window(window);
 	destroy_display(display);
 
