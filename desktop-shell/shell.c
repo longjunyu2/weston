@@ -1692,6 +1692,8 @@ notify_output_destroy(struct wl_listener *listener, void *data)
 
 	shsurf->output = NULL;
 	shsurf->output_destroy_listener.notify = NULL;
+
+	shsurf->fullscreen_output = NULL;
 }
 
 static void
