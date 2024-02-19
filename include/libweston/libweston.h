@@ -311,6 +311,44 @@ struct weston_CIExy {
 	float y;
 };
 
+/** Chromaticity coordinates and white point that defines the color gamut */
+struct weston_color_gamut {
+	struct weston_CIExy primary[3]; /* RGB order */
+	struct weston_CIExy white_point;
+};
+
+/** Color primaries known by libweston */
+enum weston_color_primaries {
+	WESTON_PRIMARIES_CICP_SRGB = 0,
+	WESTON_PRIMARIES_CICP_PAL_M,
+	WESTON_PRIMARIES_CICP_PAL,
+	WESTON_PRIMARIES_CICP_NTSC,
+	WESTON_PRIMARIES_CICP_GENERIC_FILM,
+	WESTON_PRIMARIES_CICP_BT2020,
+	WESTON_PRIMARIES_CICP_CIE1931_XYZ,
+	WESTON_PRIMARIES_CICP_DCI_P3,
+	WESTON_PRIMARIES_CICP_DISPLAY_P3,
+	WESTON_PRIMARIES_ADOBE_RGB,
+};
+
+/** Transfer functions known by libweston */
+enum weston_transfer_function {
+	WESTON_TF_LINEAR = 0,
+	WESTON_TF_GAMMA22,
+	WESTON_TF_GAMMA28,
+	WESTON_TF_SRGB,
+	WESTON_TF_EXT_SRGB,
+	WESTON_TF_BT709,
+	WESTON_TF_BT1361,
+	WESTON_TF_ST240,
+	WESTON_TF_ST428,
+	WESTON_TF_ST2084_PQ,
+	WESTON_TF_LOG_100,
+	WESTON_TF_LOG_316,
+	WESTON_TF_XVYCC,
+	WESTON_TF_HLG,
+};
+
 enum weston_color_characteristics_groups {
 	/** weston_color_characteristics::primary is set */
 	WESTON_COLOR_CHARACTERISTICS_GROUP_PRIMARIES	= 0x01,
