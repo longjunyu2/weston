@@ -104,9 +104,12 @@ cmlcms_get_surface_color_transform(struct weston_color_manager *cm_base,
 
 	surf_xform->transform = &xform->base;
 	/*
-	 * When we introduce LCMS plug-in we can precisely answer this question
-	 * by examining the color pipeline using precision parameters. For now
-	 * we just compare if it is same pointer or not.
+	 * TODO: Instead of this, we should create the INPUT_TO_OUTPUT color
+	 * transformation and check if that is identity. Comparing just the
+	 * profiles will miss image adjustments if we add some.
+	 * OTOH, that will only be useful if DRM-backend learns to do
+	 * opportunistic direct scanout without KMS blending space
+	 * transformations.
 	 */
 	if (xform->search_key.input_profile == xform->search_key.output_profile)
 		surf_xform->identity_pipeline = true;
