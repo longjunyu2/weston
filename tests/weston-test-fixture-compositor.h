@@ -31,6 +31,12 @@
 
 #include "weston-testsuite-data.h"
 
+/* Compositor configuration defaults to a refresh rate of 0 to repaint only on
+ * captures immediately. This allows to run the test suite as fast as
+ * possible. Tests not supporting that mode can fallback to the highest refresh
+ * rate using that constant. */
+#define HIGHEST_OUTPUT_REFRESH 1000000
+
 /** Weston shell plugin
  *
  * \sa compositor_setup
@@ -73,6 +79,8 @@ struct compositor_setup {
 	unsigned height;
 	/** Default output scale. */
 	int scale;
+	/** Default output refresh rate (headless backend). */
+	int refresh;
 	/** Default output transform, one of WL_OUTPUT_TRANSFORM_*. */
 	enum wl_output_transform transform;
 	/** The absolute path to \c weston.ini to use,

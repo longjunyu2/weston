@@ -64,6 +64,7 @@ fixture_setup(struct weston_test_harness *harness, const struct setup_args *arg)
 	setup.height = 240;
 	setup.shell = SHELL_TEST_DESKTOP;
 	setup.logging_scopes = "log,test-harness-plugin";
+	setup.refresh = HIGHEST_OUTPUT_REFRESH;
 
 	return weston_test_harness_execute_as_client(harness, &setup);
 }

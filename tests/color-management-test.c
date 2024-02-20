@@ -640,6 +640,7 @@ fixture_setup(struct weston_test_harness *harness)
 	compositor_setup_defaults(&setup);
         setup.renderer = WESTON_RENDERER_GL;
 	setup.shell = SHELL_TEST_DESKTOP;
+	setup.refresh = HIGHEST_OUTPUT_REFRESH;
 
 	/* Create the sRGB ICC profile. We do that only once for this test
 	 * program. */
