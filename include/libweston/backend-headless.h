@@ -44,6 +44,9 @@ struct weston_headless_backend_config {
 
 	/** Use output decorations, requires use_gl = true */
 	bool decorate;
+
+	/** Output repaint refresh rate (in mHz). */
+	int refresh;
 };
 
 #ifdef  __cplusplus

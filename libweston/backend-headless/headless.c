@@ -47,10 +47,13 @@
 #include "shared/weston-egl-ext.h"
 #include "shared/cairo-util.h"
 #include "shared/xalloc.h"
+#include "shared/timespec-util.h"
 #include "linux-dmabuf.h"
 #include "output-capture.h"
 #include "presentation-time-server-protocol.h"
 #include <libweston/windowed-output-api.h>
+
+#define DEFAULT_OUTPUT_REPAINT_REFRESH 60000 /* In mHz. */
 
 struct headless_backend {
 	struct weston_backend base;
@@ -63,6 +66,8 @@ struct headless_backend {
 
 	const struct pixel_format_info **formats;
 	unsigned int formats_count;
+
+	int refresh;
 };
 
 struct headless_head {
@@ -157,6 +162,7 @@ headless_output_repaint(struct weston_output *output_base)
 	struct headless_output *output = to_headless_output(output_base);
 	struct weston_compositor *ec;
 	pixman_region32_t damage;
+	int delay_msec;
 
 	assert(output);
 
@@ -173,7 +179,8 @@ headless_output_repaint(struct weston_output *output_base)
 
 	pixman_region32_fini(&damage);
 
-	wl_event_source_timer_update(output->finish_frame_timer, 16);
+	delay_msec = millihz_to_nsec(output->mode.refresh) / 1000000;
+	wl_event_source_timer_update(output->finish_frame_timer, delay_msec);
 
 	return 0;
 }
@@ -416,7 +423,7 @@ headless_output_set_size(struct weston_output *base,
 		WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED;
 	output->mode.width = output_width;
 	output->mode.height = output_height;
-	output->mode.refresh = 60000;
+	output->mode.refresh = output->backend->refresh;
 	wl_list_insert(&output->base.mode_list, &output->mode.link);
 
 	output->base.current_mode = &output->mode;
@@ -565,6 +572,13 @@ headless_backend_create(struct weston_compositor *compositor,
 	b->formats_count = ARRAY_LENGTH(headless_formats);
 	b->formats = pixel_format_get_array(headless_formats, b->formats_count);
 
+	/* Wayland event source's timeout has a granularity of the order of
+	 * milliseconds so the highest supported rate is 1 kHz. */
+	if (config->refresh > 0)
+		b->refresh = MIN(config->refresh, 1000000);
+	else
+		b->refresh = DEFAULT_OUTPUT_REPAINT_REFRESH;
+
 	if (!compositor->renderer) {
 		switch (config->renderer) {
 		case WESTON_RENDERER_GL: {
@@ -639,6 +653,7 @@ err_free:
 static void
 config_init_to_defaults(struct weston_headless_backend_config *config)
 {
+	config->refresh = DEFAULT_OUTPUT_REPAINT_REFRESH;
 }
 
 WL_EXPORT int

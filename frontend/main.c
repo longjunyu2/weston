@@ -752,6 +752,7 @@ usage(int error_code)
 		"  --use-pixman\t\tUse the pixman (CPU) renderer (deprecated alias for --renderer=pixman)\n"
 		"  --use-gl\t\tUse the GL renderer (deprecated alias for --renderer=gl)\n"
 		"  --no-outputs\t\tDo not create any virtual outputs\n"
+		"  --refresh-rate=RATE\tThe output refresh rate (in mHz)\n"
 		"\n");
 #endif
 
@@ -3167,7 +3168,9 @@ load_headless_backend(struct weston_compositor *c,
 		{ WESTON_OPTION_BOOLEAN, "use-gl", 0, &force_gl },
 		{ WESTON_OPTION_STRING, "transform", 0, &transform },
 		{ WESTON_OPTION_BOOLEAN, "no-outputs", 0, &no_outputs },
+		{ WESTON_OPTION_INTEGER, "refresh-rate", 0, &config.refresh },
 	};
+	config.refresh = -1;
 
 	parse_options(options, ARRAY_LENGTH(options), argc, argv);
 
