@@ -507,6 +507,9 @@ struct weston_output {
 	/** Used only between repaint_begin and repaint_cancel. */
 	bool repainted;
 
+	/** Repaints are triggered only on capture requests, not on damages. */
+	bool repaint_only_on_capture;
+
 	/** State of the repaint loop */
 	enum {
 		REPAINT_NOT_SCHEDULED = 0, /**< idle; no repaint will occur */

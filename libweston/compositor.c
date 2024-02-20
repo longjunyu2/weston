@@ -3673,6 +3673,10 @@ weston_output_maybe_repaint(struct weston_output *output, struct timespec *now)
 	if (output->power_state == WESTON_OUTPUT_POWER_FORCED_OFF)
 		goto err;
 
+	if (output->repaint_only_on_capture &&
+	    !weston_output_has_renderer_capture_tasks(output))
+		goto err;
+
 	/* If repaint fails, we aren't going to get weston_output_finish_frame
 	 * to trigger a new repaint, so drop it from repaint and hope
 	 * something schedules a successful repaint later. As repainting may
@@ -7799,6 +7803,7 @@ weston_output_init(struct weston_output *output,
 	output->desired_protection = WESTON_HDCP_DISABLE;
 	output->allow_protection = true;
 	output->power_state = WESTON_OUTPUT_POWER_NORMAL;
+	output->repaint_only_on_capture = false;
 
 	wl_list_init(&output->head_list);
 

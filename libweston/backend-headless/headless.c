@@ -68,6 +68,7 @@ struct headless_backend {
 	unsigned int formats_count;
 
 	int refresh;
+	bool repaint_only_on_capture;
 };
 
 struct headless_head {
@@ -458,6 +459,7 @@ headless_output_create(struct weston_backend *backend, const char *name)
 	output->base.disable = headless_output_disable;
 	output->base.enable = headless_output_enable;
 	output->base.attach_head = NULL;
+	output->base.repaint_only_on_capture = b->repaint_only_on_capture;
 
 	output->backend = b;
 
@@ -573,11 +575,16 @@ headless_backend_create(struct weston_compositor *compositor,
 	b->formats = pixel_format_get_array(headless_formats, b->formats_count);
 
 	/* Wayland event source's timeout has a granularity of the order of
-	 * milliseconds so the highest supported rate is 1 kHz. */
-	if (config->refresh > 0)
+	 * milliseconds so the highest supported rate is 1 kHz. 0 is a special
+	 * value that enables repaints only on capture. */
+	if (config->refresh > 0) {
 		b->refresh = MIN(config->refresh, 1000000);
-	else
+	} else if (config->refresh == 0) {
+		b->refresh = 1000000;
+		b->repaint_only_on_capture = true;
+	} else {
 		b->refresh = DEFAULT_OUTPUT_REPAINT_REFRESH;
+	}
 
 	if (!compositor->renderer) {
 		switch (config->renderer) {

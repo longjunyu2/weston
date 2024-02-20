@@ -45,7 +45,9 @@ struct weston_headless_backend_config {
 	/** Use output decorations, requires use_gl = true */
 	bool decorate;
 
-	/** Output repaint refresh rate (in mHz). */
+	/** Output repaint refresh rate (in mHz). Supported values range from 0
+	 * mHz to 1,000,000 mHz. 0 is a special value that triggers repaints
+	 * only on capture requests, not on damages. */
 	int refresh;
 };
 
