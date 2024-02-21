@@ -41,7 +41,6 @@
 #include "shared/os-compatibility.h"
 #include <libweston/zalloc.h>
 #include "xdg-shell-client-protocol.h"
-#include "fullscreen-shell-unstable-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"
 
 int print_debug = 0;
@@ -53,7 +52,6 @@ struct display {
 	struct wl_compositor *compositor;
 	struct wp_viewporter *viewporter;
 	struct xdg_wm_base *wm_base;
-	struct zwp_fullscreen_shell_v1 *fshell;
 	struct wl_shm *shm;
 	uint32_t formats;
 };
@@ -342,11 +340,6 @@ create_window(struct display *display, int width, int height,
 
 		window->wait_for_configure = true;
 		wl_surface_commit(window->surface);
-	} else if (display->fshell) {
-		zwp_fullscreen_shell_v1_present_surface(display->fshell,
-							window->surface,
-							ZWP_FULLSCREEN_SHELL_V1_PRESENT_METHOD_DEFAULT,
-							NULL);
 	} else {
 		assert(0);
 	}
@@ -766,9 +759,6 @@ registry_handle_global(void *data, struct wl_registry *registry,
 		d->wm_base = wl_registry_bind(registry,
 					      id, &xdg_wm_base_interface, 1);
 		xdg_wm_base_add_listener(d->wm_base, &wm_base_listener, d);
-	} else if (strcmp(interface, "zwp_fullscreen_shell_v1") == 0) {
-		d->fshell = wl_registry_bind(registry,
-					     id, &zwp_fullscreen_shell_v1_interface, 1);
 	} else if (strcmp(interface, "wl_shm") == 0) {
 		d->shm = wl_registry_bind(registry,
 					  id, &wl_shm_interface, 1);
@@ -829,9 +819,6 @@ destroy_display(struct display *display)
 
 	if (display->wm_base)
 		xdg_wm_base_destroy(display->wm_base);
-
-	if (display->fshell)
-		zwp_fullscreen_shell_v1_release(display->fshell);
 
 	if (display->viewporter)
 		wp_viewporter_destroy(display->viewporter);
