@@ -57,6 +57,10 @@ if installed.
 The PipeWire backend runs in memory without the need of graphical hardware and
 creates a PipeWire node for each output. It can be used to capture Weston
 outputs for processing with another application.
+.TP
+.I headless
+The headless backend runs in memory. It can be used to capture Weston outputs
+or to test client applications.
 .
 .\" ***************************************************************
 .SH SHELLS
@@ -288,6 +292,32 @@ See
 .SS VNC backend options:
 See
 .BR weston-vnc (7).
+.
+.SS headless backend options:
+.TP
+\fB\-\-width\fR=\fIW\fR, \fB\-\-height\fR=\fIH\fR
+Make the default size of each output
+.IR W x H " pixels."
+.TP
+.B \-\-scale\fR=\fIN\fR
+Give all outputs a scale factor of
+.IR N "."
+.TP
+\fB\-\-transform\fR=\fItransform\fR
+Transform for the output, which can be rotated in 90-degree steps
+and possibly flipped. Possible values are
+.BR normal ", " rotate-90 ", " rotate-180 ", " rotate-270 ", "
+.BR flipped ", " flipped-rotate-90 ", " flipped-rotate-180 ", and "
+.BR flipped-rotate-270 .
+.TP
+.B \-\-no\-outputs
+Do not create any virtual outputs.
+.TP
+.B \-\-refresh\-rate\fR=\fIN\fR
+Give all outputs a refresh rate of
+.IR N " mHz (60,000 mHz by default)."
+Supported values range from 0 mHz to 1,000,000 mHz. 0 is a special value
+that repaints as soon as possible on capture requests only, not on damages.
 .
 .
 .\" ***************************************************************
