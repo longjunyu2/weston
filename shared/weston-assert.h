@@ -102,6 +102,9 @@ do {										\
 #define weston_assert_uint32_gt(compositor, a, b) \
 	weston_assert_(compositor, a, b, uint32_t, "%u", >)
 
+#define weston_assert_uint32_gt_or_eq(compositor, a, b) \
+	weston_assert_(compositor, a, b, uint32_t, "%u", >=)
+
 #define weston_assert_uint32_lt(compositor, a, b) \
 	weston_assert_(compositor, a, b, uint32_t, "%u", <)
 

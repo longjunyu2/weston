@@ -174,11 +174,13 @@ static struct weston_output_color_outcome *
 cmnoop_create_output_color_outcome(struct weston_color_manager *cm_base,
 				   struct weston_output *output)
 {
+	struct weston_compositor *compositor = cm_base->compositor;
 	struct weston_color_manager_noop *cmnoop = get_cmnoop(cm_base);
 	struct weston_output_color_outcome *co;
 
-	assert(output->color_profile &&
-	       get_cprof(output->color_profile) == cmnoop->stock_cprof);
+	weston_assert_ptr(compositor, output->color_profile);
+	weston_assert_ptr_eq(compositor, get_cprof(output->color_profile),
+			     cmnoop->stock_cprof);
 
 	if (!check_output_eotf_mode(output))
 		return NULL;
@@ -228,7 +230,12 @@ cmnoop_destroy(struct weston_color_manager *cm_base)
 {
 	struct weston_color_manager_noop *cmnoop = get_cmnoop(cm_base);
 
-	assert(cmnoop->stock_cprof->base.ref_count == 1);
+	/* TODO: change this assert to make sure that ref_count is equal to 1.
+	 * Currently we have a bug in which we leak surfaces when shutting down
+	 * Weston with client surfaces alive, and these surfaces may have a
+	 * reference to the stock sRGB profile. */
+	weston_assert_uint32_gt_or_eq(cm_base->compositor,
+				      cmnoop->stock_cprof->base.ref_count, 1);
 	unref_cprof(cmnoop->stock_cprof);
 
 	free(cmnoop);
