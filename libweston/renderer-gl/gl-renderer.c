@@ -471,76 +471,12 @@ timeline_submit_render_sync(struct gl_renderer *gr,
 	wl_list_insert(&go->timeline_render_point_list, &trp->link);
 }
 
+static int
+compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects);
+
 static void
 global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
-		  struct clipper_vertex polygon[4], bool *axis_aligned)
-{
-	struct weston_coord_global rect_g[4] = {
-		{ .c = weston_coord(rect->x1, rect->y1) },
-		{ .c = weston_coord(rect->x2, rect->y1) },
-		{ .c = weston_coord(rect->x2, rect->y2) },
-		{ .c = weston_coord(rect->x1, rect->y2) },
-	};
-	struct weston_coord rect_s;
-	int i;
-
-	for (i = 0; i < 4; i++) {
-		rect_s = weston_coord_global_to_surface(ev, rect_g[i]).c;
-		polygon[i].x = (float)rect_s.x;
-		polygon[i].y = (float)rect_s.y;
-	}
-
-	*axis_aligned = !ev->transform.enabled ||
-		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
-}
-
-static bool
-merge_down(pixman_box32_t *a, pixman_box32_t *b, pixman_box32_t *merge)
-{
-	if (a->x1 == b->x1 && a->x2 == b->x2 && a->y1 == b->y2) {
-		merge->x1 = a->x1;
-		merge->x2 = a->x2;
-		merge->y1 = b->y1;
-		merge->y2 = a->y2;
-		return true;
-	}
-	return false;
-}
-
-static int
-compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects)
-{
-	bool merged = false;
-	pixman_box32_t *out, merge_rect;
-	int i, j, nout;
-
-	if (!nrects) {
-		*outrects = NULL;
-		return 0;
-	}
-
-	/* nrects is an upper bound - we're not too worried about
-	 * allocating a little extra
-	 */
-	out = malloc(sizeof(pixman_box32_t) * nrects);
-	out[0] = inrects[0];
-	nout = 1;
-	for (i = 1; i < nrects; i++) {
-		for (j = 0; j < nout; j++) {
-			merged = merge_down(&inrects[i], &out[j], &merge_rect);
-			if (merged) {
-				out[j] = merge_rect;
-				break;
-			}
-		}
-		if (!merged) {
-			out[nout] = inrects[i];
-			nout++;
-		}
-	}
-	*outrects = out;
-	return nout;
-}
+		  struct clipper_vertex polygon[4], bool *axis_aligned);
 
 static int
 texture_region(struct weston_paint_node *pnode,
@@ -1260,6 +1196,77 @@ gl_shader_config_init_for_paint_node(struct gl_shader_config *sconf,
 	}
 
 	return true;
+}
+
+static bool
+merge_down(pixman_box32_t *a, pixman_box32_t *b, pixman_box32_t *merge)
+{
+	if (a->x1 == b->x1 && a->x2 == b->x2 && a->y1 == b->y2) {
+		merge->x1 = a->x1;
+		merge->x2 = a->x2;
+		merge->y1 = b->y1;
+		merge->y2 = a->y2;
+		return true;
+	}
+	return false;
+}
+
+static int
+compress_bands(pixman_box32_t *inrects, int nrects, pixman_box32_t **outrects)
+{
+	bool merged = false;
+	pixman_box32_t *out, merge_rect;
+	int i, j, nout;
+
+	if (!nrects) {
+		*outrects = NULL;
+		return 0;
+	}
+
+	/* nrects is an upper bound - we're not too worried about
+	 * allocating a little extra
+	 */
+	out = malloc(sizeof(pixman_box32_t) * nrects);
+	out[0] = inrects[0];
+	nout = 1;
+	for (i = 1; i < nrects; i++) {
+		for (j = 0; j < nout; j++) {
+			merged = merge_down(&inrects[i], &out[j], &merge_rect);
+			if (merged) {
+				out[j] = merge_rect;
+				break;
+			}
+		}
+		if (!merged) {
+			out[nout] = inrects[i];
+			nout++;
+		}
+	}
+	*outrects = out;
+	return nout;
+}
+
+static void
+global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
+		  struct clipper_vertex polygon[4], bool *axis_aligned)
+{
+	struct weston_coord_global rect_g[4] = {
+		{ .c = weston_coord(rect->x1, rect->y1) },
+		{ .c = weston_coord(rect->x2, rect->y1) },
+		{ .c = weston_coord(rect->x2, rect->y2) },
+		{ .c = weston_coord(rect->x1, rect->y2) },
+	};
+	struct weston_coord rect_s;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		rect_s = weston_coord_global_to_surface(ev, rect_g[i]).c;
+		polygon[i].x = (float)rect_s.x;
+		polygon[i].y = (float)rect_s.y;
+	}
+
+	*axis_aligned = !ev->transform.enabled ||
+		(ev->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
 }
 
 static void
