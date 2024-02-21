@@ -119,8 +119,6 @@ simple_clients = [
 			xdg_shell_protocol_c,
 			weston_direct_display_client_protocol_h,
 			weston_direct_display_protocol_c,
-			fullscreen_shell_unstable_v1_client_protocol_h,
-			fullscreen_shell_unstable_v1_protocol_c,
 			viewporter_client_protocol_h,
 			viewporter_protocol_c,
 		],
