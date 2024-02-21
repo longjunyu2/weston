@@ -41,7 +41,6 @@
 #include "shared/os-compatibility.h"
 #include <libweston/zalloc.h>
 #include "xdg-shell-client-protocol.h"
-#include "fullscreen-shell-unstable-v1-client-protocol.h"
 
 #define MAX_BUFFER_ALLOC	2
 
@@ -50,7 +49,6 @@ struct display {
 	struct wl_registry *registry;
 	struct wl_compositor *compositor;
 	struct xdg_wm_base *wm_base;
-	struct zwp_fullscreen_shell_v1 *fshell;
 	struct wl_seat *seat;
 	struct wl_keyboard *keyboard;
 	struct wl_shm *shm;
@@ -367,11 +365,6 @@ create_window(struct display *display, int width, int height)
 
 		wl_surface_commit(window->surface);
 		window->wait_for_configure = true;
-	} else if (display->fshell) {
-		zwp_fullscreen_shell_v1_present_surface(display->fshell,
-							window->surface,
-							ZWP_FULLSCREEN_SHELL_V1_PRESENT_METHOD_DEFAULT,
-							NULL);
 	} else {
 		assert(0);
 	}
@@ -560,9 +553,6 @@ registry_handle_global(void *data, struct wl_registry *registry,
 		d->seat = wl_registry_bind(registry, id,
 					   &wl_seat_interface, 1);
 		wl_seat_add_listener(d->seat, &seat_listener, d);
-	} else if (strcmp(interface, "zwp_fullscreen_shell_v1") == 0) {
-		d->fshell = wl_registry_bind(registry,
-					     id, &zwp_fullscreen_shell_v1_interface, 1);
 	} else if (strcmp(interface, "wl_shm") == 0) {
 		d->shm = wl_registry_bind(registry,
 					  id, &wl_shm_interface, 1);
@@ -662,9 +652,6 @@ destroy_display(struct display *display)
 
 	if (display->wm_base)
 		xdg_wm_base_destroy(display->wm_base);
-
-	if (display->fshell)
-		zwp_fullscreen_shell_v1_release(display->fshell);
 
 	if (display->compositor)
 		wl_compositor_destroy(display->compositor);

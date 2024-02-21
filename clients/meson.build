@@ -160,8 +160,6 @@ simple_clients = [
 			'simple-shm.c',
 			xdg_shell_client_protocol_h,
 			xdg_shell_protocol_c,
-			fullscreen_shell_unstable_v1_client_protocol_h,
-			fullscreen_shell_unstable_v1_protocol_c,
 			ivi_application_client_protocol_h,
 			ivi_application_protocol_c,
 		],
