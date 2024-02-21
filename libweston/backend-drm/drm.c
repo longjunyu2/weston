@@ -1686,6 +1686,7 @@ drm_output_detach_head(struct weston_output *output_base,
 		return;
 
 	/* Drop connectors that should no longer be driven on next repaint. */
+	wl_list_remove(&head->disable_head_link);
 	wl_list_insert(&output->disable_head, &head->disable_head_link);
 }
 
@@ -2381,6 +2382,8 @@ drm_output_destroy(struct weston_output *base)
 
 	assert(output->hdr_output_metadata_blob_id == 0);
 
+	wl_list_remove(&output->disable_head);
+
 	free(output);
 }
 
@@ -2703,6 +2706,8 @@ drm_head_destroy(struct weston_head *base)
 
 	if (head->backlight)
 		backlight_destroy(head->backlight);
+
+	wl_list_remove(&head->disable_head_link);
 
 	free(head->display_data);
 	free(head);
