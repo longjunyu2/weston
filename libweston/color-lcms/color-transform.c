@@ -1011,17 +1011,10 @@ cmlcms_color_transform_create(struct weston_color_manager_lcms *cm,
 	weston_log_scope_printf(cm->transforms_scope, "%s", str);
 	free(str);
 
-	/* Ensure the linearization etc. have been extracted. */
-	if (!search_param->output_profile->extract.eotf[0]) {
-		if (!retrieve_eotf_and_output_inv_eotf(cm->lcms_ctx,
-						       search_param->output_profile->profile,
-						       search_param->output_profile->extract.eotf,
-						       search_param->output_profile->extract.output_inv_eotf_vcgt,
-						       search_param->output_profile->extract.vcgt,
-						       cmlcms_reasonable_1D_points())) {
-			err_msg = "retrieve_eotf_and_output_inv_eotf failed";
-			goto error;
-		}
+	if (!ensure_output_profile_extract(search_param->output_profile, cm->lcms_ctx,
+					   cmlcms_reasonable_1D_points())) {
+		err_msg = "could not extract EOTF, inverse EOTF, or VCGT";
+		goto error;
 	}
 
 	/*

@@ -239,12 +239,9 @@ char *
 cmlcms_color_profile_print(const struct cmlcms_color_profile *cprof);
 
 bool
-retrieve_eotf_and_output_inv_eotf(cmsContext lcms_ctx,
-				  cmsHPROFILE hProfile,
-				  cmsToneCurve *output_eotf[3],
-				  cmsToneCurve *output_inv_eotf_vcgt[3],
-				  cmsToneCurve *vcgt[3],
-				  unsigned int num_points);
+ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
+			      cmsContext lcms_ctx,
+			      unsigned int num_points);
 
 unsigned int
 cmlcms_reasonable_1D_points(void);

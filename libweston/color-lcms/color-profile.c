@@ -182,12 +182,10 @@ error:
  * then invert and concatenate with 'vcgt' curve if it
  * is available.
  */
-bool
-retrieve_eotf_and_output_inv_eotf(cmsContext lcms_ctx,
+static bool
+ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
+				  cmsContext lcms_ctx,
 				  cmsHPROFILE hProfile,
-				  cmsToneCurve *output_eotf[3],
-				  cmsToneCurve *output_inv_eotf_vcgt[3],
-				  cmsToneCurve *vcgt[3],
 				  unsigned int num_points)
 {
 	cmsToneCurve *curve = NULL;
@@ -206,8 +204,8 @@ retrieve_eotf_and_output_inv_eotf(cmsContext lcms_ctx,
 			curve = cmsReadTag(hProfile, tags[i]);
 			if (!curve)
 				goto fail;
-			output_eotf[i] = cmsDupToneCurve(curve);
-			if (!output_eotf[i])
+			extract->eotf[i] = cmsDupToneCurve(curve);
+			if (!extract->eotf[i])
 				goto fail;
 		}
 	} else {
@@ -216,43 +214,55 @@ retrieve_eotf_and_output_inv_eotf(cmsContext lcms_ctx,
 		 * 1DLUT->3DLUT, 3DLUT
 		 */
 		if (!build_eotf_from_clut_profile(lcms_ctx, hProfile,
-						 output_eotf, num_points))
+						  extract->eotf, num_points))
 			goto fail;
 	}
-	/**
-	 * If the caller looking for eotf only then return early.
-	 * It could be used for input profile when identity case: EOTF + INV_EOTF
-	 * in pipeline only.
-	 */
-	if (output_inv_eotf_vcgt == NULL)
-		return true;
 
 	for (i = 0; i < 3; i++) {
-		curve = cmsReverseToneCurve(output_eotf[i]);
+		curve = cmsReverseToneCurve(extract->eotf[i]);
 		if (!curve)
 			goto fail;
-		output_inv_eotf_vcgt[i] = curve;
+		extract->output_inv_eotf_vcgt[i] = curve;
 	}
 	vcgt_curves = cmsReadTag(hProfile, cmsSigVcgtTag);
 	if (vcgt_curves && vcgt_curves[0] && vcgt_curves[1] && vcgt_curves[2]) {
 		for (i = 0; i < 3; i++) {
 			curve = lcmsJoinToneCurve(lcms_ctx,
-						  output_inv_eotf_vcgt[i],
+						  extract->output_inv_eotf_vcgt[i],
 						  vcgt_curves[i], num_points);
 			if (!curve)
 				goto fail;
-			cmsFreeToneCurve(output_inv_eotf_vcgt[i]);
-			output_inv_eotf_vcgt[i] = curve;
-			if (vcgt)
-				vcgt[i] = cmsDupToneCurve(vcgt_curves[i]);
+			cmsFreeToneCurve(extract->output_inv_eotf_vcgt[i]);
+			extract->output_inv_eotf_vcgt[i] = curve;
+			extract->vcgt[i] = cmsDupToneCurve(vcgt_curves[i]);
 		}
 	}
 	return true;
 
 fail:
-	cmsFreeToneCurveTriple(output_eotf);
-	cmsFreeToneCurveTriple(output_inv_eotf_vcgt);
+	cmsFreeToneCurveTriple(extract->eotf);
+	cmsFreeToneCurveTriple(extract->output_inv_eotf_vcgt);
 	return false;
+}
+
+bool
+ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
+			      cmsContext lcms_ctx,
+			      unsigned int num_points)
+{
+	bool ret;
+
+	/* Everything already computed */
+	if (cprof->extract.eotf[0])
+		return true;
+
+	ret = ensure_output_profile_extract_icc(&cprof->extract, lcms_ctx,
+						cprof->profile, num_points);
+
+	if (ret)
+		weston_assert_ptr(cprof->base.cm->compositor, cprof->extract.eotf[0]);
+
+	return ret;
 }
 
 /* FIXME: sync with spec! */
@@ -431,12 +441,8 @@ cmlcms_create_stock_profile(struct weston_color_manager_lcms *cm)
 	if (!cm->sRGB_profile)
 		goto err_close;
 
-	if (!retrieve_eotf_and_output_inv_eotf(cm->lcms_ctx,
-					       cm->sRGB_profile->profile,
-					       cm->sRGB_profile->extract.eotf,
-					       cm->sRGB_profile->extract.output_inv_eotf_vcgt,
-					       cm->sRGB_profile->extract.vcgt,
-					       cmlcms_reasonable_1D_points()))
+	if (!ensure_output_profile_extract(cm->sRGB_profile, cm->lcms_ctx,
+					   cmlcms_reasonable_1D_points()))
 		goto err_close;
 
 	return true;
