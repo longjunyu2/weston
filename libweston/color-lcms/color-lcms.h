@@ -57,6 +57,31 @@ struct cmlcms_md5_sum {
 	uint8_t bytes[16];
 };
 
+struct cmlcms_output_profile_extract {
+	/** The curves to decode an electrical signal
+	 *
+	 * For ICC profiles, if the profile type is matrix-shaper, then eotf
+	 * contains the TRC, otherwise eotf contains an approximated EOTF.
+	 */
+	cmsToneCurve *eotf[3];
+
+	/**
+	 * This field represents a concatenation of inverse EOTF + VCGT,
+	 * if the tag exists and it can not be null.
+	 * VCGT is part of monitor calibration which means: even though we must
+	 * apply VCGT in the compositor, we pretend that it happens inside the
+	 * monitor. This is how the classic color management and ICC profiles work.
+	 * The ICC profile (ignoring the VCGT tag) characterizes the output which
+	 * is VCGT + monitor behavior.
+	 */
+	cmsToneCurve *output_inv_eotf_vcgt[3];
+
+	/**
+	 * VCGT tag cached from output profile, it could be null if not exist
+	 */
+	cmsToneCurve *vcgt[3];
+};
+
 struct cmlcms_color_profile {
 	struct weston_color_profile base;
 
@@ -69,33 +94,8 @@ struct cmlcms_color_profile {
 	/* Only for profiles created from an ICC file. */
 	struct ro_anonymous_file *prof_rofile;
 
-	/** The curves to decode an electrical signal
-	 *
-	 * For ICC profiles, if the profile type is matrix-shaper, then eotf
-	 * contains the TRC, otherwise eotf contains an approximated EOTF if the
-	 * profile is used for output.
-	 * The field may be populated on demand.
-	 */
-	cmsToneCurve *eotf[3];
-
-	/**
-	 * If the profile does support being an output profile and it is used as an
-	 * output then this field represents a concatenation of inverse EOTF + VCGT,
-	 * if the tag exists and it can not be null.
-	 * VCGT is part of monitor calibration which means: even though we must
-	 * apply VCGT in the compositor, we pretend that it happens inside the
-	 * monitor. This is how the classic color management and ICC profiles work.
-	 * The ICC profile (ignoring the VCGT tag) characterizes the output which
-	 * is VCGT + monitor behavior. The field is null only if the profile is not
-	 * usable as an output profile. The field is set when cmlcms_color_profile
-	 * is created.
-	 */
-	cmsToneCurve *output_inv_eotf_vcgt[3];
-
-	/**
-	 * VCGT tag cached from output profile, it could be null if not exist
-	 */
-	cmsToneCurve *vcgt[3];
+	/* Populated only when profile used as output profile */
+	struct cmlcms_output_profile_extract extract;
 };
 
 /**

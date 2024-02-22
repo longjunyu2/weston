@@ -346,9 +346,9 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 	struct weston_color_manager_lcms *cm = to_cmlcms(cprof->base.cm);
 
 	wl_list_remove(&cprof->link);
-	cmsFreeToneCurveTriple(cprof->vcgt);
-	cmsFreeToneCurveTriple(cprof->eotf);
-	cmsFreeToneCurveTriple(cprof->output_inv_eotf_vcgt);
+	cmsFreeToneCurveTriple(cprof->extract.vcgt);
+	cmsFreeToneCurveTriple(cprof->extract.eotf);
+	cmsFreeToneCurveTriple(cprof->extract.output_inv_eotf_vcgt);
 	cmsCloseProfile(cprof->profile);
 
 	/* Only profiles created from ICC files have these. */
@@ -433,9 +433,9 @@ cmlcms_create_stock_profile(struct weston_color_manager_lcms *cm)
 
 	if (!retrieve_eotf_and_output_inv_eotf(cm->lcms_ctx,
 					       cm->sRGB_profile->profile,
-					       cm->sRGB_profile->eotf,
-					       cm->sRGB_profile->output_inv_eotf_vcgt,
-					       cm->sRGB_profile->vcgt,
+					       cm->sRGB_profile->extract.eotf,
+					       cm->sRGB_profile->extract.output_inv_eotf_vcgt,
+					       cm->sRGB_profile->extract.vcgt,
 					       cmlcms_reasonable_1D_points()))
 		goto err_close;
 

@@ -96,7 +96,7 @@ cmlcms_fill_in_output_inv_eotf_vcgt(struct weston_color_transform *xform_base,
 	struct cmlcms_color_profile *p = xform->search_key.output_profile;
 
 	assert(p && "output_profile");
-	fill_in_curves(p->output_inv_eotf_vcgt, values, len);
+	fill_in_curves(p->extract.output_inv_eotf_vcgt, values, len);
 }
 
 static void
@@ -894,14 +894,14 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 	switch (xform->search_key.category) {
 	case CMLCMS_CATEGORY_INPUT_TO_BLEND:
 		/* Add linearization step to make blending well-defined. */
-		extra = profile_from_rgb_curves(cm->lcms_ctx, output_profile->eotf);
+		extra = profile_from_rgb_curves(cm->lcms_ctx, output_profile->extract.eotf);
 		chain[chain_len++] = extra;
 		break;
 	case CMLCMS_CATEGORY_INPUT_TO_OUTPUT:
 		/* Just add VCGT if it is provided. */
-		if (output_profile->vcgt[0]) {
+		if (output_profile->extract.vcgt[0]) {
 			extra = profile_from_rgb_curves(cm->lcms_ctx,
-							output_profile->vcgt);
+							output_profile->extract.vcgt);
 			chain[chain_len++] = extra;
 		}
 		break;
@@ -1012,12 +1012,12 @@ cmlcms_color_transform_create(struct weston_color_manager_lcms *cm,
 	free(str);
 
 	/* Ensure the linearization etc. have been extracted. */
-	if (!search_param->output_profile->eotf[0]) {
+	if (!search_param->output_profile->extract.eotf[0]) {
 		if (!retrieve_eotf_and_output_inv_eotf(cm->lcms_ctx,
 						       search_param->output_profile->profile,
-						       search_param->output_profile->eotf,
-						       search_param->output_profile->output_inv_eotf_vcgt,
-						       search_param->output_profile->vcgt,
+						       search_param->output_profile->extract.eotf,
+						       search_param->output_profile->extract.output_inv_eotf_vcgt,
+						       search_param->output_profile->extract.vcgt,
 						       cmlcms_reasonable_1D_points())) {
 			err_msg = "retrieve_eotf_and_output_inv_eotf failed";
 			goto error;
