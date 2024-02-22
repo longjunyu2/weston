@@ -198,8 +198,10 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 
 	if (cmsIsMatrixShaper(hProfile)) {
 		/**
-		 * Optimization for matrix-shaper profile
-		 * May have 1DLUT->3x3->3x3->1DLUT, 1DLUT->3x3->1DLUT
+		 * Matrix-shaper profiles contain TRC and MatrixColumn tags.
+		 * Assumes that AToB or DToB tags do not exist or are
+		 * equivalent to TRC + MatrixColumn.
+		 * We can take the TRC curves straight as EOTF.
 		 */
 		for (i = 0 ; i < 3; i++) {
 			curve = cmsReadTag(hProfile, tags[i]);
@@ -215,8 +217,8 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 		}
 	} else {
 		/**
-		 * Linearization of cLUT profile may have 1DLUT->3DLUT->1DLUT,
-		 * 1DLUT->3DLUT, 3DLUT
+		 * Any other kind of profile goes through approximate
+		 * linearization that produces sampled curves.
 		 */
 		if (!build_eotf_from_clut_profile(lcms_ctx, hProfile,
 						  extract->eotf, num_points)) {
