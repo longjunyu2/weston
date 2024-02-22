@@ -9246,6 +9246,8 @@ weston_compositor_create(struct wl_display *display,
 
 	weston_compositor_install_capture_protocol(ec);
 
+	ec->color_profile_id_generator = weston_idalloc_create(ec);
+
 	wl_list_init(&ec->view_list);
 	wl_list_init(&ec->plane_list);
 	wl_list_init(&ec->layer_list);
@@ -9335,11 +9337,6 @@ weston_compositor_shutdown(struct weston_compositor *ec)
 		ec->color_manager->destroy(ec->color_manager);
 		ec->color_manager = NULL;
 	}
-
-	/* Already destroyed color manager, now we can safely destroy the color
-	 * profile id generator. */
-	weston_idalloc_destroy(ec->color_profile_id_generator);
-	ec->color_profile_id_generator = NULL;
 
 	if (ec->renderer)
 		ec->renderer->destroy(ec);
@@ -9453,9 +9450,6 @@ weston_compositor_backends_loaded(struct weston_compositor *compositor)
 
 	if (!compositor->color_manager)
 		return -1;
-
-	/* Create id generator before initing the color manager. */
-	compositor->color_profile_id_generator = weston_idalloc_create(compositor);
 
 	if (!compositor->color_manager->init(compositor->color_manager))
 		return -1;
@@ -9769,6 +9763,8 @@ weston_compositor_destroy(struct weston_compositor *compositor)
 
 	weston_log_scope_destroy(compositor->libseat_debug);
 	compositor->libseat_debug = NULL;
+
+	weston_idalloc_destroy(compositor->color_profile_id_generator);
 
 	if (compositor->default_dmabuf_feedback) {
 		weston_dmabuf_feedback_destroy(compositor->default_dmabuf_feedback);
