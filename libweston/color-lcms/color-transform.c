@@ -1225,6 +1225,12 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 	struct lcmsProfilePtr extra = { NULL };
 	cmsUInt32Number dwFlags;
 
+	/* TODO: address this when we implement param color profiles.*/
+	if (output_profile->type == CMLCMS_PROFILE_TYPE_PARAMS ||
+	    (xform->search_key.input_profile &&
+	     xform->search_key.input_profile->type == CMLCMS_PROFILE_TYPE_PARAMS))
+		return false;
+
 	render_intent = xform->search_key.render_intent;
 
 	/*

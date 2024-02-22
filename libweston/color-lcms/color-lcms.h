@@ -93,8 +93,17 @@ struct cmlcms_output_profile_extract {
 	struct lcmsProfilePtr vcgt;
 };
 
+/**
+ * Profile type, based on what was used to create it.
+ */
+enum cmlcms_profile_type {
+	CMLCMS_PROFILE_TYPE_ICC = 0, /* created with ICC profile. */
+	CMLCMS_PROFILE_TYPE_PARAMS,  /* created with color parameters. */
+};
+
 struct cmlcms_color_profile {
 	struct weston_color_profile base;
+	enum cmlcms_profile_type type;
 
 	/* struct weston_color_manager_lcms::color_profile_list */
 	struct wl_list link;
@@ -102,8 +111,11 @@ struct cmlcms_color_profile {
 	struct lcmsProfilePtr profile;
 	struct cmlcms_md5_sum md5sum;
 
-	/* Only for profiles created from an ICC file. */
+	/* Only for CMLCMS_PROFILE_TYPE_ICC */
 	struct ro_anonymous_file *prof_rofile;
+
+	/* Only for CMLCMS_PROFILE_TYPE_PARAMS */
+	struct weston_color_profile_params *params;
 
 	/* Populated only when profile used as output profile */
 	struct cmlcms_output_profile_extract extract;
@@ -152,6 +164,13 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm,
 				  const char *name_part,
 				  struct weston_color_profile **cprof_out,
 				  char **errmsg);
+
+bool
+cmlcms_get_color_profile_from_params(struct weston_color_manager *cm_base,
+				     const struct weston_color_profile_params *params,
+				     const char *name_part,
+				     struct weston_color_profile **cprof_out,
+				     char **errmsg);
 
 bool
 cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,

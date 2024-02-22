@@ -135,6 +135,17 @@ cmnoop_get_color_profile_from_icc(struct weston_color_manager *cm,
 	return false;
 }
 
+static bool
+cmnoop_get_color_profile_from_params(struct weston_color_manager *cm,
+				     const struct weston_color_profile_params *params,
+				     const char *name_part,
+				     struct weston_color_profile **cprof_out,
+				     char **errmsg)
+{
+	*errmsg = xstrdup("parametric profiles are unsupported.");
+	return false;
+}
+
 static void
 cmnoop_destroy_color_transform(struct weston_color_transform *xform)
 {
@@ -256,6 +267,7 @@ weston_color_manager_noop_create(struct weston_compositor *compositor)
 	cm->base.destroy_color_profile = cmnoop_destroy_color_profile;
 	cm->base.ref_stock_sRGB_color_profile = cmnoop_ref_stock_sRGB_color_profile;
 	cm->base.get_color_profile_from_icc = cmnoop_get_color_profile_from_icc;
+	cm->base.get_color_profile_from_params = cmnoop_get_color_profile_from_params;
 	cm->base.send_image_desc_info = NULL;
 	cm->base.destroy_color_transform = cmnoop_destroy_color_transform;
 	cm->base.get_surface_color_transform = cmnoop_get_surface_color_transform;

@@ -285,17 +285,28 @@ ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 			      unsigned int num_points,
 			      const char **err_msg)
 {
+	struct weston_compositor *compositor = cprof->base.cm->compositor;
 	bool ret;
 
 	/* Everything already computed */
 	if (cprof->extract.eotf.p)
 		return true;
 
-	ret = ensure_output_profile_extract_icc(&cprof->extract, lcms_ctx,
-						cprof->profile, num_points, err_msg);
-
-	if (ret)
-		weston_assert_ptr(cprof->base.cm->compositor, cprof->extract.eotf.p);
+	switch (cprof->type) {
+	case CMLCMS_PROFILE_TYPE_ICC:
+		ret = ensure_output_profile_extract_icc(&cprof->extract, lcms_ctx,
+							cprof->profile, num_points,
+							err_msg);
+		if (ret)
+			weston_assert_ptr(compositor, cprof->extract.eotf.p);
+		break;
+	case CMLCMS_PROFILE_TYPE_PARAMS:
+		/* TODO: need to address this when we create param profiles. */
+		ret = false;
+		break;
+	default:
+		weston_assert_not_reached(compositor, "unknown profile type");
+	}
 
 	return ret;
 }
@@ -337,8 +348,40 @@ cmlcms_find_color_profile_by_md5(const struct weston_color_manager_lcms *cm,
 	struct cmlcms_color_profile *cprof;
 
 	wl_list_for_each(cprof, &cm->color_profile_list, link) {
+		if (cprof->type != CMLCMS_PROFILE_TYPE_ICC)
+			continue;
+
 		if (memcmp(cprof->md5sum.bytes,
 			   md5sum->bytes, sizeof(md5sum->bytes)) == 0)
+			return cprof;
+	}
+
+	return NULL;
+}
+
+static struct cmlcms_color_profile *
+cmlcms_find_color_profile_by_params(const struct weston_color_manager_lcms *cm,
+				    const struct weston_color_profile_params *params)
+{
+	struct cmlcms_color_profile *cprof;
+
+	/* Ensure no uninitialized data inside struct to make memcmp work. */
+	static_assert(sizeof(*params) ==
+			2 * sizeof(float) * 2 * 4 + /* primaries, target_primaries */
+			sizeof(params->primaries_info) +
+			sizeof(params->tf_info) +
+			sizeof(params->tf_params) +
+			sizeof(params->min_luminance) +
+			sizeof(params->max_luminance) +
+			sizeof(params->maxCLL) +
+			sizeof(params->maxFALL),
+		"struct weston_color_profile_params must not contain implicit padding");
+
+	wl_list_for_each(cprof, &cm->color_profile_list, link) {
+		if (cprof->type != CMLCMS_PROFILE_TYPE_PARAMS)
+			continue;
+
+		if (memcmp(cprof->params, params, sizeof(*params)) == 0)
 			return cprof;
 	}
 
@@ -349,6 +392,8 @@ char *
 cmlcms_color_profile_print(const struct cmlcms_color_profile *cprof)
 {
 	char *str;
+
+	/* TODO: also print cprof->params for parametric profiles. */
 
 	str_printf(&str, "  description: %s\n", cprof->base.description);
 	abort_oom_if_null(str);
@@ -394,11 +439,25 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 	cmsCloseProfile(cprof->extract.vcgt.p);
 	cmsCloseProfile(cprof->extract.inv_eotf.p);
 	cmsCloseProfile(cprof->extract.eotf.p);
-	cmsCloseProfile(cprof->profile.p);
 
-	/* Only profiles created from ICC files have these. */
-	if (cprof->prof_rofile)
-		os_ro_anonymous_file_destroy(cprof->prof_rofile);
+	switch (cprof->type) {
+	case CMLCMS_PROFILE_TYPE_ICC:
+		cmsCloseProfile(cprof->profile.p);
+		/**
+		 * TODO: drop this if when we convert the stock sRGB profile to
+		 * a parametric one. When we do that, all ICC profiles will have
+		 * their ro_anonymous_file, so we won't have to check.
+		 */
+		if (cprof->prof_rofile)
+			os_ro_anonymous_file_destroy(cprof->prof_rofile);
+		break;
+	case CMLCMS_PROFILE_TYPE_PARAMS:
+		free(cprof->params);
+		break;
+	default:
+		weston_assert_not_reached(cm->base.compositor,
+					  "unknown profile type");
+	}
 
 	weston_log_scope_printf(cm->profiles_scope, "Destroyed color profile p%u. " \
 				"Description: %s\n", cprof->base.id, cprof->base.description);
@@ -476,6 +535,8 @@ cmlcms_create_stock_profile(struct weston_color_manager_lcms *cm)
 	cm->sRGB_profile = cmlcms_color_profile_create(cm, profile, desc, NULL);
 	if (!cm->sRGB_profile)
 		goto err_close;
+
+	cm->sRGB_profile->type = CMLCMS_PROFILE_TYPE_ICC;
 
 	if (!ensure_output_profile_extract(cm->sRGB_profile, cm->lcms_ctx,
 					   cmlcms_reasonable_1D_points(), &err_msg))
@@ -556,6 +617,8 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 	if (!cprof)
 		goto err_close;
 
+	cprof->type = CMLCMS_PROFILE_TYPE_ICC;
+
 	cprof->prof_rofile = os_ro_anonymous_file_create(icc_len, icc_data);
 	if (!cprof->prof_rofile)
 		goto err_close;
@@ -572,6 +635,62 @@ err_close:
 }
 
 bool
+cmlcms_get_color_profile_from_params(struct weston_color_manager *cm_base,
+				     const struct weston_color_profile_params *params,
+				     const char *name_part,
+				     struct weston_color_profile **cprof_out,
+				     char **errmsg)
+{
+	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
+	struct cmlcms_color_profile *cprof;
+	char *desc;
+	char *str;
+
+	/* TODO: add a helper similar to cmlcms_color_profile_create() but for
+	 * parametric color profiles. For now this just creates a cprof
+	 * boilerplate, just to help us to imagine how things would work.
+	 *
+	 * The color profile that this function creates is invalid and we won't
+	 * be able to do anything useful with that.
+	 */
+
+	cprof = cmlcms_find_color_profile_by_params(cm, params);
+	if (cprof) {
+		*cprof_out = weston_color_profile_ref(&cprof->base);
+		return true;
+	}
+
+	cprof = xzalloc(sizeof(*cprof));
+	cprof->type = CMLCMS_PROFILE_TYPE_PARAMS;
+
+	cprof->params = xzalloc(sizeof(*cprof->params));
+	memcpy(cprof->params, params, sizeof(*params));
+
+	str_printf(&desc, "Parametric (%s): %s, %s",
+			  name_part,
+			  params->primaries_info ? params->primaries_info->desc :
+						   "custom primaries",
+			  params->tf_info->desc);
+
+	weston_color_profile_init(&cprof->base, &cm->base);
+	cprof->base.description = desc;
+	wl_list_insert(&cm->color_profile_list, &cprof->link);
+
+	weston_log_scope_printf(cm->profiles_scope,
+				"New color profile: p%u. WARNING: this is a " \
+				"boilerplate color profile. We still do not fully " \
+				"support creating color profiles from params\n",
+				cprof->base.id);
+
+	str = cmlcms_color_profile_print(cprof);
+	weston_log_scope_printf(cm->profiles_scope, "%s", str);
+	free(str);
+
+	*cprof_out = &cprof->base;
+	return true;
+}
+
+bool
 cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
 			    struct weston_color_profile *cprof_base)
 {
@@ -583,7 +702,13 @@ cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
         int32_t fd;
         uint32_t len;
 
-	if (cprof->prof_rofile) {
+	/**
+	 * TODO: when we convert the stock sRGB profile to a parametric profile
+	 * instead of an ICC one, we'll be able to change the if/else below to
+	 * a switch/case.
+	 */
+
+	if (cprof->type == CMLCMS_PROFILE_TYPE_ICC && cprof != cm->sRGB_profile) {
 		/* ICC-based color profile, so just send the ICC file fd. If we
 		 * get an error (negative fd), the helper will send the proper
 		 * error to the client. */

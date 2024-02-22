@@ -127,6 +127,30 @@ struct weston_color_profile {
 	uint32_t id;
 };
 
+/** Parameters that define a parametric color profile */
+struct weston_color_profile_params {
+	/* Primary color volume; always set. */
+	struct weston_color_gamut primaries;
+
+	/* Primary color volume by enumeration; optional, may be NULL. */
+	const struct weston_color_primaries_info *primaries_info;
+
+	/* Encoding transfer characteristic by enumeration; always set. */
+	const struct weston_color_tf_info *tf_info;
+
+	/* Transfer characteristic's parameters; depends on tf_info. */
+	float tf_params[10];
+
+	/* Target color volume; always set. */
+	struct weston_color_gamut target_primaries;
+
+	/* Luminance parameters cd/m²; negative when not set */
+
+	float min_luminance, max_luminance;
+	float maxCLL;
+	float maxFALL;
+};
+
 /** Type or formula for a curve */
 enum weston_color_curve_type {
 	/** Identity function, no-op */
@@ -470,6 +494,29 @@ struct weston_color_manager {
 				      const char *name_part,
 				      struct weston_color_profile **cprof_out,
 				      char **errmsg);
+
+	/** Create a color profile from parameters
+	 *
+	 * \param cm The color manager.
+	 * \param params The struct weston_color_profile_params with the params.
+	 * \param name_part A string to be used in describing the profile.
+	 * \param cprof_out On success, the created object is returned here.
+	 * On failure, untouched.
+	 * \param errmsg On success, untouched. On failure, a pointer to a
+	 * string describing the error is stored here. The string must be
+	 * free()'d.
+	 * \return True on success, false on failure.
+	 *
+	 * This may return a new reference to an existing color profile if
+	 * that profile is identical to the one that would be created, apart
+	 * from name_part.
+	 */
+	bool
+	(*get_color_profile_from_params)(struct weston_color_manager *cm,
+					 const struct weston_color_profile_params *params,
+					 const char *name_part,
+					 struct weston_color_profile **cprof_out,
+					 char **errmsg);
 
 	/** Send image description to clients.
 	 *
