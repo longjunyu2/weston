@@ -119,7 +119,7 @@ move_client_internal(struct client *client, int x, int y)
 }
 
 void
-move_client(struct client *client, int x, int y)
+move_client_frame_sync(struct client *client, int x, int y)
 {
 	struct surface *surface = client->surface;
 	int done;
@@ -128,6 +128,15 @@ move_client(struct client *client, int x, int y)
 	frame_callback_set(surface->wl_surface, &done);
 	wl_surface_commit(surface->wl_surface);
 	frame_callback_wait(client, &done);
+}
+
+void
+move_client(struct client *client, int x, int y)
+{
+	struct surface *surface = client->surface;
+
+	move_client_internal(client, x, y);
+	wl_surface_commit(surface->wl_surface);
 }
 
 void
@@ -1108,7 +1117,7 @@ create_client_and_test_surface(int x, int y, int width, int height)
 				 width, height);
 	pixman_image_unref(solid);
 
-	move_client(client, x, y);
+	move_client_frame_sync(client, x, y);
 
 	return client;
 }

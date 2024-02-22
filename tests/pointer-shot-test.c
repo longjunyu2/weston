@@ -142,7 +142,7 @@ TEST(pointer_cursor_retains_committed_buffer_after_reenter)
 	client->surface = main_surface;
 	client->surface->buffer = create_shm_buffer_a8r8g8b8(client, 100, 100);
 	fill_image_with_color(client->surface->buffer->image, &red);
-	move_client(client, 50, 50);
+	move_client_frame_sync(client, 50, 50);
 
 	/* Move the pointer into the main surface. */
 	send_motion(client, &t1, 100, 100);

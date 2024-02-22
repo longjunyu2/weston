@@ -231,6 +231,9 @@ void
 move_client(struct client *client, int x, int y);
 
 void
+move_client_frame_sync(struct client *client, int x, int y);
+
+void
 move_client_offscreenable(struct client *client, int x, int y);
 
 #define client_roundtrip(c) do { \

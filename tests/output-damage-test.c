@@ -214,7 +214,7 @@ TEST(output_damage)
 	}
 
 	client->surface->buffer = buf[0];
-	move_client(client, 19, 19);
+	move_client_frame_sync(client, 19, 19);
 
 	/*
 	 * Each time we commit a buffer with a different color, the damage box

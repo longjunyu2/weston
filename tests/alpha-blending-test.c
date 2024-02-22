@@ -71,7 +71,6 @@ fixture_setup(struct weston_test_harness *harness, const struct setup_args *arg)
 	setup.width = BLOCK_WIDTH * ALPHA_STEPS;
 	setup.height = 16;
 	setup.shell = SHELL_TEST_DESKTOP;
-	setup.refresh = HIGHEST_OUTPUT_REFRESH;
 
 	if (arg->color_management) {
 #if !BUILD_COLOR_LCMS

@@ -58,7 +58,6 @@ fixture_setup(struct weston_test_harness *harness,
 	compositor_setup_defaults(&setup);
 	setup.renderer = arg->renderer;
 	setup.shell = SHELL_TEST_DESKTOP;
-	setup.refresh = HIGHEST_OUTPUT_REFRESH;
 
 	return weston_test_harness_execute_as_client(harness, &setup);
 }

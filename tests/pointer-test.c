@@ -363,7 +363,7 @@ TEST(test_pointer_surface_move)
 	check_pointer_move(client, 50, 50);
 
 	/* move client center to pointer */
-	move_client(client, 0, 0);
+	move_client_frame_sync(client, 0, 0);
 	assert(surface_contains(client->surface, 50, 50));
 	check_pointer(client, 50, 50);
 
