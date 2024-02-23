@@ -54,7 +54,7 @@ check_output_eotf_mode(struct weston_output *output)
 }
 
 static struct weston_color_manager_noop *
-get_cmnoop(struct weston_color_manager *cm_base)
+to_cmnoop(struct weston_color_manager *cm_base)
 {
 	return container_of(cm_base, struct weston_color_manager_noop, base);
 }
@@ -115,7 +115,7 @@ cmnoop_color_profile_create(struct weston_color_manager_noop *cm, char *desc)
 static struct weston_color_profile *
 cmnoop_get_stock_sRGB_color_profile(struct weston_color_manager *cm_base)
 {
-	struct weston_color_manager_noop *cm = get_cmnoop(cm_base);
+	struct weston_color_manager_noop *cm = to_cmnoop(cm_base);
 	struct cmnoop_color_profile *cprof;
 
 	cprof = ref_cprof(cm->stock_cprof);
@@ -148,7 +148,7 @@ cmnoop_get_surface_color_transform(struct weston_color_manager *cm_base,
 				   struct weston_surface_color_transform *surf_xform)
 {
 	struct weston_compositor *compositor = output->compositor;
-	struct weston_color_manager_noop *cmnoop = get_cmnoop(cm_base);
+	struct weston_color_manager_noop *cmnoop = to_cmnoop(cm_base);
 
 	/* If surface has a cprof, it has to be the stock one. */
 	if (surface->color_profile)
@@ -175,7 +175,7 @@ cmnoop_create_output_color_outcome(struct weston_color_manager *cm_base,
 				   struct weston_output *output)
 {
 	struct weston_compositor *compositor = cm_base->compositor;
-	struct weston_color_manager_noop *cmnoop = get_cmnoop(cm_base);
+	struct weston_color_manager_noop *cmnoop = to_cmnoop(cm_base);
 	struct weston_output_color_outcome *co;
 
 	weston_assert_ptr(compositor, output->color_profile);
@@ -216,7 +216,7 @@ cmnoop_create_stock_profile(struct weston_color_manager_noop *cm)
 static bool
 cmnoop_init(struct weston_color_manager *cm_base)
 {
-	struct weston_color_manager_noop *cm = get_cmnoop(cm_base);
+	struct weston_color_manager_noop *cm = to_cmnoop(cm_base);
 
 	if (!cmnoop_create_stock_profile(cm))
 		return false;
@@ -228,7 +228,7 @@ cmnoop_init(struct weston_color_manager *cm_base)
 static void
 cmnoop_destroy(struct weston_color_manager *cm_base)
 {
-	struct weston_color_manager_noop *cmnoop = get_cmnoop(cm_base);
+	struct weston_color_manager_noop *cmnoop = to_cmnoop(cm_base);
 
 	/* TODO: change this assert to make sure that ref_count is equal to 1.
 	 * Currently we have a bug in which we leak surfaces when shutting down
