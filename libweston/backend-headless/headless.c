@@ -619,6 +619,7 @@ headless_backend_create(struct weston_compositor *compositor,
 			break;
 		default:
 			weston_log("Error: unsupported renderer\n");
+			ret = -1;
 			break;
 		}
 
