@@ -437,6 +437,10 @@ cmlcms_init(struct weston_color_manager *cm_base)
 	return true;
 
 out_err:
+	if (cm->lcms_ctx)
+		cmsDeleteContext(cm->lcms_ctx);
+	cm->lcms_ctx = NULL;
+
 	weston_log_scope_destroy(cm->transforms_scope);
 	cm->transforms_scope = NULL;
 	weston_log_scope_destroy(cm->optimizer_scope);
@@ -480,7 +484,8 @@ cmlcms_destroy(struct weston_color_manager *cm_base)
 	assert(wl_list_empty(&cm->color_transform_list));
 	assert(wl_list_empty(&cm->color_profile_list));
 
-	cmsDeleteContext(cm->lcms_ctx);
+	if (cm->lcms_ctx)
+		cmsDeleteContext(cm->lcms_ctx);
 
 	weston_log_scope_destroy(cm->transforms_scope);
 	weston_log_scope_destroy(cm->optimizer_scope);
