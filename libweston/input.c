@@ -572,6 +572,9 @@ weston_pointer_send_motion(struct weston_pointer *pointer,
 		surf_pos = weston_coord_global_to_surface(pointer->focus, pos);
 		pointer->sx = wl_fixed_from_double(surf_pos.c.x);
 		pointer->sy = wl_fixed_from_double(surf_pos.c.y);
+	} else {
+		old_sx = -1000000;
+		old_sy = -1000000;
 	}
 
 	weston_pointer_move(pointer, event);
