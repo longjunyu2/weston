@@ -35,6 +35,25 @@
 #include "shared/helpers.h"
 #include "shared/os-compatibility.h"
 
+/*
+ * Because cmsHPROFILE is a typedef of void*, it happily and implicitly
+ * casts to and from any pointer at all. In order to bring some type
+ * safety, wrap it.
+ */
+struct lcmsProfilePtr {
+	cmsHPROFILE p;
+};
+
+/* Cast an array of lcmsProfilePtr into array of cmsHPROFILE */
+static inline cmsHPROFILE *
+from_lcmsProfilePtr_array(struct lcmsProfilePtr *arr)
+{
+	static_assert(sizeof(struct lcmsProfilePtr) == sizeof(cmsHPROFILE),
+		      "arrays of cmsHPROFILE wrapper are castable");
+
+	return &arr[0].p;
+}
+
 struct weston_color_manager_lcms {
 	struct weston_color_manager base;
 	struct weston_log_scope *profiles_scope;
@@ -88,7 +107,7 @@ struct cmlcms_color_profile {
 	/* struct weston_color_manager_lcms::color_profile_list */
 	struct wl_list link;
 
-	cmsHPROFILE profile;
+	struct lcmsProfilePtr profile;
 	struct cmlcms_md5_sum md5sum;
 
 	/* Only for profiles created from an ICC file. */

@@ -56,14 +56,14 @@ xyz_dot_prod(const struct xyz_arr_flt a, const struct xyz_arr_flt b)
  */
 static bool
 build_eotf_from_clut_profile(cmsContext lcms_ctx,
-			     cmsHPROFILE profile,
+			     struct lcmsProfilePtr profile,
 			     cmsToneCurve *output_eotf[3],
 			     int num_points)
 {
 	int ch, point;
 	float *curve_array[3];
 	float *red = NULL;
-	cmsHPROFILE xyz_profile = NULL;
+	struct lcmsProfilePtr xyz_profile = { NULL };
 	cmsHTRANSFORM transform_rgb_to_xyz = NULL;
 	bool ret = false;
 	const float div = num_points - 1;
@@ -76,12 +76,12 @@ build_eotf_from_clut_profile(cmsContext lcms_ctx,
 	curve_array[1] = red + num_points;
 	curve_array[2] = red + 2 * num_points;
 
-	xyz_profile = cmsCreateXYZProfileTHR(lcms_ctx);
-	if (!xyz_profile)
+	xyz_profile.p = cmsCreateXYZProfileTHR(lcms_ctx);
+	if (!xyz_profile.p)
 		goto release;
 
-	transform_rgb_to_xyz = cmsCreateTransformTHR(lcms_ctx, profile,
-						     TYPE_RGB_FLT, xyz_profile,
+	transform_rgb_to_xyz = cmsCreateTransformTHR(lcms_ctx, profile.p,
+						     TYPE_RGB_FLT, xyz_profile.p,
 						     TYPE_XYZ_FLT,
 						     INTENT_ABSOLUTE_COLORIMETRIC,
 						     0);
@@ -136,8 +136,8 @@ build_eotf_from_clut_profile(cmsContext lcms_ctx,
 release:
 	if (transform_rgb_to_xyz)
 		cmsDeleteTransform(transform_rgb_to_xyz);
-	if (xyz_profile)
-		cmsCloseProfile(xyz_profile);
+	if (xyz_profile.p)
+		cmsCloseProfile(xyz_profile.p);
 	free(red);
 	if (ret == false)
 		cmsFreeToneCurveTriple(output_eotf);
@@ -185,7 +185,7 @@ error:
 static bool
 ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 				  cmsContext lcms_ctx,
-				  cmsHPROFILE hProfile,
+				  struct lcmsProfilePtr hProfile,
 				  unsigned int num_points,
 				  const char **err_msg)
 {
@@ -196,7 +196,7 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 			cmsSigRedTRCTag, cmsSigGreenTRCTag, cmsSigBlueTRCTag
 	};
 
-	if (cmsIsMatrixShaper(hProfile)) {
+	if (cmsIsMatrixShaper(hProfile.p)) {
 		/**
 		 * Matrix-shaper profiles contain TRC and MatrixColumn tags.
 		 * Assumes that AToB or DToB tags do not exist or are
@@ -204,7 +204,7 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 		 * We can take the TRC curves straight as EOTF.
 		 */
 		for (i = 0 ; i < 3; i++) {
-			curve = cmsReadTag(hProfile, tags[i]);
+			curve = cmsReadTag(hProfile.p, tags[i]);
 			if (!curve) {
 				*err_msg = "TRC tag missing from matrix-shaper ICC profile";
 				goto fail;
@@ -235,7 +235,7 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 		}
 		extract->output_inv_eotf_vcgt[i] = curve;
 	}
-	vcgt_curves = cmsReadTag(hProfile, cmsSigVcgtTag);
+	vcgt_curves = cmsReadTag(hProfile.p, cmsSigVcgtTag);
 	if (vcgt_curves && vcgt_curves[0] && vcgt_curves[1] && vcgt_curves[2]) {
 		for (i = 0; i < 3; i++) {
 			curve = lcmsJoinToneCurve(lcms_ctx,
@@ -286,11 +286,11 @@ ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 
 /* FIXME: sync with spec! */
 static bool
-validate_icc_profile(cmsHPROFILE profile, char **errmsg)
+validate_icc_profile(struct lcmsProfilePtr profile, char **errmsg)
 {
-	cmsColorSpaceSignature cs = cmsGetColorSpace(profile);
+	cmsColorSpaceSignature cs = cmsGetColorSpace(profile.p);
 	uint32_t nr_channels = cmsChannelsOf(cs);
-	uint8_t version = cmsGetEncodedICCversion(profile) >> 24;
+	uint8_t version = cmsGetEncodedICCversion(profile.p) >> 24;
 
 	if (version != 2 && version != 4) {
 		str_printf(errmsg,
@@ -306,7 +306,7 @@ validate_icc_profile(cmsHPROFILE profile, char **errmsg)
 		return false;
 	}
 
-	if (cmsGetDeviceClass(profile) != cmsSigDisplayClass) {
+	if (cmsGetDeviceClass(profile.p) != cmsSigDisplayClass) {
 		str_printf(errmsg, "ICC profile is required to be of Display device class, but it is not.");
 		return false;
 	}
@@ -342,7 +342,7 @@ cmlcms_color_profile_print(const struct cmlcms_color_profile *cprof)
 
 static struct cmlcms_color_profile *
 cmlcms_color_profile_create(struct weston_color_manager_lcms *cm,
-			    cmsHPROFILE profile,
+			    struct lcmsProfilePtr profile,
 			    char *desc,
 			    char **errmsg)
 {
@@ -356,7 +356,7 @@ cmlcms_color_profile_create(struct weston_color_manager_lcms *cm,
 	weston_color_profile_init(&cprof->base, &cm->base);
 	cprof->base.description = desc;
 	cprof->profile = profile;
-	cmsGetHeaderProfileID(profile, cprof->md5sum.bytes);
+	cmsGetHeaderProfileID(profile.p, cprof->md5sum.bytes);
 	wl_list_insert(&cm->color_profile_list, &cprof->link);
 
 	weston_log_scope_printf(cm->profiles_scope,
@@ -378,7 +378,7 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 	cmsFreeToneCurveTriple(cprof->extract.vcgt);
 	cmsFreeToneCurveTriple(cprof->extract.eotf);
 	cmsFreeToneCurveTriple(cprof->extract.output_inv_eotf_vcgt);
-	cmsCloseProfile(cprof->profile);
+	cmsCloseProfile(cprof->profile.p);
 
 	/* Only profiles created from ICC files have these. */
 	if (cprof->prof_rofile)
@@ -411,7 +411,7 @@ unref_cprof(struct cmlcms_color_profile *cprof)
 }
 
 static char *
-make_icc_file_description(cmsHPROFILE profile,
+make_icc_file_description(struct lcmsProfilePtr profile,
 			  const struct cmlcms_md5_sum *md5sum,
 			  const char *name_part)
 {
@@ -424,7 +424,7 @@ make_icc_file_description(cmsHPROFILE profile,
 			 "%02x", md5sum->bytes[i]);
 	}
 
-	str_printf(&desc, "ICCv%.1f %s %s", cmsGetProfileVersion(profile),
+	str_printf(&desc, "ICCv%.1f %s %s", cmsGetProfileVersion(profile.p),
 		   name_part, md5sum_str);
 
 	return desc;
@@ -437,22 +437,22 @@ make_icc_file_description(cmsHPROFILE profile,
 bool
 cmlcms_create_stock_profile(struct weston_color_manager_lcms *cm)
 {
-	cmsHPROFILE profile;
+	struct lcmsProfilePtr profile;
 	struct cmlcms_md5_sum md5sum;
 	char *desc = NULL;
 	const char *err_msg = NULL;
 
-	profile = cmsCreate_sRGBProfileTHR(cm->lcms_ctx);
-	if (!profile) {
+	profile.p = cmsCreate_sRGBProfileTHR(cm->lcms_ctx);
+	if (!profile.p) {
 		weston_log("color-lcms: error: cmsCreate_sRGBProfileTHR failed\n");
 		return false;
 	}
-	if (!cmsMD5computeID(profile)) {
+	if (!cmsMD5computeID(profile.p)) {
 		weston_log("Failed to compute MD5 for ICC profile\n");
 		goto err_close;
 	}
 
-	cmsGetHeaderProfileID(profile, md5sum.bytes);
+	cmsGetHeaderProfileID(profile.p, md5sum.bytes);
 	desc = make_icc_file_description(profile, &md5sum, "sRGB stock");
 	if (!desc)
 		goto err_close;
@@ -472,7 +472,7 @@ err_close:
 		weston_log("%s\n", err_msg);
 
 	free(desc);
-	cmsCloseProfile(profile);
+	cmsCloseProfile(profile.p);
 	return false;
 }
 
@@ -496,7 +496,7 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 				  char **errmsg)
 {
 	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
-	cmsHPROFILE profile;
+	struct lcmsProfilePtr profile;
 	struct cmlcms_md5_sum md5sum;
 	struct cmlcms_color_profile *cprof = NULL;
 	char *desc = NULL;
@@ -510,8 +510,8 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 		return false;
 	}
 
-	profile = cmsOpenProfileFromMemTHR(cm->lcms_ctx, icc_data, icc_len);
-	if (!profile) {
+	profile.p = cmsOpenProfileFromMemTHR(cm->lcms_ctx, icc_data, icc_len);
+	if (!profile.p) {
 		str_printf(errmsg, "ICC data not understood.");
 		return false;
 	}
@@ -519,16 +519,16 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 	if (!validate_icc_profile(profile, errmsg))
 		goto err_close;
 
-	if (!cmsMD5computeID(profile)) {
+	if (!cmsMD5computeID(profile.p)) {
 		str_printf(errmsg, "Failed to compute MD5 for ICC profile.");
 		goto err_close;
 	}
 
-	cmsGetHeaderProfileID(profile, md5sum.bytes);
+	cmsGetHeaderProfileID(profile.p, md5sum.bytes);
 	cprof = cmlcms_find_color_profile_by_md5(cm, &md5sum);
 	if (cprof) {
 		*cprof_out = weston_color_profile_ref(&cprof->base);
-		cmsCloseProfile(profile);
+		cmsCloseProfile(profile.p);
 		return true;
 	}
 
@@ -551,7 +551,7 @@ err_close:
 	if (cprof)
 		cmlcms_color_profile_destroy(cprof);
 	free(desc);
-	cmsCloseProfile(profile);
+	cmsCloseProfile(profile.p);
 	return false;
 }
 

@@ -863,17 +863,17 @@ lcms_xform_error_logger(cmsContext context_id,
 		   text);
 }
 
-static cmsHPROFILE
+static struct lcmsProfilePtr
 profile_from_rgb_curves(cmsContext ctx, cmsToneCurve *const curveset[3])
 {
-	cmsHPROFILE p;
+	struct lcmsProfilePtr p;
 	int i;
 
 	for (i = 0; i < 3; i++)
 		assert(curveset[i]);
 
-	p = cmsCreateLinearizationDeviceLinkTHR(ctx, cmsSigRgbData, curveset);
-	abort_oom_if_null(p);
+	p.p = cmsCreateLinearizationDeviceLinkTHR(ctx, cmsSigRgbData, curveset);
+	abort_oom_if_null(p.p);
 
 	return p;
 }
@@ -883,9 +883,9 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 {
 	struct weston_color_manager_lcms *cm = to_cmlcms(xform->base.cm);
 	struct cmlcms_color_profile *output_profile = xform->search_key.output_profile;
-	cmsHPROFILE chain[5];
+	struct lcmsProfilePtr chain[5];
 	unsigned chain_len = 0;
-	cmsHPROFILE extra = NULL;
+	struct lcmsProfilePtr extra = { NULL };
 	cmsUInt32Number dwFlags;
 
 	chain[chain_len++] = xform->search_key.input_profile->profile;
@@ -926,13 +926,13 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 	/* transform_factory() is invoked by this call. */
 	dwFlags = xform->search_key.render_intent->bps ? cmsFLAGS_BLACKPOINTCOMPENSATION : 0;
 	xform->cmap_3dlut = cmsCreateMultiprofileTransformTHR(xform->lcms_ctx,
-							      chain,
+							      from_lcmsProfilePtr_array(chain),
 							      chain_len,
 							      TYPE_RGB_FLT,
 							      TYPE_RGB_FLT,
 							      xform->search_key.render_intent->lcms_intent,
 							      dwFlags);
-	cmsCloseProfile(extra);
+	cmsCloseProfile(extra.p);
 
 	if (!xform->cmap_3dlut)
 		goto failed;
