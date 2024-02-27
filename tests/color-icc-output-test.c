@@ -225,6 +225,17 @@ fixture_setup(struct weston_test_harness *harness, const struct setup_args *arg)
 	struct compositor_setup setup;
 	char *file_name;
 
+#if !HAVE_CMS_GET_TONE_CURVE_SEGMENT
+	/* When cmsGetToneCurveSegment() is at disposal, Weston is able to
+	 * inspect the LittleCMS color curves and convert them to Weston's
+	 * internal representation of color curves. In such case, we don't need
+	 * to fallback to a more generic solution (usage of LUT's), which is
+	 * less precise. Thanks to that, we are able to decrease the
+	 * tolerance in this test. We already have cmsGetToneCurveSegment() in
+	 * our CI, so simply skip this test when this is not available. */
+	return RESULT_SKIP;
+#endif
+
 	cmsSetLogErrorHandler(test_lcms_error_logger);
 
 	compositor_setup_defaults(&setup);
