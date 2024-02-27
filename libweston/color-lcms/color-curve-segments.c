@@ -572,3 +572,83 @@ curveset_print(cmsStage *stage, struct weston_log_scope *scope)
 		curve_print(data->TheCurves[i], scope);
 	}
 }
+
+bool
+get_parametric_curveset_params(struct weston_compositor *compositor,
+			       _cmsStageToneCurvesData *trc_data,
+			       cmsInt32Number *type,
+			       float curveset_params[3][10],
+			       bool *clamped_input)
+{
+	const cmsCurveSegment *seg, *seg0, *seg1, *seg2;
+	cmsInt32Number curve_types[3];
+	unsigned int i, j;
+
+	/* If there isn't a curve for each color channel, we define our curveset
+	 * as not being a parametric one. */
+	if (trc_data->nCurves != 3)
+		return false;
+
+	/* If at least one of the curves is being clamped to [0.0, 1.0], we
+	 * change clamped_input to true. Our expectation is that if one of the
+	 * curves is being clamped, all of them are. It makes no sense that it
+	 * gets clamped in a certain color channel and not in the others. */
+	*clamped_input = false;
+
+	for (i = 0; i < 3; i++) {
+		/* We handle curves with 1 or 3 segments. No more, no less. */
+		seg0 = cmsGetToneCurveSegment(0, trc_data->TheCurves[i]);
+		seg1 = cmsGetToneCurveSegment(1, trc_data->TheCurves[i]);
+		seg2 = cmsGetToneCurveSegment(2, trc_data->TheCurves[i]);
+
+		if (seg0 && !seg1) {
+			/* Case 1: we have a single segment (seg0).
+			 *
+			 * Ensure that the domain is (-inf, inf) and that the
+			 * seg type is not 0 (the type of sampled segments).
+			 */
+			if (!are_segment_breaks_equal(seg0->x0, -INFINITY) ||
+			    !are_segment_breaks_equal(seg0->x1, INFINITY) ||
+			    seg0->Type == 0)
+				return false;
+			seg = seg0;
+		} else if (seg0 && seg1 && seg2) {
+			/* Case 2: we have three segments. Clamped input.
+			 *
+			 * Ensure that the domain breaks are (-inf, 0.0],
+			 * (0.0, 1.0] and (1.0, inf] and that the 2nd segment
+			 * type is not 0 (the type of sampled segments).
+			 */
+			if (!are_segment_breaks_equal(seg0->x0, -INFINITY) ||
+			    !are_segment_breaks_equal(seg0->x1, 0.0) ||
+			    !are_segment_breaks_equal(seg1->x0, 0.0) ||
+			    !are_segment_breaks_equal(seg1->x1, 1.0) ||
+			    !are_segment_breaks_equal(seg2->x0, 1.0) ||
+			    !are_segment_breaks_equal(seg2->x1, INFINITY) ||
+			    seg1->Type == 0)
+				return false;
+			seg = seg1;
+			*clamped_input = true;
+		} else {
+			/* Neither 1 or 3 segments. So we don't define the
+			 * curveset as parametric. */
+			return false;
+		}
+
+		/* Copy the type and params from the segment that matters. We
+		 * don't use memcpy because we need to cast each cmsFloat64Number
+		 * to float. The precision loss doesn't matter. */
+		curve_types[i] = seg->Type;
+		for (j = 0; j < 10; j++)
+			curveset_params[i][j] = (float)seg->Params[j];
+	}
+
+	/* We only define our curveset as parametric when each of its curves are
+	 * of the same type for all the 3 channels. */
+	if (curve_types[0] != curve_types[1] || curve_types[0] != curve_types[2])
+		return false;
+
+	*type = curve_types[0];
+
+	return true;
+}

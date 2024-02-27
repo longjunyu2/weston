@@ -32,6 +32,13 @@
 
 #if HAVE_CMS_GET_TONE_CURVE_SEGMENT
 
+bool
+get_parametric_curveset_params(struct weston_compositor *compositor,
+			       _cmsStageToneCurvesData *trc_data,
+			       cmsInt32Number *type,
+			       float curveset_params[3][10],
+			       bool *clamped_input);
+
 void
 curveset_print(cmsStage *stage, struct weston_log_scope *scope);
 
@@ -46,6 +53,16 @@ join_powerlaw_curvesets(cmsContext context_id,
 			cmsToneCurve **set_A, cmsToneCurve **set_B);
 
 # else /* HAVE_CMS_GET_TONE_CURVE_SEGMENT */
+
+static inline bool
+get_parametric_curveset_params(struct weston_compositor *compositor,
+			       _cmsStageToneCurvesData *trc_data,
+			       cmsInt32Number *type,
+			       float curveset_params[3][10],
+			       bool *clamped_input)
+{
+	return false;
+}
 
 static inline void
 curveset_print(cmsStage *stage, struct weston_log_scope *scope)
