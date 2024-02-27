@@ -894,8 +894,7 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 	switch (xform->search_key.category) {
 	case CMLCMS_CATEGORY_INPUT_TO_BLEND:
 		/* Add linearization step to make blending well-defined. */
-		extra = profile_from_rgb_curves(cm->lcms_ctx, output_profile->extract.eotf);
-		chain[chain_len++] = extra;
+		chain[chain_len++] = output_profile->extract.eotf;
 		break;
 	case CMLCMS_CATEGORY_INPUT_TO_OUTPUT:
 		/* Just add VCGT if it is provided. */

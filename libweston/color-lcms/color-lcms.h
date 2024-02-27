@@ -82,7 +82,7 @@ struct cmlcms_output_profile_extract {
 	 * For ICC profiles, if the profile type is matrix-shaper, then eotf
 	 * contains the TRC, otherwise eotf contains an approximated EOTF.
 	 */
-	cmsToneCurve *eotf[3];
+	struct lcmsProfilePtr eotf;
 
 	/**
 	 * This field represents a concatenation of inverse EOTF + VCGT,

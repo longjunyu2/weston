@@ -191,6 +191,7 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 {
 	cmsToneCurve *curve = NULL;
 	const cmsToneCurve * const *vcgt_curves;
+	cmsToneCurve *eotf_curves[3] = {};
 	unsigned i;
 	cmsTagSignature tags[] = {
 			cmsSigRedTRCTag, cmsSigGreenTRCTag, cmsSigBlueTRCTag
@@ -209,8 +210,8 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 				*err_msg = "TRC tag missing from matrix-shaper ICC profile";
 				goto fail;
 			}
-			extract->eotf[i] = cmsDupToneCurve(curve);
-			if (!extract->eotf[i]) {
+			eotf_curves[i] = cmsDupToneCurve(curve);
+			if (!eotf_curves[i]) {
 				*err_msg = "out of memory";
 				goto fail;
 			}
@@ -221,14 +222,20 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 		 * linearization that produces sampled curves.
 		 */
 		if (!build_eotf_from_clut_profile(lcms_ctx, hProfile,
-						  extract->eotf, num_points)) {
+						  eotf_curves, num_points)) {
 			*err_msg = "estimating EOTF failed";
 			goto fail;
 		}
 	}
 
+	extract->eotf.p = cmsCreateLinearizationDeviceLinkTHR(lcms_ctx, cmsSigRgbData, eotf_curves);
+	if (!extract->eotf.p) {
+		*err_msg = "out of memory";
+		goto fail;
+	}
+
 	for (i = 0; i < 3; i++) {
-		curve = cmsReverseToneCurve(extract->eotf[i]);
+		curve = cmsReverseToneCurve(eotf_curves[i]);
 		if (!curve) {
 			*err_msg = "inverting EOTF failed";
 			goto fail;
@@ -254,10 +261,15 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 			}
 		}
 	}
+
+	cmsFreeToneCurveTriple(eotf_curves);
+
 	return true;
 
 fail:
-	cmsFreeToneCurveTriple(extract->eotf);
+	cmsCloseProfile(extract->eotf.p);
+	extract->eotf.p = NULL;
+	cmsFreeToneCurveTriple(eotf_curves);
 	cmsFreeToneCurveTriple(extract->output_inv_eotf_vcgt);
 	cmsFreeToneCurveTriple(extract->vcgt);
 	return false;
@@ -272,14 +284,14 @@ ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 	bool ret;
 
 	/* Everything already computed */
-	if (cprof->extract.eotf[0])
+	if (cprof->extract.eotf.p)
 		return true;
 
 	ret = ensure_output_profile_extract_icc(&cprof->extract, lcms_ctx,
 						cprof->profile, num_points, err_msg);
 
 	if (ret)
-		weston_assert_ptr(cprof->base.cm->compositor, cprof->extract.eotf[0]);
+		weston_assert_ptr(cprof->base.cm->compositor, cprof->extract.eotf.p);
 
 	return ret;
 }
@@ -376,7 +388,7 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 
 	wl_list_remove(&cprof->link);
 	cmsFreeToneCurveTriple(cprof->extract.vcgt);
-	cmsFreeToneCurveTriple(cprof->extract.eotf);
+	cmsCloseProfile(cprof->extract.eotf.p);
 	cmsFreeToneCurveTriple(cprof->extract.output_inv_eotf_vcgt);
 	cmsCloseProfile(cprof->profile.p);
 
