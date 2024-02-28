@@ -190,7 +190,7 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 				  const char **err_msg)
 {
 	cmsToneCurve *curve = NULL;
-	const cmsToneCurve * const *vcgt_curves;
+	cmsToneCurve **vcgt_curves;
 	cmsToneCurve *eotf_curves[3] = {};
 	unsigned i;
 	cmsTagSignature tags[] = {
@@ -244,6 +244,12 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 	}
 	vcgt_curves = cmsReadTag(hProfile.p, cmsSigVcgtTag);
 	if (vcgt_curves && vcgt_curves[0] && vcgt_curves[1] && vcgt_curves[2]) {
+		extract->vcgt.p = cmsCreateLinearizationDeviceLinkTHR(lcms_ctx, cmsSigRgbData, vcgt_curves);
+		if (!extract->vcgt.p) {
+			*err_msg = "out of memory";
+			goto fail;
+		}
+
 		for (i = 0; i < 3; i++) {
 			curve = lcmsJoinToneCurve(lcms_ctx,
 						  extract->output_inv_eotf_vcgt[i],
@@ -254,11 +260,6 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 			}
 			cmsFreeToneCurve(extract->output_inv_eotf_vcgt[i]);
 			extract->output_inv_eotf_vcgt[i] = curve;
-			extract->vcgt[i] = cmsDupToneCurve(vcgt_curves[i]);
-			if (!extract->vcgt[i]) {
-				*err_msg = "out of memory";
-				goto fail;
-			}
 		}
 	}
 
@@ -267,11 +268,13 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 	return true;
 
 fail:
+	cmsCloseProfile(extract->vcgt.p);
+	extract->vcgt.p = NULL;
+
 	cmsCloseProfile(extract->eotf.p);
 	extract->eotf.p = NULL;
 	cmsFreeToneCurveTriple(eotf_curves);
 	cmsFreeToneCurveTriple(extract->output_inv_eotf_vcgt);
-	cmsFreeToneCurveTriple(extract->vcgt);
 	return false;
 }
 
@@ -387,7 +390,7 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 	struct weston_color_manager_lcms *cm = to_cmlcms(cprof->base.cm);
 
 	wl_list_remove(&cprof->link);
-	cmsFreeToneCurveTriple(cprof->extract.vcgt);
+	cmsCloseProfile(cprof->extract.vcgt.p);
 	cmsCloseProfile(cprof->extract.eotf.p);
 	cmsFreeToneCurveTriple(cprof->extract.output_inv_eotf_vcgt);
 	cmsCloseProfile(cprof->profile.p);

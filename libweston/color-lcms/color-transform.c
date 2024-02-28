@@ -863,21 +863,6 @@ lcms_xform_error_logger(cmsContext context_id,
 		   text);
 }
 
-static struct lcmsProfilePtr
-profile_from_rgb_curves(cmsContext ctx, cmsToneCurve *const curveset[3])
-{
-	struct lcmsProfilePtr p;
-	int i;
-
-	for (i = 0; i < 3; i++)
-		assert(curveset[i]);
-
-	p.p = cmsCreateLinearizationDeviceLinkTHR(ctx, cmsSigRgbData, curveset);
-	abort_oom_if_null(p.p);
-
-	return p;
-}
-
 static bool
 xform_realize_chain(struct cmlcms_color_transform *xform)
 {
@@ -898,11 +883,8 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 		break;
 	case CMLCMS_CATEGORY_INPUT_TO_OUTPUT:
 		/* Just add VCGT if it is provided. */
-		if (output_profile->extract.vcgt[0]) {
-			extra = profile_from_rgb_curves(cm->lcms_ctx,
-							output_profile->extract.vcgt);
-			chain[chain_len++] = extra;
-		}
+		if (output_profile->extract.vcgt.p)
+			chain[chain_len++] = output_profile->extract.vcgt;
 		break;
 	case CMLCMS_CATEGORY_BLEND_TO_OUTPUT:
 		assert(0 && "category handled in the caller");

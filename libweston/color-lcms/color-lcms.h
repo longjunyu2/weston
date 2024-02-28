@@ -98,7 +98,7 @@ struct cmlcms_output_profile_extract {
 	/**
 	 * VCGT tag cached from output profile, it could be null if not exist
 	 */
-	cmsToneCurve *vcgt[3];
+	struct lcmsProfilePtr vcgt;
 };
 
 struct cmlcms_color_profile {
