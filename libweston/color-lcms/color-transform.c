@@ -132,9 +132,6 @@ cmlcms_fill_in_3dlut(struct weston_color_transform *xform_base,
 	unsigned int value_b, value_r, value_g;
 	float divider = len - 1;
 
-	assert(xform->search_key.category == CMLCMS_CATEGORY_INPUT_TO_BLEND ||
-	       xform->search_key.category == CMLCMS_CATEGORY_INPUT_TO_OUTPUT);
-
 	for (value_b = 0; value_b < len; value_b++) {
 		for (value_g = 0; value_g < len; value_g++) {
 			for (value_r = 0; value_r < len; value_r++) {
@@ -935,7 +932,14 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 	case CMLCMS_TRANSFORM_FAILED:
 		goto failed;
 	case CMLCMS_TRANSFORM_OPTIMIZED:
+		break;
 	case CMLCMS_TRANSFORM_3DLUT:
+		/*
+		 * Given the chain formed above, blend-to-output should never
+		 * fall back to 3D LUT.
+		 */
+		weston_assert_uint32_neq(cm->base.compositor, xform->search_key.category,
+					 CMLCMS_CATEGORY_BLEND_TO_OUTPUT);
 		break;
 	}
 
