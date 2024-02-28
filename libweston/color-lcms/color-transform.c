@@ -89,17 +89,6 @@ fill_in_curves(cmsToneCurve *curves[3], float *values, unsigned len)
 }
 
 static void
-cmlcms_fill_in_output_inv_eotf_vcgt(struct weston_color_transform *xform_base,
-				    float *values, unsigned len)
-{
-	struct cmlcms_color_transform *xform = to_cmlcms_xform(xform_base);
-	struct cmlcms_color_profile *p = xform->search_key.output_profile;
-
-	assert(p && "output_profile");
-	fill_in_curves(p->extract.output_inv_eotf_vcgt, values, len);
-}
-
-static void
 cmlcms_fill_in_pre_curve(struct weston_color_transform *xform_base,
 			 float *values, unsigned len)
 {
@@ -868,31 +857,50 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 {
 	struct weston_color_manager_lcms *cm = to_cmlcms(xform->base.cm);
 	struct cmlcms_color_profile *output_profile = xform->search_key.output_profile;
+	const struct weston_render_intent_info *render_intent;
 	struct lcmsProfilePtr chain[5];
 	unsigned chain_len = 0;
 	struct lcmsProfilePtr extra = { NULL };
 	cmsUInt32Number dwFlags;
 
-	chain[chain_len++] = xform->search_key.input_profile->profile;
-	chain[chain_len++] = output_profile->profile;
+	render_intent = xform->search_key.render_intent;
+
+	/*
+	 * Our blending space is chosen to be the optical output color space.
+	 * From input space, we always go to electrical output space, then
+	 * come to optical space for blending, and finally go back to
+	 * electrical output space. Before the image is sent to display,
+	 * we must also apply VCGT if given, since nothing else would do that.
+	 *
+	 * INPUT_TO_BLEND + BLEND_TO_OUTPUT = INPUT_TO_OUTPUT
+	 */
 
 	switch (xform->search_key.category) {
 	case CMLCMS_CATEGORY_INPUT_TO_BLEND:
-		/* Add linearization step to make blending well-defined. */
+		chain[chain_len++] = xform->search_key.input_profile->profile;
+		chain[chain_len++] = output_profile->profile;
 		chain[chain_len++] = output_profile->extract.eotf;
 		break;
+	case CMLCMS_CATEGORY_BLEND_TO_OUTPUT:
+		chain[chain_len++] = output_profile->extract.inv_eotf;
+		if (output_profile->extract.vcgt.p)
+			chain[chain_len++] = output_profile->extract.vcgt;
+
+		/* Render intent does not apply here, but need to set something. */
+		weston_assert_ptr_is_null(cm->base.compositor, render_intent);
+		render_intent = weston_render_intent_info_from(cm->base.compositor,
+							       WESTON_RENDER_INTENT_ABSOLUTE);
+		break;
 	case CMLCMS_CATEGORY_INPUT_TO_OUTPUT:
-		/* Just add VCGT if it is provided. */
+		chain[chain_len++] = xform->search_key.input_profile->profile;
+		chain[chain_len++] = output_profile->profile;
 		if (output_profile->extract.vcgt.p)
 			chain[chain_len++] = output_profile->extract.vcgt;
 		break;
-	case CMLCMS_CATEGORY_BLEND_TO_OUTPUT:
-		assert(0 && "category handled in the caller");
-		return false;
 	}
 
 	assert(chain_len <= ARRAY_LENGTH(chain));
-	weston_assert_ptr(cm->base.compositor, xform->search_key.render_intent);
+	weston_assert_ptr(cm->base.compositor, render_intent);
 
 	/**
 	 * Binding to our LittleCMS plug-in occurs here.
@@ -905,13 +913,13 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 
 	assert(xform->status == CMLCMS_TRANSFORM_FAILED);
 	/* transform_factory() is invoked by this call. */
-	dwFlags = xform->search_key.render_intent->bps ? cmsFLAGS_BLACKPOINTCOMPENSATION : 0;
+	dwFlags = render_intent->bps ? cmsFLAGS_BLACKPOINTCOMPENSATION : 0;
 	xform->cmap_3dlut = cmsCreateMultiprofileTransformTHR(xform->lcms_ctx,
 							      from_lcmsProfilePtr_array(chain),
 							      chain_len,
 							      TYPE_RGB_FLT,
 							      TYPE_RGB_FLT,
-							      xform->search_key.render_intent->lcms_intent,
+							      render_intent->lcms_intent,
 							      dwFlags);
 	cmsCloseProfile(extra.p);
 
@@ -996,26 +1004,9 @@ cmlcms_color_transform_create(struct weston_color_manager_lcms *cm,
 					   cmlcms_reasonable_1D_points(), &err_msg))
 		goto error;
 
-	/*
-	 * The blending space is chosen to be the output device space but
-	 * linearized. This means that BLEND_TO_OUTPUT only needs to
-	 * undo the linearization and add VCGT.
-	 */
-	switch (search_param->category) {
-	case CMLCMS_CATEGORY_INPUT_TO_BLEND:
-	case CMLCMS_CATEGORY_INPUT_TO_OUTPUT:
-		if (!xform_realize_chain(xform)) {
-			err_msg = "xform_realize_chain failed";
-			goto error;
-		}
-		break;
-	case CMLCMS_CATEGORY_BLEND_TO_OUTPUT:
-		xform->base.pre_curve.type = WESTON_COLOR_CURVE_TYPE_LUT_3x1D;
-		xform->base.pre_curve.u.lut_3x1d.fill_in = cmlcms_fill_in_output_inv_eotf_vcgt;
-		xform->base.pre_curve.u.lut_3x1d.optimal_len =
-				cmlcms_reasonable_1D_points();
-		xform->status = CMLCMS_TRANSFORM_OPTIMIZED;
-		break;
+	if (!xform_realize_chain(xform)) {
+		err_msg = "xform_realize_chain failed";
+		goto error;
 	}
 
 	wl_list_insert(&cm->color_transform_list, &xform->link);

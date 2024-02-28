@@ -84,16 +84,8 @@ struct cmlcms_output_profile_extract {
 	 */
 	struct lcmsProfilePtr eotf;
 
-	/**
-	 * This field represents a concatenation of inverse EOTF + VCGT,
-	 * if the tag exists and it can not be null.
-	 * VCGT is part of monitor calibration which means: even though we must
-	 * apply VCGT in the compositor, we pretend that it happens inside the
-	 * monitor. This is how the classic color management and ICC profiles work.
-	 * The ICC profile (ignoring the VCGT tag) characterizes the output which
-	 * is VCGT + monitor behavior.
-	 */
-	cmsToneCurve *output_inv_eotf_vcgt[3];
+	/** The inverse of above */
+	struct lcmsProfilePtr inv_eotf;
 
 	/**
 	 * VCGT tag cached from output profile, it could be null if not exist

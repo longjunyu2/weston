@@ -192,6 +192,7 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 	cmsToneCurve *curve = NULL;
 	cmsToneCurve **vcgt_curves;
 	cmsToneCurve *eotf_curves[3] = {};
+	cmsToneCurve *inv_eotf_curves[3] = {};
 	unsigned i;
 	cmsTagSignature tags[] = {
 			cmsSigRedTRCTag, cmsSigGreenTRCTag, cmsSigBlueTRCTag
@@ -240,8 +241,14 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 			*err_msg = "inverting EOTF failed";
 			goto fail;
 		}
-		extract->output_inv_eotf_vcgt[i] = curve;
+		inv_eotf_curves[i] = curve;
 	}
+	extract->inv_eotf.p = cmsCreateLinearizationDeviceLinkTHR(lcms_ctx, cmsSigRgbData, inv_eotf_curves);
+	if (!extract->inv_eotf.p) {
+		*err_msg = "out of memory";
+		goto fail;
+	}
+
 	vcgt_curves = cmsReadTag(hProfile.p, cmsSigVcgtTag);
 	if (vcgt_curves && vcgt_curves[0] && vcgt_curves[1] && vcgt_curves[2]) {
 		extract->vcgt.p = cmsCreateLinearizationDeviceLinkTHR(lcms_ctx, cmsSigRgbData, vcgt_curves);
@@ -249,20 +256,9 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 			*err_msg = "out of memory";
 			goto fail;
 		}
-
-		for (i = 0; i < 3; i++) {
-			curve = lcmsJoinToneCurve(lcms_ctx,
-						  extract->output_inv_eotf_vcgt[i],
-						  vcgt_curves[i], num_points);
-			if (!curve) {
-				*err_msg = "joining curves failed";
-				goto fail;
-			}
-			cmsFreeToneCurve(extract->output_inv_eotf_vcgt[i]);
-			extract->output_inv_eotf_vcgt[i] = curve;
-		}
 	}
 
+	cmsFreeToneCurveTriple(inv_eotf_curves);
 	cmsFreeToneCurveTriple(eotf_curves);
 
 	return true;
@@ -271,10 +267,15 @@ fail:
 	cmsCloseProfile(extract->vcgt.p);
 	extract->vcgt.p = NULL;
 
+	cmsCloseProfile(extract->inv_eotf.p);
+	extract->inv_eotf.p = NULL;
+
 	cmsCloseProfile(extract->eotf.p);
 	extract->eotf.p = NULL;
+
+	cmsFreeToneCurveTriple(inv_eotf_curves);
 	cmsFreeToneCurveTriple(eotf_curves);
-	cmsFreeToneCurveTriple(extract->output_inv_eotf_vcgt);
+
 	return false;
 }
 
@@ -391,8 +392,8 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 
 	wl_list_remove(&cprof->link);
 	cmsCloseProfile(cprof->extract.vcgt.p);
+	cmsCloseProfile(cprof->extract.inv_eotf.p);
 	cmsCloseProfile(cprof->extract.eotf.p);
-	cmsFreeToneCurveTriple(cprof->extract.output_inv_eotf_vcgt);
 	cmsCloseProfile(cprof->profile.p);
 
 	/* Only profiles created from ICC files have these. */
