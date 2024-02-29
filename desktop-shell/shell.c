@@ -3840,7 +3840,7 @@ shell_fade_create_view(struct desktop_shell *shell)
 		.surface_committed = black_surface_committed,
 		.get_label = fade_surface_get_label,
 		.surface_private = shell,
-		.capture_input = false,
+		.capture_input = true,
 	};
 	struct weston_curtain *curtain;
 	bool first = true;
