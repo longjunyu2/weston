@@ -1155,6 +1155,7 @@ drm_plane_create(struct drm_device *device, const drmModePlane *kplane)
 	plane->possible_crtcs = kplane->possible_crtcs;
 	plane->plane_id = kplane->plane_id;
 	plane->crtc_id = kplane->crtc_id;
+	plane->is_underlay = false;
 
 	weston_drm_format_array_init(&plane->formats);
 
@@ -1328,6 +1329,7 @@ create_sprites(struct drm_device *device)
 	struct drm_plane *drm_plane;
 	uint32_t i;
 	uint32_t next_plane_idx = 0;
+	uint64_t primary_plane_zpos_min = DRM_PLANE_ZPOS_INVALID_PLANE;
 	kplane_res = drmModeGetPlaneResources(device->drm.fd);
 
 	if (!kplane_res) {
@@ -1350,10 +1352,29 @@ create_sprites(struct drm_device *device)
 			weston_compositor_stack_plane(b->compositor,
 						      &drm_plane->base,
 						      NULL);
+
+		if (drm_plane->type == WDRM_PLANE_TYPE_PRIMARY)
+			primary_plane_zpos_min = drm_plane->zpos_min;
 	}
 
-	wl_list_for_each (drm_plane, &device->plane_list, link)
+	wl_list_for_each (drm_plane, &device->plane_list, link) {
 		drm_plane->plane_idx = next_plane_idx++;
+
+		if (primary_plane_zpos_min != DRM_PLANE_ZPOS_INVALID_PLANE &&
+		    drm_plane->zpos_max != DRM_PLANE_ZPOS_INVALID_PLANE &&
+		    drm_plane->zpos_max < primary_plane_zpos_min) {
+			drm_plane->is_underlay = true;
+			b->has_underlay = true;
+		}
+	}
+
+	if (b->has_underlay && !b->format->opaque_substitute) {
+		weston_log("WARNING: Unable to use hardware underlay "
+			   "planes as the output format is opaque. In "
+			    "order to make use of hardware overlay planes "
+			    "adjust the output format.\n");
+		b->has_underlay = false;
+	}
 
 	drmModeFreePlaneResources(kplane_res);
 }
@@ -3974,6 +3995,7 @@ drm_backend_create(struct weston_compositor *compositor,
 	b->compositor = compositor;
 	b->pageflip_timeout = config->pageflip_timeout;
 	b->use_pixman_shadow = config->use_pixman_shadow;
+	b->has_underlay = false;
 
 	b->debug = weston_compositor_add_log_scope(compositor, "drm-backend",
 						   "Debug messages from DRM/KMS backend\n",

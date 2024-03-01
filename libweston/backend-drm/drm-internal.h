@@ -257,6 +257,9 @@ struct drm_backend {
 
 	uint32_t pageflip_timeout;
 
+	/* True, if underlay planes exist. */
+	bool has_underlay;
+
 	struct weston_log_scope *debug;
 };
 
@@ -414,6 +417,8 @@ struct drm_plane {
 	uint32_t crtc_id;
 
 	struct drm_property_info props[WDRM_PLANE__COUNT];
+	/* True if the plane's zpos_max < primary plane's zpos_min. */
+	bool is_underlay;
 
 	/* The last state submitted to the kernel for this plane. */
 	struct drm_plane_state *state_cur;
@@ -651,7 +656,7 @@ drm_output_get_plane_type_name(struct drm_plane *p)
 	case WDRM_PLANE_TYPE_CURSOR:
 		return "cursor";
 	case WDRM_PLANE_TYPE_OVERLAY:
-		return "overlay";
+		return p->is_underlay ? "underlay" : "overlay";
 	default:
 		assert(0);
 		break;
