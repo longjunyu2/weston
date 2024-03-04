@@ -171,7 +171,7 @@ cmlcms_color_transform_destroy(struct cmlcms_color_transform *xform)
 	unref_cprof(xform->search_key.output_profile);
 
 	weston_log_scope_printf(cm->transforms_scope,
-				"Destroyed color transformation %p.\n", xform);
+				"Destroyed color transformation t%u.\n", xform->base.id);
 
 	free(xform);
 }
@@ -841,8 +841,9 @@ lcms_xform_error_logger(cmsContext context_id,
 	in = xform->search_key.input_profile;
 	out = xform->search_key.output_profile;
 
-	weston_log("LittleCMS error with color transformation from "
+	weston_log("LittleCMS error with color transformation t%u from "
 		   "'%s' (p%u) to '%s' (p%u), %s: %s\n",
+		   xform->base.id,
 		   in ? in->base.description : "(none)",
 		   in ? in->base.id : 0,
 		   out ? out->base.description : "(none)",
@@ -1007,7 +1008,7 @@ cmlcms_color_transform_create(struct weston_color_manager_lcms *cm,
 	xform->search_key.output_profile = ref_cprof(search_param->output_profile);
 
 	weston_log_scope_printf(cm->transforms_scope,
-				"New color transformation: %p\n", xform);
+				"New color transformation: t%u\n", xform->base.id);
 	str = cmlcms_color_transform_search_param_string(&xform->search_key);
 	weston_log_scope_printf(cm->transforms_scope, "%s", str);
 	free(str);

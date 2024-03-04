@@ -327,7 +327,7 @@ transforms_scope_new_sub(struct weston_log_subscription *subs, void *data)
 
 	weston_log_subscription_printf(subs, "Existent:\n");
 	wl_list_for_each(xform, &cm->color_transform_list, link) {
-		weston_log_subscription_printf(subs, "Color transformation %p:\n", xform);
+		weston_log_subscription_printf(subs, "Color transformation t%u:\n", xform->base.id);
 
 		str = cmlcms_color_transform_search_param_string(&xform->search_key);
 		weston_log_subscription_printf(subs, "%s", str);
