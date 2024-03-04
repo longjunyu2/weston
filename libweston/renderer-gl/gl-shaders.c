@@ -52,6 +52,8 @@
 #include "fragment-shader.h"
 
 struct gl_shader {
+	struct wl_list link; /* gl_renderer::shader_list */
+	struct timespec last_used;
 	struct gl_shader_requirements key;
 	GLuint program;
 	GLuint vertex_shader, fragment_shader;
@@ -60,8 +62,12 @@ struct gl_shader {
 	GLint tex_uniforms[3];
 	GLint view_alpha_uniform;
 	GLint color_uniform;
-	GLint color_pre_curve_lut_2d_uniform;
-	GLint color_pre_curve_lut_scale_offset_uniform;
+	union {
+		struct {
+			GLint tex_2d_uniform;
+			GLint scale_offset_uniform;
+		} lut_3x1d;
+	} color_pre_curve;
 	union {
 		struct {
 			GLint tex_uniform;
@@ -69,10 +75,12 @@ struct gl_shader {
 		} lut3d;
 		GLint matrix_uniform;
 	} color_mapping;
-	GLint color_post_curve_lut_2d_uniform;
-	GLint color_post_curve_lut_scale_offset_uniform;
-	struct wl_list link; /* gl_renderer::shader_list */
-	struct timespec last_used;
+	union {
+		struct {
+			GLint tex_2d_uniform;
+			GLint scale_offset_uniform;
+		} lut_3x1d;
+	} color_post_curve;
 };
 
 static const char *
@@ -336,15 +344,28 @@ gl_shader_create(struct gl_renderer *gr,
 	} else {
 		shader->color_uniform = -1;
 	}
-	shader->color_pre_curve_lut_2d_uniform =
-		glGetUniformLocation(shader->program, "color_pre_curve_lut_2d");
-	shader->color_pre_curve_lut_scale_offset_uniform =
-		glGetUniformLocation(shader->program, "color_pre_curve_lut_scale_offset");
 
-	shader->color_post_curve_lut_2d_uniform =
-		glGetUniformLocation(shader->program, "color_post_curve_lut_2d");
-	shader->color_post_curve_lut_scale_offset_uniform =
-		glGetUniformLocation(shader->program, "color_post_curve_lut_scale_offset");
+	switch(requirements->color_pre_curve) {
+	case SHADER_COLOR_CURVE_IDENTITY:
+		break;
+	case SHADER_COLOR_CURVE_LUT_3x1D:
+		shader->color_pre_curve.lut_3x1d.tex_2d_uniform =
+			glGetUniformLocation(shader->program, "color_pre_curve_lut_2d");
+		shader->color_pre_curve.lut_3x1d.scale_offset_uniform =
+			glGetUniformLocation(shader->program, "color_pre_curve_lut_scale_offset");
+		break;
+	}
+
+	switch(requirements->color_post_curve) {
+	case SHADER_COLOR_CURVE_IDENTITY:
+		break;
+	case SHADER_COLOR_CURVE_LUT_3x1D:
+		shader->color_post_curve.lut_3x1d.tex_2d_uniform =
+			glGetUniformLocation(shader->program, "color_post_curve_lut_2d");
+		shader->color_post_curve.lut_3x1d.scale_offset_uniform =
+			glGetUniformLocation(shader->program, "color_post_curve_lut_scale_offset");
+		break;
+	}
 
 	switch(requirements->color_mapping) {
 	case SHADER_COLOR_MAPPING_3DLUT:
@@ -606,18 +627,17 @@ gl_shader_load_config(struct gl_shader *shader,
 	i = GL_SHADER_INPUT_TEX_MAX;
 	switch (sconf->req.color_pre_curve) {
 	case SHADER_COLOR_CURVE_IDENTITY:
-		assert(sconf->color_pre_curve_lut_tex == 0);
 		break;
 	case SHADER_COLOR_CURVE_LUT_3x1D:
-		assert(sconf->color_pre_curve_lut_tex != 0);
-		assert(shader->color_pre_curve_lut_2d_uniform != -1);
-		assert(shader->color_pre_curve_lut_scale_offset_uniform != -1);
+		assert(sconf->color_pre_curve.lut_3x1d.tex != 0);
+		assert(shader->color_pre_curve.lut_3x1d.tex_2d_uniform != -1);
+		assert(shader->color_pre_curve.lut_3x1d.scale_offset_uniform != -1);
 		glActiveTexture(GL_TEXTURE0 + i);
-		glBindTexture(GL_TEXTURE_2D, sconf->color_pre_curve_lut_tex);
-		glUniform1i(shader->color_pre_curve_lut_2d_uniform, i);
+		glBindTexture(GL_TEXTURE_2D, sconf->color_pre_curve.lut_3x1d.tex);
+		glUniform1i(shader->color_pre_curve.lut_3x1d.tex_2d_uniform, i);
 		i++;
-		glUniform2fv(shader->color_pre_curve_lut_scale_offset_uniform,
-			     1, sconf->color_pre_curve_lut_scale_offset);
+		glUniform2fv(shader->color_pre_curve.lut_3x1d.scale_offset_uniform,
+			     1, sconf->color_pre_curve.lut_3x1d.scale_offset);
 		break;
 	}
 
@@ -645,18 +665,17 @@ gl_shader_load_config(struct gl_shader *shader,
 
 	switch (sconf->req.color_post_curve) {
 	case SHADER_COLOR_CURVE_IDENTITY:
-		assert(sconf->color_post_curve_lut_tex == 0);
 		break;
 	case SHADER_COLOR_CURVE_LUT_3x1D:
-		assert(sconf->color_post_curve_lut_tex != 0);
-		assert(shader->color_post_curve_lut_2d_uniform != -1);
-		assert(shader->color_post_curve_lut_scale_offset_uniform != -1);
+		assert(sconf->color_post_curve.lut_3x1d.tex != 0);
+		assert(shader->color_post_curve.lut_3x1d.tex_2d_uniform != -1);
+		assert(shader->color_post_curve.lut_3x1d.scale_offset_uniform != -1);
 		glActiveTexture(GL_TEXTURE0 + i);
-		glBindTexture(GL_TEXTURE_2D, sconf->color_post_curve_lut_tex);
-		glUniform1i(shader->color_post_curve_lut_2d_uniform, i);
+		glBindTexture(GL_TEXTURE_2D, sconf->color_post_curve.lut_3x1d.tex);
+		glUniform1i(shader->color_post_curve.lut_3x1d.tex_2d_uniform, i);
 		i++;
-		glUniform2fv(shader->color_post_curve_lut_scale_offset_uniform,
-			     1, sconf->color_post_curve_lut_scale_offset);
+		glUniform2fv(shader->color_post_curve.lut_3x1d.scale_offset_uniform,
+			     1, sconf->color_post_curve.lut_3x1d.scale_offset);
 		break;
 	}
 }

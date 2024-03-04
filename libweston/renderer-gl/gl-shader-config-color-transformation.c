@@ -41,9 +41,13 @@
 
 struct gl_renderer_color_curve {
 	enum gl_shader_color_curve type;
-	GLuint tex;
-	float scale;
-	float offset;
+	union {
+		struct {
+			GLuint tex;
+			float scale;
+			float offset;
+		} lut_3x1d;
+	} u;
 };
 
 struct gl_renderer_color_mapping {
@@ -69,8 +73,13 @@ struct gl_renderer_color_transform {
 static void
 gl_renderer_color_curve_fini(struct gl_renderer_color_curve *gl_curve)
 {
-	if (gl_curve->tex)
-		glDeleteTextures(1, &gl_curve->tex);
+	switch (gl_curve->type) {
+	case SHADER_COLOR_CURVE_IDENTITY:
+		break;
+	case SHADER_COLOR_CURVE_LUT_3x1D:
+		glDeleteTextures(1, &gl_curve->u.lut_3x1d.tex);
+		break;
+	};
 }
 
 static void
@@ -173,9 +182,9 @@ gl_color_curve_lut_3x1d(struct gl_renderer *gr,
 	free(lut);
 
 	gl_curve->type = SHADER_COLOR_CURVE_LUT_3x1D;
-	gl_curve->tex = tex;
-	gl_curve->scale = (float)(lut_len - 1) / lut_len;
-	gl_curve->offset = 0.5f / lut_len;
+	gl_curve->u.lut_3x1d.tex = tex;
+	gl_curve->u.lut_3x1d.scale = (float)(lut_len - 1) / lut_len;
+	gl_curve->u.lut_3x1d.offset = 0.5f / lut_len;
 
 	return true;
 }
@@ -228,14 +237,8 @@ gl_renderer_color_transform_from(struct gl_renderer *gr,
 {
 	static const struct gl_renderer_color_transform no_op_gl_xform = {
 		.pre_curve.type = SHADER_COLOR_CURVE_IDENTITY,
-		.pre_curve.tex = 0,
-		.pre_curve.scale = 0.0f,
-		.pre_curve.offset = 0.0f,
 		.mapping.type = SHADER_COLOR_MAPPING_IDENTITY,
 		.post_curve.type = SHADER_COLOR_CURVE_IDENTITY,
-		.post_curve.tex = 0,
-		.post_curve.scale = 0.0f,
-		.post_curve.offset = 0.0f,
 	};
 	struct gl_renderer_color_transform *gl_xform;
 	bool ok = false;
@@ -265,11 +268,11 @@ gl_renderer_color_transform_from(struct gl_renderer *gr,
 					     &xform->pre_curve, xform);
 		break;
 	}
-
 	if (!ok) {
 		gl_renderer_color_transform_destroy(gl_xform);
 		return NULL;
 	}
+
 	switch (xform->mapping.type) {
 	case WESTON_COLOR_MAPPING_TYPE_IDENTITY:
 		gl_xform->mapping = no_op_gl_xform.mapping;
@@ -288,6 +291,7 @@ gl_renderer_color_transform_from(struct gl_renderer *gr,
 		gl_renderer_color_transform_destroy(gl_xform);
 		return NULL;
 	}
+
 	switch (xform->post_curve.type) {
 	case WESTON_COLOR_CURVE_TYPE_IDENTITY:
 		gl_xform->post_curve = no_op_gl_xform.post_curve;
@@ -319,14 +323,26 @@ gl_shader_config_set_color_transform(struct gl_renderer *gr,
 		return false;
 
 	sconf->req.color_pre_curve = gl_xform->pre_curve.type;
-	sconf->color_pre_curve_lut_tex = gl_xform->pre_curve.tex;
-	sconf->color_pre_curve_lut_scale_offset[0] = gl_xform->pre_curve.scale;
-	sconf->color_pre_curve_lut_scale_offset[1] = gl_xform->pre_curve.offset;
+	switch (gl_xform->pre_curve.type) {
+	case SHADER_COLOR_CURVE_IDENTITY:
+		break;
+	case SHADER_COLOR_CURVE_LUT_3x1D:
+		sconf->color_pre_curve.lut_3x1d.tex = gl_xform->pre_curve.u.lut_3x1d.tex;
+		sconf->color_pre_curve.lut_3x1d.scale_offset[0] = gl_xform->pre_curve.u.lut_3x1d.scale;
+		sconf->color_pre_curve.lut_3x1d.scale_offset[1] = gl_xform->pre_curve.u.lut_3x1d.offset;
+		break;
+	}
 
 	sconf->req.color_post_curve = gl_xform->post_curve.type;
-	sconf->color_post_curve_lut_tex = gl_xform->post_curve.tex;
-	sconf->color_post_curve_lut_scale_offset[0] = gl_xform->post_curve.scale;
-	sconf->color_post_curve_lut_scale_offset[1] = gl_xform->post_curve.offset;
+	switch (gl_xform->post_curve.type) {
+	case SHADER_COLOR_CURVE_IDENTITY:
+		break;
+	case SHADER_COLOR_CURVE_LUT_3x1D:
+		sconf->color_post_curve.lut_3x1d.tex = gl_xform->post_curve.u.lut_3x1d.tex;
+		sconf->color_post_curve.lut_3x1d.scale_offset[0] = gl_xform->post_curve.u.lut_3x1d.scale;
+		sconf->color_post_curve.lut_3x1d.scale_offset[1] = gl_xform->post_curve.u.lut_3x1d.offset;
+		break;
+	}
 
 	sconf->req.color_mapping = gl_xform->mapping.type;
 	switch (gl_xform->mapping.type) {

@@ -113,17 +113,28 @@ struct gl_shader_config {
 	GLfloat unicolor[4];
 	GLint input_tex_filter; /* GL_NEAREST or GL_LINEAR */
 	GLuint input_tex[GL_SHADER_INPUT_TEX_MAX];
-	GLuint color_pre_curve_lut_tex;
-	GLfloat color_pre_curve_lut_scale_offset[2];
+
 	union {
 		struct {
-			GLuint  tex;
+			GLuint tex;
+			GLfloat scale_offset[2];
+		} lut_3x1d;
+	} color_pre_curve;
+
+	union {
+		struct {
+			GLuint tex;
 			GLfloat scale_offset[2];
 		} lut3d;
 		GLfloat matrix[9];
 	} color_mapping;
-	GLuint color_post_curve_lut_tex;
-	GLfloat color_post_curve_lut_scale_offset[2];
+
+	union {
+		struct {
+			GLuint tex;
+			GLfloat scale_offset[2];
+		} lut_3x1d;
+	} color_post_curve;
 };
 
 struct gl_renderer {
