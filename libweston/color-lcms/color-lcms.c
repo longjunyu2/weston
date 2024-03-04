@@ -351,7 +351,7 @@ profiles_scope_new_sub(struct weston_log_subscription *subs, void *data)
 
 	weston_log_subscription_printf(subs, "Existent:\n");
 	wl_list_for_each(cprof, &cm->color_profile_list, link) {
-		weston_log_subscription_printf(subs, "Color profile %p:\n", cprof);
+		weston_log_subscription_printf(subs, "Color profile p%u:\n", cprof->base.id);
 
 		str = cmlcms_color_profile_print(cprof);
 		weston_log_subscription_printf(subs, "%s", str);

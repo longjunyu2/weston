@@ -842,9 +842,11 @@ lcms_xform_error_logger(cmsContext context_id,
 	out = xform->search_key.output_profile;
 
 	weston_log("LittleCMS error with color transformation from "
-		   "'%s' to '%s', %s: %s\n",
+		   "'%s' (p%u) to '%s' (p%u), %s: %s\n",
 		   in ? in->base.description : "(none)",
+		   in ? in->base.id : 0,
 		   out ? out->base.description : "(none)",
+		   out ? out->base.id : 0,
 		   cmlcms_category_name(xform->search_key.category),
 		   text);
 }
@@ -956,26 +958,32 @@ char *
 cmlcms_color_transform_search_param_string(const struct cmlcms_color_transform_search_param *search_key)
 {
 	const char *input_prof_desc = "none";
+	unsigned input_prof_id = 0;
 	const char *output_prof_desc = "none";
+	unsigned output_prof_id = 0;
 	const char *intent_desc = "none";
 	char *str;
 
-	if (search_key->input_profile)
+	if (search_key->input_profile) {
 		input_prof_desc = search_key->input_profile->base.description;
+		input_prof_id = search_key->input_profile->base.id;
+	}
 
-	if (search_key->output_profile)
+	if (search_key->output_profile) {
 		output_prof_desc = search_key->output_profile->base.description;
+		output_prof_id = search_key->output_profile->base.id;
+	}
 
 	if (search_key->render_intent)
 		intent_desc = search_key->render_intent->desc;
 
 	str_printf(&str, "  category: %s\n" \
-			 "  input profile: %s\n" \
-			 "  output profile: %s\n" \
+			 "  input profile p%u: %s\n" \
+			 "  output profile p%u: %s\n" \
 			 "  render intent: %s\n",
 			 cmlcms_category_name(search_key->category),
-			 input_prof_desc,
-			 output_prof_desc,
+			 input_prof_id, input_prof_desc,
+			 output_prof_id, output_prof_desc,
 			 intent_desc);
 
 	abort_oom_if_null(str);

@@ -376,7 +376,7 @@ cmlcms_color_profile_create(struct weston_color_manager_lcms *cm,
 	wl_list_insert(&cm->color_profile_list, &cprof->link);
 
 	weston_log_scope_printf(cm->profiles_scope,
-				"New color profile: %p\n", cprof);
+				"New color profile: p%u\n", cprof->base.id);
 
 	str = cmlcms_color_profile_print(cprof);
 	weston_log_scope_printf(cm->profiles_scope, "%s", str);
@@ -400,8 +400,8 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 	if (cprof->prof_rofile)
 		os_ro_anonymous_file_destroy(cprof->prof_rofile);
 
-	weston_log_scope_printf(cm->profiles_scope, "Destroyed color profile %p. " \
-				"Description: %s\n", cprof, cprof->base.description);
+	weston_log_scope_printf(cm->profiles_scope, "Destroyed color profile p%u. " \
+				"Description: %s\n", cprof->base.id, cprof->base.description);
 
 	free(cprof->base.description);
 	free(cprof);
