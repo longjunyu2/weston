@@ -150,6 +150,8 @@ weston_color_transform_unref(struct weston_color_transform *xform)
 		return;
 
 	wl_signal_emit(&xform->destroy_signal, xform);
+	weston_idalloc_put_id(xform->cm->compositor->color_transform_id_generator,
+			      xform->id);
 	xform->cm->destroy_color_transform(xform);
 }
 
@@ -168,6 +170,7 @@ weston_color_transform_init(struct weston_color_transform *xform,
 {
 	xform->cm = cm;
 	xform->ref_count = 1;
+	xform->id = weston_idalloc_get_id(cm->compositor->color_transform_id_generator);
 	wl_signal_init(&xform->destroy_signal);
 }
 

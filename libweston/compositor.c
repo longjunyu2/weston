@@ -9247,6 +9247,7 @@ weston_compositor_create(struct wl_display *display,
 	weston_compositor_install_capture_protocol(ec);
 
 	ec->color_profile_id_generator = weston_idalloc_create(ec);
+	ec->color_transform_id_generator = weston_idalloc_create(ec);
 
 	wl_list_init(&ec->view_list);
 	wl_list_init(&ec->plane_list);
@@ -9775,6 +9776,7 @@ weston_compositor_destroy(struct weston_compositor *compositor)
 	weston_log_scope_destroy(compositor->libseat_debug);
 	compositor->libseat_debug = NULL;
 
+	weston_idalloc_destroy(compositor->color_transform_id_generator);
 	weston_idalloc_destroy(compositor->color_profile_id_generator);
 
 	if (compositor->default_dmabuf_feedback) {

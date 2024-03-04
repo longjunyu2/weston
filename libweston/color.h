@@ -199,6 +199,7 @@ struct weston_color_mapping {
 struct weston_color_transform {
 	struct weston_color_manager *cm;
 	int ref_count;
+	uint32_t id; /* For debug */
 
 	/* for renderer or backend to attach their own cached objects */
 	struct wl_signal destroy_signal;
