@@ -3393,85 +3393,55 @@ weston_rdp_backend_config_init(struct weston_rdp_backend_config *config)
 	config->refresh_rate = RDP_DEFAULT_FREQ;
 }
 
-static void
-rdp_handle_layout(struct weston_compositor *ec, struct wet_backend *wb)
+static int
+rdp_backend_output_configure(struct weston_output *output)
 {
-	struct wet_compositor *wc = to_wet_compositor(ec);
-	struct wet_output_config *parsed_options = wc->parsed_options;
-	const struct weston_rdp_output_api *api = weston_rdp_output_get_api(ec);
+	struct wet_compositor *compositor = to_wet_compositor(output->compositor);
+	const struct weston_rdp_output_api *api =
+		weston_rdp_output_get_api(compositor->compositor);
+	struct wet_output_config *parsed_options = compositor->parsed_options;
 	struct weston_rdp_monitor config;
-	struct weston_head *head = NULL;
 	int width;
 	int height;
-	int scale = 1;
-
-	while ((head = wet_backend_iterate_heads(wc, wb, head))) {
-		struct weston_coord_global pos;
-		struct weston_output *output = head->output;
-		struct weston_mode new_mode = {};
-
-		assert(output);
-
-		api->head_get_monitor(head, &config);
-
-		width = config.width;
-		height = config.height;
-		scale = config.desktop_scale / 100;
-
-		/* If these are invalid, the backend is expecting
-		 * us to provide defaults.
-		 */
-		width = width ? width : parsed_options->width;
-		height = height ? height : parsed_options->height;
-		scale = scale ? scale : parsed_options->scale;
-
-		/* Fallback to 640 x 480 if we have nothing to use */
-		width = width ? width : 640;
-		height = height ? height : 480;
-		scale = scale ? scale : 1;
-
-		new_mode.width = width;
-		new_mode.height = height;
-		api->output_set_mode(output, &new_mode);
-
-		weston_output_set_scale(output, scale);
-		weston_output_set_transform(output,
-					    WL_OUTPUT_TRANSFORM_NORMAL);
-		pos.c = weston_coord(config.x, config.y);
-		weston_output_move(output, pos);
-	}
-}
-
-static void
-rdp_heads_changed(struct wl_listener *listener, void *arg)
-{
-	struct weston_compositor *compositor = arg;
-	struct wet_compositor *wet = to_wet_compositor(compositor);
-	struct wet_backend *wb = container_of(listener, struct wet_backend,
-					      heads_changed_listener);
 	struct weston_head *head = NULL;
+	int scale = 1;
+	struct weston_mode new_mode = {};
 
-	while ((head = wet_backend_iterate_heads(wet, wb, head))) {
-		if (head->output)
-			continue;
-
-		struct weston_output *out;
-
-		out = weston_compositor_create_output(compositor,
-						      head, head->name);
-
-		wet_head_tracker_create(wet, head);
-		weston_output_attach_head(out, head);
+	head = weston_output_get_first_head(output);
+	if (!head) {
+		weston_log("RDP backend: Failed to get proper head for output %s\n", output->name);
+		return -1;
 	}
 
-	rdp_handle_layout(compositor, wb);
+	api->head_get_monitor(head, &config);
 
-	while ((head = wet_backend_iterate_heads(wet, wb, head))) {
-		if (!head->output->enabled)
-			weston_output_enable(head->output);
+	width = config.width;
+	height = config.height;
+	scale = config.desktop_scale / 100;
 
-		weston_head_reset_device_changed(head);
-	}
+	/* If these are invalid, the backend is expecting
+	 * us to provide defaults.
+	 */
+	width = width ? width : parsed_options->width;
+	height = height ? height : parsed_options->height;
+	scale = scale ? scale : parsed_options->scale;
+
+	/* Fallback to 640 x 480 if we have nothing to use */
+	width = width ? width : 640;
+	height = height ? height : 480;
+	scale = scale ? scale : 1;
+
+	new_mode.width = width;
+	new_mode.height = height;
+
+	api->output_set_mode(output, &new_mode);
+
+	weston_output_set_scale(output, scale);
+	weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL);
+
+	weston_log("rdp_backend_output_configure.. Done\n");
+
+	return 0;
 }
 
 static int
@@ -3521,7 +3491,8 @@ load_rdp_backend(struct weston_compositor *c,
 					 &config.server_key, config.server_key);
 
 	wb = wet_compositor_load_backend(c, WESTON_BACKEND_RDP, &config.base,
-					 rdp_heads_changed, NULL);
+					 simple_heads_changed,
+					 rdp_backend_output_configure);
 
 	free(config.bind_address);
 	free(config.rdp_key);
