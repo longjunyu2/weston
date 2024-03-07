@@ -59,10 +59,13 @@ render_intent_from_surface_or_default(struct weston_color_manager_lcms *cm,
 	if (surface && surface->render_intent)
 		return surface->render_intent;
 
-	/* Use default render intent. TODO: default should be
-	 * WESTON_RENDER_INTENT_PERCEPTUAL. That requires tweaking the tests. */
+	/*
+	 * When color-management protocol has not been used to set a rendering
+	 * intent, we can freely choose our own. Perceptual is the best
+	 * considering the use case of color unaware apps on a HDR screen.
+	 */
 	return weston_render_intent_info_from(cm->base.compositor,
-					      WESTON_RENDER_INTENT_RELATIVE);
+					      WESTON_RENDER_INTENT_PERCEPTUAL);
 }
 
 static struct cmlcms_color_profile *
