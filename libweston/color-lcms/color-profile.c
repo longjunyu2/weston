@@ -186,7 +186,8 @@ static bool
 ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 				  cmsContext lcms_ctx,
 				  cmsHPROFILE hProfile,
-				  unsigned int num_points)
+				  unsigned int num_points,
+				  const char **err_msg)
 {
 	cmsToneCurve *curve = NULL;
 	const cmsToneCurve * const *vcgt_curves;
@@ -202,11 +203,15 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 		 */
 		for (i = 0 ; i < 3; i++) {
 			curve = cmsReadTag(hProfile, tags[i]);
-			if (!curve)
+			if (!curve) {
+				*err_msg = "TRC tag missing from matrix-shaper ICC profile";
 				goto fail;
+			}
 			extract->eotf[i] = cmsDupToneCurve(curve);
-			if (!extract->eotf[i])
+			if (!extract->eotf[i]) {
+				*err_msg = "out of memory";
 				goto fail;
+			}
 		}
 	} else {
 		/**
@@ -214,14 +219,18 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 		 * 1DLUT->3DLUT, 3DLUT
 		 */
 		if (!build_eotf_from_clut_profile(lcms_ctx, hProfile,
-						  extract->eotf, num_points))
+						  extract->eotf, num_points)) {
+			*err_msg = "estimating EOTF failed";
 			goto fail;
+		}
 	}
 
 	for (i = 0; i < 3; i++) {
 		curve = cmsReverseToneCurve(extract->eotf[i]);
-		if (!curve)
+		if (!curve) {
+			*err_msg = "inverting EOTF failed";
 			goto fail;
+		}
 		extract->output_inv_eotf_vcgt[i] = curve;
 	}
 	vcgt_curves = cmsReadTag(hProfile, cmsSigVcgtTag);
@@ -230,11 +239,17 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 			curve = lcmsJoinToneCurve(lcms_ctx,
 						  extract->output_inv_eotf_vcgt[i],
 						  vcgt_curves[i], num_points);
-			if (!curve)
+			if (!curve) {
+				*err_msg = "joining curves failed";
 				goto fail;
+			}
 			cmsFreeToneCurve(extract->output_inv_eotf_vcgt[i]);
 			extract->output_inv_eotf_vcgt[i] = curve;
 			extract->vcgt[i] = cmsDupToneCurve(vcgt_curves[i]);
+			if (!extract->vcgt[i]) {
+				*err_msg = "out of memory";
+				goto fail;
+			}
 		}
 	}
 	return true;
@@ -242,13 +257,15 @@ ensure_output_profile_extract_icc(struct cmlcms_output_profile_extract *extract,
 fail:
 	cmsFreeToneCurveTriple(extract->eotf);
 	cmsFreeToneCurveTriple(extract->output_inv_eotf_vcgt);
+	cmsFreeToneCurveTriple(extract->vcgt);
 	return false;
 }
 
 bool
 ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 			      cmsContext lcms_ctx,
-			      unsigned int num_points)
+			      unsigned int num_points,
+			      const char **err_msg)
 {
 	bool ret;
 
@@ -257,7 +274,7 @@ ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 		return true;
 
 	ret = ensure_output_profile_extract_icc(&cprof->extract, lcms_ctx,
-						cprof->profile, num_points);
+						cprof->profile, num_points, err_msg);
 
 	if (ret)
 		weston_assert_ptr(cprof->base.cm->compositor, cprof->extract.eotf[0]);
@@ -421,6 +438,7 @@ cmlcms_create_stock_profile(struct weston_color_manager_lcms *cm)
 	cmsHPROFILE profile;
 	struct cmlcms_md5_sum md5sum;
 	char *desc = NULL;
+	const char *err_msg = NULL;
 
 	profile = cmsCreate_sRGBProfileTHR(cm->lcms_ctx);
 	if (!profile) {
@@ -442,12 +460,15 @@ cmlcms_create_stock_profile(struct weston_color_manager_lcms *cm)
 		goto err_close;
 
 	if (!ensure_output_profile_extract(cm->sRGB_profile, cm->lcms_ctx,
-					   cmlcms_reasonable_1D_points()))
+					   cmlcms_reasonable_1D_points(), &err_msg))
 		goto err_close;
 
 	return true;
 
 err_close:
+	if (err_msg)
+		weston_log("%s\n", err_msg);
+
 	free(desc);
 	cmsCloseProfile(profile);
 	return false;

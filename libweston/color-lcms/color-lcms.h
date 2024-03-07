@@ -241,7 +241,8 @@ cmlcms_color_profile_print(const struct cmlcms_color_profile *cprof);
 bool
 ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 			      cmsContext lcms_ctx,
-			      unsigned int num_points);
+			      unsigned int num_points,
+			      const char **err_msg);
 
 unsigned int
 cmlcms_reasonable_1D_points(void);

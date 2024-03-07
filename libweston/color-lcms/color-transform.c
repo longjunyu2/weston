@@ -995,7 +995,7 @@ cmlcms_color_transform_create(struct weston_color_manager_lcms *cm,
 			      const struct cmlcms_color_transform_search_param *search_param)
 {
 	struct cmlcms_color_transform *xform;
-	const char *err_msg;
+	const char *err_msg = NULL;
 	char *str;
 
 	xform = xzalloc(sizeof *xform);
@@ -1012,10 +1012,8 @@ cmlcms_color_transform_create(struct weston_color_manager_lcms *cm,
 	free(str);
 
 	if (!ensure_output_profile_extract(search_param->output_profile, cm->lcms_ctx,
-					   cmlcms_reasonable_1D_points())) {
-		err_msg = "could not extract EOTF, inverse EOTF, or VCGT";
+					   cmlcms_reasonable_1D_points(), &err_msg))
 		goto error;
-	}
 
 	/*
 	 * The blending space is chosen to be the output device space but
