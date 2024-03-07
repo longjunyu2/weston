@@ -735,10 +735,10 @@ pipewire_output_repaint(struct weston_output *base)
 
 	assert(output);
 
+	pixman_region32_init(&damage);
+
 	if (pw_stream_get_state(output->stream, NULL) != PW_STREAM_STATE_STREAMING)
 		goto out;
-
-	pixman_region32_init(&damage);
 
 	weston_output_flush_damage_for_primary_plane(base, &damage);
 
