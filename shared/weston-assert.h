@@ -97,6 +97,9 @@ do {										\
 #define weston_assert_double_eq(compositor, a, b) \
 	weston_assert_(compositor, a, b, double, "%.10g", ==)
 
+#define weston_assert_uint32_eq(compositor, a, b) \
+	weston_assert_(compositor, a, b, uint32_t, "%u", ==)
+
 #define weston_assert_uint32_neq(compositor, a, b) \
 	weston_assert_(compositor, a, b, uint32_t, "%u", !=)
 

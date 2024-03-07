@@ -470,21 +470,14 @@ enum color_transform_step {
 };
 
 static bool
-translate_curve_element(struct cmlcms_color_transform *xform,
-			cmsStage *elem, enum color_transform_step step)
+translate_curve_element_LUT(struct cmlcms_color_transform *xform,
+			    _cmsStageToneCurvesData *trc_data,
+			    enum color_transform_step step)
 {
 	struct weston_compositor *compositor = xform->base.cm->compositor;
 	struct weston_color_curve *curve;
 	cmsToneCurve **stash;
-	_cmsStageToneCurvesData *trc_data;
 	unsigned i;
-
-	weston_assert_uint64_eq(compositor, cmsStageType(elem),
-				cmsSigCurveSetElemType);
-
-	trc_data = cmsStageData(elem);
-	if (trc_data->nCurves != 3)
-		return false;
 
 	switch(step) {
 	case PRE_CURVE:
@@ -505,12 +498,30 @@ translate_curve_element(struct cmlcms_color_transform *xform,
 	curve->type = WESTON_COLOR_CURVE_TYPE_LUT_3x1D;
 	curve->u.lut_3x1d.optimal_len = cmlcms_reasonable_1D_points();
 
+	weston_assert_uint32_eq(compositor, trc_data->nCurves, 3);
 	for (i = 0; i < 3; i++) {
 		stash[i] = cmsDupToneCurve(trc_data->TheCurves[i]);
 		abort_oom_if_null(stash[i]);
 	}
 
 	return true;
+}
+
+static bool
+translate_curve_element(struct cmlcms_color_transform *xform,
+			cmsStage *elem, enum color_transform_step step)
+{
+	struct weston_compositor *compositor = xform->base.cm->compositor;
+	_cmsStageToneCurvesData *trc_data;
+
+	weston_assert_uint64_eq(compositor, cmsStageType(elem),
+				cmsSigCurveSetElemType);
+
+	trc_data = cmsStageData(elem);
+	if (trc_data->nCurves != 3)
+		return false;
+
+	return translate_curve_element_LUT(xform, trc_data, step);
 }
 
 static bool
