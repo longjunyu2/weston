@@ -6,7 +6,7 @@ srcs_libshared = [
         'process-util.c',
 	'hash.c',
 ]
-deps_libshared = [dep_wayland_client, dep_pixman, deps_for_libweston_users]
+deps_libshared = [dep_wayland_client, dep_pixman, deps_for_libweston_users, dep_egl]
 
 lib_libshared = static_library(
 	'shared',

@@ -30,6 +30,7 @@ if get_option('renderer-gl')
 		error('wayland-backend + gl-renderer requires wayland-egl which was not found. Or, you can use \'-Dbackend-wayland=false\' or \'-Drenderer-gl=false\'.')
 	endif
 	deps_wlwl += d
+	deps_wlwl += dep_egl # for gl-renderer.h
 endif
 
 plugin_wlwl = shared_library(

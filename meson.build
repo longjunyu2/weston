@@ -159,6 +159,15 @@ deps_for_libweston_users = [
 	dep_xkbcommon,
 ]
 
+if get_option('renderer-gl')
+	dep_egl = dependency('egl', required: false)
+	if not dep_egl.found()
+		error('libweston + gl-renderer requires egl which was not found. Or, you can use \'-Drenderer-gl=false\'.')
+	endif
+else
+	dep_egl = dependency('', required: false)
+endif
+
 
 subdir('include')
 subdir('protocol')

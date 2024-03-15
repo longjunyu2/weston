@@ -5,7 +5,8 @@ deps_libweston = [
 	dep_libdl,
 	dep_libdrm,
 	dep_xkbcommon,
-	dep_matrix_c
+	dep_matrix_c,
+	dep_egl,
 ]
 srcs_libweston = [
 	git_version_h,
@@ -84,16 +85,6 @@ srcs_libweston = [
 
 subdir('desktop')
 subdir('shell-utils')
-
-if get_option('renderer-gl')
-	dep_egl = dependency('egl', required: false)
-	if not dep_egl.found()
-		error('libweston + gl-renderer requires egl which was not found. Or, you can use \'-Drenderer-gl=false\'.')
-	endif
-	deps_libweston += dep_egl
-else
-	dep_egl = dependency('', required: false)
-endif
 
 if get_option('backend-vnc')
 	dep_pam = dependency('pam', required: false)

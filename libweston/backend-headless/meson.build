@@ -13,6 +13,7 @@ plugin_headless = shared_library(
 	srcs_headless,
 	include_directories: common_inc,
 	dependencies: [
+		dep_egl, # for gl-renderer.h
 		dep_libweston_private,
 		dep_libdrm_headers,
 		dep_lib_cairo_shared,
