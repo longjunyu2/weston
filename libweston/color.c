@@ -182,6 +182,10 @@ curve_type_to_str(enum weston_color_curve_type curve_type)
 		return "identity";
 	case WESTON_COLOR_CURVE_TYPE_LUT_3x1D:
 		return "3x1D LUT";
+	case WESTON_COLOR_CURVE_TYPE_LINPOW:
+		return "linpow";
+	case WESTON_COLOR_CURVE_TYPE_POWLIN:
+		return "powlin";
 	}
 	return "???";
 }

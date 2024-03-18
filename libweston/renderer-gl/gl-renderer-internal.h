@@ -61,6 +61,8 @@ enum gl_shader_texture_variant {
 enum gl_shader_color_curve {
 	SHADER_COLOR_CURVE_IDENTITY = 0,
 	SHADER_COLOR_CURVE_LUT_3x1D,
+	SHADER_COLOR_CURVE_LINPOW,
+	SHADER_COLOR_CURVE_POWLIN,
 };
 
 /* Keep the following in sync with fragment.glsl. */
@@ -87,14 +89,14 @@ struct gl_shader_requirements
 	bool input_is_premult:1;
 	bool green_tint:1;
 
-	unsigned color_pre_curve:1; /* enum gl_shader_color_curve */
+	unsigned color_pre_curve:2; /* enum gl_shader_color_curve */
 	unsigned color_mapping:2; /* enum gl_shader_color_mapping */
-	unsigned color_post_curve:1; /* enum gl_shader_color_curve */
+	unsigned color_post_curve:2; /* enum gl_shader_color_curve */
 	/*
 	 * The total size of all bitfields plus pad_bits_ must fill up exactly
 	 * how many bytes the compiler allocates for them together.
 	 */
-	unsigned pad_bits_:21;
+	unsigned pad_bits_:19;
 };
 static_assert(sizeof(struct gl_shader_requirements) ==
 	      4 /* total bitfield size in bytes */,
@@ -119,6 +121,10 @@ struct gl_shader_config {
 			GLuint tex;
 			GLfloat scale_offset[2];
 		} lut_3x1d;
+		struct {
+			GLfloat params[3][10];
+			GLboolean clamped_input;
+		} parametric;
 	} color_pre_curve;
 
 	union {
@@ -134,6 +140,10 @@ struct gl_shader_config {
 			GLuint tex;
 			GLfloat scale_offset[2];
 		} lut_3x1d;
+		struct {
+			GLfloat params[3][10];
+			GLboolean clamped_input;
+		} parametric;
 	} color_post_curve;
 };
 

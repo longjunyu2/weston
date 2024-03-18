@@ -46,6 +46,8 @@
 /* enum gl_shader_color_curve */
 #define SHADER_COLOR_CURVE_IDENTITY 0
 #define SHADER_COLOR_CURVE_LUT_3x1D 1
+#define SHADER_COLOR_CURVE_LINPOW 2
+#define SHADER_COLOR_CURVE_POWLIN 3
 
 /* enum gl_shader_color_mapping */
 #define SHADER_COLOR_MAPPING_IDENTITY 0
@@ -124,10 +126,16 @@ uniform sampler2D tex1;
 uniform sampler2D tex2;
 uniform float view_alpha;
 uniform vec4 unicolor;
+
 uniform HIGHPRECISION sampler2D color_pre_curve_lut_2d;
 uniform HIGHPRECISION vec2 color_pre_curve_lut_scale_offset;
+uniform HIGHPRECISION float color_pre_curve_params[30];
+uniform bool color_pre_curve_clamped_input;
+
 uniform HIGHPRECISION sampler2D color_post_curve_lut_2d;
 uniform HIGHPRECISION vec2 color_post_curve_lut_scale_offset;
+uniform HIGHPRECISION float color_post_curve_params[30];
+uniform bool color_post_curve_clamped_input;
 
 #if DEF_COLOR_MAPPING == SHADER_COLOR_MAPPING_3DLUT
 uniform HIGHPRECISION sampler3D color_mapping_lut_3d;
@@ -212,6 +220,120 @@ sample_color_pre_curve_lut_2d(float x, compile_const int row)
 			 vec2(tx, (float(row) + 0.5) / 4.0)).x;
 }
 
+float
+linpow(float x, float g, float a, float b, float c, float d)
+{
+	/* See WESTON_COLOR_CURVE_TYPE_LINPOW for details about LINPOW. */
+
+	if (x >= d)
+		return pow((a * x) + b, g);
+
+	return c * x;
+}
+
+float
+powlin(float x, float g, float a, float b, float c, float d)
+{
+	/* See WESTON_COLOR_CURVE_TYPE_POWLIN for details about POWLIN. */
+
+	if (x >= d)
+		return a * pow(x, g) + b;
+
+	return c * x;
+}
+
+float
+sample_color_pre_curve_linpow(float x, compile_const int color_channel)
+{
+	float g, a, b, c, d;
+
+	/* For each color channel we have 10 parameters. The params are
+	 * linearized in an array of size 30, in RGB order. */
+	g = color_pre_curve_params[0 + (color_channel * 10)];
+	a = color_pre_curve_params[1 + (color_channel * 10)];
+	b = color_pre_curve_params[2 + (color_channel * 10)];
+	c = color_pre_curve_params[3 + (color_channel * 10)];
+	d = color_pre_curve_params[4 + (color_channel * 10)];
+
+	if (color_pre_curve_clamped_input)
+		x = clamp(x, 0.0, 1.0);
+
+	/* We use mirroring for negative input values. */
+	if (x < 0.0)
+		return -linpow(-x, g, a, b, c, d);
+
+	return linpow(x, g, a, b, c, d);
+}
+
+float
+sample_color_pre_curve_powlin(float x, compile_const int color_channel)
+{
+	float g, a, b, c, d;
+
+	/* For each color channel we have 10 parameters. The params are
+	 * linearized in an array of size 30, in RGB order. */
+	g = color_pre_curve_params[0 + (color_channel * 10)];
+	a = color_pre_curve_params[1 + (color_channel * 10)];
+	b = color_pre_curve_params[2 + (color_channel * 10)];
+	c = color_pre_curve_params[3 + (color_channel * 10)];
+	d = color_pre_curve_params[4 + (color_channel * 10)];
+
+	if (color_pre_curve_clamped_input)
+		x = clamp(x, 0.0, 1.0);
+
+	/* We use mirroring for negative input values. */
+	if (x < 0.0)
+		return -powlin(-x, g, a, b, c, d);
+
+	return powlin(x, g, a, b, c, d);
+}
+
+float
+sample_color_post_curve_linpow(float x, compile_const int color_channel)
+{
+	float g, a, b, c, d;
+
+	/* For each color channel we have 10 parameters. The params are
+	 * linearized in an array of size 30, in RGB order. */
+	g = color_post_curve_params[0 + (color_channel * 10)];
+	a = color_post_curve_params[1 + (color_channel * 10)];
+	b = color_post_curve_params[2 + (color_channel * 10)];
+	c = color_post_curve_params[3 + (color_channel * 10)];
+	d = color_post_curve_params[4 + (color_channel * 10)];
+
+	if (color_post_curve_clamped_input)
+		x = clamp(x, 0.0, 1.0);
+
+	/* We use mirroring for negative input values. */
+	if (x < 0.0)
+		return -linpow(-x, g, a, b, c, d);
+
+	return linpow(x, g, a, b, c, d);
+}
+
+float
+sample_color_post_curve_powlin(float x, compile_const int color_channel)
+{
+	float g, a, b, c, d;
+
+	/* For each color channel we have 10 parameters. The params are
+	 * linearized in an array of size 30, in RGB order. */
+	g = color_post_curve_params[0 + (color_channel * 10)];
+	a = color_post_curve_params[1 + (color_channel * 10)];
+	b = color_post_curve_params[2 + (color_channel * 10)];
+	c = color_post_curve_params[3 + (color_channel * 10)];
+	d = color_post_curve_params[4 + (color_channel * 10)];
+
+	if (color_post_curve_clamped_input)
+		x = clamp(x, 0.0, 1.0);
+
+	/* We use mirroring for negative input values. */
+	if (x < 0.0)
+		return -powlin(-x, g, a, b, c, d);
+
+	return powlin(x, g, a, b, c, d);
+}
+
 vec3
 color_pre_curve(vec3 color)
 {
@@ -223,6 +345,16 @@ color_pre_curve(vec3 color)
 		ret.r = sample_color_pre_curve_lut_2d(color.r, 0);
 		ret.g = sample_color_pre_curve_lut_2d(color.g, 1);
 		ret.b = sample_color_pre_curve_lut_2d(color.b, 2);
+		return ret;
+	} else if (c_color_pre_curve == SHADER_COLOR_CURVE_LINPOW) {
+		ret.r = sample_color_pre_curve_linpow(color.r, 0);
+		ret.g = sample_color_pre_curve_linpow(color.g, 1);
+		ret.b = sample_color_pre_curve_linpow(color.b, 2);
+		return ret;
+	} else if (c_color_pre_curve == SHADER_COLOR_CURVE_POWLIN) {
+		ret.r = sample_color_pre_curve_powlin(color.r, 0);
+		ret.g = sample_color_pre_curve_powlin(color.g, 1);
+		ret.b = sample_color_pre_curve_powlin(color.b, 2);
 		return ret;
 	} else {
 		/* Never reached, bad c_color_pre_curve. */
@@ -274,6 +406,16 @@ color_post_curve(vec3 color)
 		ret.r = sample_color_post_curve_lut_2d(color.r, 0);
 		ret.g = sample_color_post_curve_lut_2d(color.g, 1);
 		ret.b = sample_color_post_curve_lut_2d(color.b, 2);
+		return ret;
+	} else if (c_color_post_curve == SHADER_COLOR_CURVE_LINPOW) {
+		ret.r = sample_color_post_curve_linpow(color.r, 0);
+		ret.g = sample_color_post_curve_linpow(color.g, 1);
+		ret.b = sample_color_post_curve_linpow(color.b, 2);
+		return ret;
+	} else if (c_color_post_curve == SHADER_COLOR_CURVE_POWLIN) {
+		ret.r = sample_color_post_curve_powlin(color.r, 0);
+		ret.g = sample_color_post_curve_powlin(color.g, 1);
+		ret.b = sample_color_post_curve_powlin(color.b, 2);
 		return ret;
 	} else {
 		/* Never reached, bad c_color_post_curve. */

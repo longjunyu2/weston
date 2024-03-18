@@ -52,6 +52,50 @@ enum weston_color_curve_type {
 
 	/** Three-channel, one-dimensional look-up table */
 	WESTON_COLOR_CURVE_TYPE_LUT_3x1D,
+
+	/** Transfer function named LINPOW
+	 *
+	 * y = (a * x + b) ^ g | x >= d
+	 * y = c * x           | 0 <= x < d
+	 *
+	 * We gave it the name LINPOW because the first operation with the input
+	 * x is a linear one, and then the result is raised to g.
+	 *
+	 * As all parametric curves, this one should be represented using struct
+	 * weston_color_curve_parametric. For each color channel RGB we may have
+	 * different params, see weston_color_curve_parametric::params.
+	 *
+	 * For LINPOW, the params g, a, b, c, and d are respectively
+	 * params[channel][0], ... , params[channel][4].
+	 *
+	 * The input for all color channels may be clamped to [0.0, 1.0]. In
+	 * such case, weston_color_curve_parametric::clamped_input is true.
+	 * If the input is not clamped and LINPOW needs to evaluate a negative
+	 * input value, it uses mirroring (i.e. -f(-x)).
+	 */
+	WESTON_COLOR_CURVE_TYPE_LINPOW,
+
+	/** Transfer function named POWLIN
+	 *
+	 * y = (a * (x ^ g)) + b | x >= d
+	 * y = c * x             | 0 <= x < d
+	 *
+	 * We gave it the name POWLIN because the first operation with the input
+	 * x is an exponential one, and then the result is multiplied by a.
+	 *
+	 * As all parametric curves, this one should be represented using struct
+	 * weston_color_curve_parametric. For each color channel RGB we may have
+	 * different params, see weston_color_curve_parametric::params.
+	 *
+	 * For POWLIN, the params g, a, b, c, and d are respectively
+	 * params[channel][0], ... , params[channel][4].
+	 *
+	 * The input for all color channels may be clamped to [0.0, 1.0]. In
+	 * such case, weston_color_curve_parametric::clamped_input is true.
+	 * If the input is not clamped and POWLIN needs to evaluate a negative
+	 * input value, it uses mirroring (i.e. -f(-x)).
+	 */
+	WESTON_COLOR_CURVE_TYPE_POWLIN,
 };
 
 /** LUT_3x1D parameters */
@@ -80,6 +124,17 @@ struct weston_color_curve_lut_3x1d {
 	unsigned optimal_len;
 };
 
+/** Parametric color curve parameters */
+struct weston_color_curve_parametric {
+	/* For each color channel we may have different curves. For each of
+	 * them, we can have up to 10 params, depending on the curve type. The
+	 * channels are in RGB order. */
+	float params[3][10];
+
+	/* The input of the curve should be clamped from 0.0 to 1.0? */
+	bool clamped_input;
+};
+
 /**
  * A scalar function for color encoding and decoding
  *
@@ -99,6 +154,7 @@ struct weston_color_curve {
 	union {
 		/* identity: no parameters */
 		struct weston_color_curve_lut_3x1d lut_3x1d;
+		struct weston_color_curve_parametric parametric;
 	} u;
 };
 

@@ -464,10 +464,338 @@ merge_curvesets(cmsPipeline **lut, cmsContext context_id)
 	return modified;
 }
 
+static bool
+linpow_from_type_1(struct weston_compositor *compositor,
+		   struct weston_color_curve *curve,
+		   const float type_1_params[3][10], bool clamped_input)
+{
+	struct weston_color_curve_parametric *parametric = &curve->u.parametric;
+	unsigned int i;
+
+	curve->type = WESTON_COLOR_CURVE_TYPE_LINPOW;
+
+	parametric->clamped_input = clamped_input;
+
+	/* LittleCMS type 1 is the pure power-law curve, which is a special case
+	 * of LINPOW.
+	 *
+	 * LINPOW is defined as:
+	 *
+	 * y = (a * x + b) ^ g | x >= d
+	 * y = c * x           | 0 <= x < d
+	 *
+	 * So for a = 1, b = 0, c = 1 and d = 0, we have:
+	 *
+	 * y = x ^ g | x >= 0
+	 *
+	 * As the pure power-law is only defined for values x >= 0 (because
+	 * negative values raised to fractional exponents results in complex
+	 * numbers), this is exactly the pure power-law curve.
+	 */
+	for (i = 0; i < ARRAY_LENGTH(parametric->params); i++) {
+		parametric->params[i][0] = type_1_params[i][0]; /* g */
+		parametric->params[i][1] = 1.0f; /* a */
+		parametric->params[i][2] = 0.0f; /* b */
+		parametric->params[i][3] = 1.0f; /* c */
+		parametric->params[i][4] = 0.0f; /* d */
+	}
+
+	return true;
+}
+
+static bool
+linpow_from_type_1_inverse(struct weston_compositor *compositor,
+			   struct weston_color_curve *curve,
+			   const float type_1_params[3][10], bool clamped_input)
+{
+	struct weston_color_manager_lcms *cm = to_cmlcms(compositor->color_manager);
+	struct weston_color_curve_parametric *parametric = &curve->u.parametric;
+	float g;
+	const char *err_msg;
+	unsigned int i;
+
+	curve->type = WESTON_COLOR_CURVE_TYPE_LINPOW;
+
+	parametric->clamped_input = clamped_input;
+
+	/* LittleCMS type -1 (inverse of type 1) is the inverse of the pure
+	 * power-law curve, which is a special case of LINPOW.
+	 *
+	 * The type 1 is defined as:
+	 *
+	 * y = x ^ g | x >= 0
+	 *
+	 * Computing its inverse, we have:
+	 *
+	 * y = x ^ (1 / g) | x >= 0
+	 *
+	 * LINPOW is defined as:
+	 *
+	 * y = (a * x + b) ^ g | x >= d
+	 * y = c * x           | 0 <= x < d
+	 *
+	 * So for a = 1, b = 0, c = 1 and d = 0, we have:
+	 *
+	 * y = x ^ g | x >= 0
+	 *
+	 * If we take the param g from type -1 and invert it, we can fit type -1
+	 * into the curve above.
+	 */
+	for (i = 0; i < ARRAY_LENGTH(parametric->params); i++) {
+		g = type_1_params[i][0];
+
+		if (g == 0.0f) {
+			err_msg = "WARNING: xform has a LittleCMS type -1 curve " \
+				  "(inverse of pure power-law) with exponent 1 " \
+				  "divided by 0, which is invalid";
+			goto err;
+		}
+
+		parametric->params[i][0] = 1.0f / g;
+		parametric->params[i][1] = 1.0f; /* a */
+		parametric->params[i][2] = 0.0f; /* b */
+		parametric->params[i][3] = 1.0f; /* c */
+		parametric->params[i][4] = 0.0f; /* d */
+	}
+
+	return true;
+
+err:
+	weston_log_scope_printf(cm->transforms_scope, "%s\n", err_msg);
+	return false;
+}
+
+static bool
+linpow_from_type_4(struct weston_compositor *compositor,
+		   struct weston_color_curve *curve,
+		   const float type_4_params[3][10], bool clamped_input)
+{
+	struct weston_color_manager_lcms *cm = to_cmlcms(compositor->color_manager);
+	struct weston_color_curve_parametric *parametric = &curve->u.parametric;
+	float g, a, b, c, d;
+	const char *err_msg;
+	unsigned int i;
+
+	curve->type = WESTON_COLOR_CURVE_TYPE_LINPOW;
+
+	parametric->clamped_input = clamped_input;
+
+	/* LittleCMS type 4 is almost exactly the same as LINPOW. So simply copy
+	 * the params. No need to adjust anything.
+	 *
+	 * The only difference is that type 4 evaluates negative input values as
+	 * is, and LINPOW handles negative input values using mirroring (i.e.
+	 * for LINPOW being f(x) we'll compute -f(-x)).
+	 *
+	 * LINPOW is defined as:
+	 *
+	 * y = (a * x + b) ^ g | x >= d
+	 * y = c * x           | 0 <= x < d
+	 */
+	for (i = 0; i < ARRAY_LENGTH(parametric->params); i++) {
+		g = type_4_params[i][0];
+		a = type_4_params[i][1];
+		b = type_4_params[i][2];
+		c = type_4_params[i][3];
+		d = type_4_params[i][4];
+
+		if (a < 0.0f) {
+			err_msg = "WARNING: xform has a LittleCMS type 4 curve " \
+				  "with a < 0, which is unexpected";
+			goto err;
+		}
+
+		if (d < 0.0f) {
+			err_msg = "WARNING: xform has a LittleCMS type 4 curve " \
+				  "with d < 0, which is unexpected";
+			goto err;
+		}
+
+		if (a * d + b < 0) {
+			err_msg = "WARNING: xform has a LittleCMS type 4 curve " \
+				  "with a * d + b < 0, which is invalid";
+			goto err;
+		}
+
+		parametric->params[i][0] = g;
+		parametric->params[i][1] = a;
+		parametric->params[i][2] = b;
+		parametric->params[i][3] = c;
+		parametric->params[i][4] = d;
+	}
+
+	return true;
+
+err:
+	weston_log_scope_printf(cm->transforms_scope, "%s\n", err_msg);
+	return false;
+}
+
+static bool
+powlin_from_type_4_inverse(struct weston_compositor *compositor,
+			   struct weston_color_curve *curve,
+			   const float type_4_params[3][10], bool clamped_input)
+{
+	struct weston_color_manager_lcms *cm = to_cmlcms(compositor->color_manager);
+	struct weston_color_curve_parametric *parametric = &curve->u.parametric;
+	float g, a, b, c, d;
+	const char *err_msg;
+	unsigned int i;
+
+	curve->type = WESTON_COLOR_CURVE_TYPE_POWLIN;
+
+	parametric->clamped_input = clamped_input;
+
+	/* LittleCMS type -4 (inverse of type 4) fits into POWLIN. We need to
+	 * adjust the params that LittleCMS gives us, like below. Do not forget
+	 * that LittleCMS gives the params of the type 4 curve whose inverse
+	 * is the one it wants to represent.
+	 *
+	 * Also, type -4 evaluates negative input values as is, and POWLIN
+	 * handles negative input values using mirroring (i.e. for POWLIN being
+	 * f(x) we'll compute -f(-x)). We do that to avoid negative values being
+	 * raised to fractional exponents, what would result in complex numbers.
+	 *
+	 * The type 4 is defined as:
+	 *
+	 * y = (a * x + b) ^ g | x >= d
+	 * y = c * x           | else
+	 *
+	 * Computing its inverse, we have:
+	 *
+	 * y = ((x ^ (1 / g)) / a) - (b / a) | x >= c * d or (a * d + b) ^ g
+	 * y = x / c			     | else
+	 *
+	 * POWLIN is defined as:
+	 *
+	 * y = (a * (x ^ g)) + b | x >= d
+	 * y = c * x             | 0 <= x < d
+	 *
+	 * So we need to take the params from LittleCMS and adjust:
+	 *
+	 * g ←  1 / g
+	 * a ←  1 / a
+	 * b ← -b / a
+	 * c ←  1 / c
+	 * d ←  c * d
+	 *
+	 * Also, notice that c * d should be equal to (a * d + b) ^ g. But
+	 * because of precision problems or a deliberate discontinuity in the
+	 * function, that may not be true. So we may have a range of input
+	 * values for POWLIN such that c * d <= x <= (a * d + b) ^ g. For these
+	 * values, when evaluating POWLIN we need to decide with what segment
+	 * we're going to evaluate the input. For the majority of POWLIN color
+	 * curves created from type -4 we are expecting c * d ≈ (a * d + b) ^ g,
+	 * so the different output produced by the two discontinuous segments
+	 * would be so close that this wouldn't matter. But mathematically
+	 * there's nothing that guarantees that the two discontinuous segments
+	 * are close, and in this case the outputs would vary significantly.
+	 * There's nothing we can do regarding that, so we'll arbitrarily choose
+	 * one of the segments to compute the output.
+	 */
+	for (i = 0; i < ARRAY_LENGTH(parametric->params); i++) {
+		g = type_4_params[i][0];
+		a = type_4_params[i][1];
+		b = type_4_params[i][2];
+		c = type_4_params[i][3];
+		d = type_4_params[i][4];
+
+		if (g == 0.0f) {
+			err_msg = "WARNING: xform has a LittleCMS type -4 curve " \
+				  "but the param g of the original type 4 curve " \
+				  "is zero, so the inverse is invalid";
+			goto err;
+		}
+
+		if (a == 0.0f) {
+			err_msg = "WARNING: xform has a LittleCMS type -4 curve " \
+				  "but the param a of the original type 4 curve " \
+				  "is zero, so the inverse is invalid";
+			goto err;
+		}
+
+		if (c == 0.0f) {
+			err_msg = "WARNING: xform has a LittleCMS type -4 curve " \
+				  "but the param c of the original type 4 curve " \
+				  "is zero, so the inverse is invalid";
+			goto err;
+		}
+
+		parametric->params[i][0] = 1.0f / g;
+		parametric->params[i][1] = 1.0f / a;
+		parametric->params[i][2] = -b / a;
+		parametric->params[i][3] = 1.0f / c;
+		parametric->params[i][4] = c * d;
+	}
+
+	return true;
+
+err:
+	weston_log_scope_printf(cm->transforms_scope, "%s\n", err_msg);
+	return false;
+}
+
 enum color_transform_step {
 	PRE_CURVE,
 	POST_CURVE,
 };
+
+static bool
+translate_curve_element_parametric(struct cmlcms_color_transform *xform,
+				   _cmsStageToneCurvesData *trc_data,
+				   enum color_transform_step step)
+{
+	struct weston_compositor *compositor = xform->base.cm->compositor;
+	struct weston_color_curve *curve;
+	cmsInt32Number type;
+	float lcms_curveset_params[3][10];
+	bool clamped_input;
+	bool ret;
+
+	switch(step) {
+	case PRE_CURVE:
+		curve = &xform->base.pre_curve;
+		break;
+	case POST_CURVE:
+		curve = &xform->base.post_curve;
+		break;
+	default:
+		weston_assert_not_reached(compositor,
+					  "curve should be a pre or post curve");
+	}
+
+	/* The curveset may not be a parametric one, in such case we have a
+	 * fallback path. But if it is a parametric curve, we get the params for
+	 * each color channel and also the parametric curve type (defined by
+	 * LittleCMS). */
+	if (!get_parametric_curveset_params(compositor, trc_data, &type,
+					    lcms_curveset_params, &clamped_input))
+		return false;
+
+	switch (type) {
+	case 1:
+		ret = linpow_from_type_1(compositor, curve,
+					 lcms_curveset_params, clamped_input);
+		break;
+	case -1:
+		ret = linpow_from_type_1_inverse(compositor, curve,
+						 lcms_curveset_params, clamped_input);
+		break;
+	case 4:
+		ret = linpow_from_type_4(compositor, curve,
+					 lcms_curveset_params, clamped_input);
+		break;
+	case -4:
+		ret = powlin_from_type_4_inverse(compositor, curve,
+						 lcms_curveset_params, clamped_input);
+		break;
+	default:
+		/* We don't implement the curve. */
+		ret = false;
+	}
+
+	return ret;
+}
 
 static bool
 translate_curve_element_LUT(struct cmlcms_color_transform *xform,
@@ -521,6 +849,12 @@ translate_curve_element(struct cmlcms_color_transform *xform,
 	if (trc_data->nCurves != 3)
 		return false;
 
+	/* First try to translate the curve to a parametric one. */
+	if (translate_curve_element_parametric(xform, trc_data, step))
+		return true;
+
+	/* Curve does not fit any of the parametric curves that we implement, so
+	 * fallback to LUT. */
 	return translate_curve_element_LUT(xform, trc_data, step);
 }
 

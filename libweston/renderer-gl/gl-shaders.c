@@ -67,6 +67,10 @@ struct gl_shader {
 			GLint tex_2d_uniform;
 			GLint scale_offset_uniform;
 		} lut_3x1d;
+		struct {
+			GLint params_uniform;
+			GLint clamped_input_uniform;
+		} parametric;
 	} color_pre_curve;
 	union {
 		struct {
@@ -80,6 +84,10 @@ struct gl_shader {
 			GLint tex_2d_uniform;
 			GLint scale_offset_uniform;
 		} lut_3x1d;
+		struct {
+			GLint params_uniform;
+			GLint clamped_input_uniform;
+		} parametric;
 	} color_post_curve;
 };
 
@@ -123,6 +131,8 @@ gl_shader_color_curve_to_string(enum gl_shader_color_curve kind)
 #define CASERET(x) case x: return #x;
 	CASERET(SHADER_COLOR_CURVE_IDENTITY)
 	CASERET(SHADER_COLOR_CURVE_LUT_3x1D)
+	CASERET(SHADER_COLOR_CURVE_LINPOW)
+	CASERET(SHADER_COLOR_CURVE_POWLIN)
 #undef CASERET
 	}
 
@@ -348,6 +358,13 @@ gl_shader_create(struct gl_renderer *gr,
 	switch(requirements->color_pre_curve) {
 	case SHADER_COLOR_CURVE_IDENTITY:
 		break;
+	case SHADER_COLOR_CURVE_LINPOW:
+	case SHADER_COLOR_CURVE_POWLIN:
+		shader->color_pre_curve.parametric.params_uniform =
+			glGetUniformLocation(shader->program, "color_pre_curve_params");
+		shader->color_pre_curve.parametric.clamped_input_uniform =
+			glGetUniformLocation(shader->program, "color_pre_curve_clamped_input");
+		break;
 	case SHADER_COLOR_CURVE_LUT_3x1D:
 		shader->color_pre_curve.lut_3x1d.tex_2d_uniform =
 			glGetUniformLocation(shader->program, "color_pre_curve_lut_2d");
@@ -358,6 +375,13 @@ gl_shader_create(struct gl_renderer *gr,
 
 	switch(requirements->color_post_curve) {
 	case SHADER_COLOR_CURVE_IDENTITY:
+		break;
+	case SHADER_COLOR_CURVE_LINPOW:
+	case SHADER_COLOR_CURVE_POWLIN:
+		shader->color_post_curve.parametric.params_uniform =
+			glGetUniformLocation(shader->program, "color_post_curve_params");
+		shader->color_post_curve.parametric.clamped_input_uniform =
+			glGetUniformLocation(shader->program, "color_post_curve_clamped_input");
 		break;
 	case SHADER_COLOR_CURVE_LUT_3x1D:
 		shader->color_post_curve.lut_3x1d.tex_2d_uniform =
@@ -595,6 +619,7 @@ gl_shader_load_config(struct gl_shader *shader,
 {
 	GLint in_filter = sconf->input_tex_filter;
 	GLenum in_tgt;
+	GLsizei n_params;
 	int i;
 
 	glUniformMatrix4fv(shader->proj_uniform,
@@ -639,6 +664,14 @@ gl_shader_load_config(struct gl_shader *shader,
 		glUniform2fv(shader->color_pre_curve.lut_3x1d.scale_offset_uniform,
 			     1, sconf->color_pre_curve.lut_3x1d.scale_offset);
 		break;
+	case SHADER_COLOR_CURVE_LINPOW:
+	case SHADER_COLOR_CURVE_POWLIN:
+		n_params = sizeof(sconf->color_pre_curve.parametric.params) / sizeof(GLfloat);
+		glUniform1fv(shader->color_pre_curve.parametric.params_uniform, n_params,
+			     &sconf->color_pre_curve.parametric.params[0][0]);
+		glUniform1i(shader->color_pre_curve.parametric.clamped_input_uniform,
+			    sconf->color_pre_curve.parametric.clamped_input);
+		break;
 	}
 
 	switch (sconf->req.color_mapping) {
@@ -676,6 +709,14 @@ gl_shader_load_config(struct gl_shader *shader,
 		i++;
 		glUniform2fv(shader->color_post_curve.lut_3x1d.scale_offset_uniform,
 			     1, sconf->color_post_curve.lut_3x1d.scale_offset);
+		break;
+	case SHADER_COLOR_CURVE_LINPOW:
+	case SHADER_COLOR_CURVE_POWLIN:
+		n_params = sizeof(sconf->color_post_curve.parametric.params) / sizeof(GLfloat);
+		glUniform1fv(shader->color_post_curve.parametric.params_uniform, n_params,
+			     &sconf->color_post_curve.parametric.params[0][0]);
+		glUniform1i(shader->color_post_curve.parametric.clamped_input_uniform,
+			    sconf->color_post_curve.parametric.clamped_input);
 		break;
 	}
 }

@@ -136,7 +136,7 @@ static const struct setup_args my_setup_args[] = {
 	/* name,                    ref img, pipeline,     tolerance, dim, profile type, clut tolerance, vcgt_exponents */
 	{ { "sRGB->sRGB MAT" },           0, &pipeline_sRGB,     0.0,  0, PTYPE_MATRIX_SHAPER },
 	{ { "sRGB->sRGB MAT VCGT" },      3, &pipeline_sRGB,     0.8,  0, PTYPE_MATRIX_SHAPER, 0.0000,   {1.1, 1.2, 1.3} },
-	{ { "sRGB->adobeRGB MAT" },       1, &pipeline_adobeRGB, 1.4,  0, PTYPE_MATRIX_SHAPER },
+	{ { "sRGB->adobeRGB MAT" },       1, &pipeline_adobeRGB, 1.6,  0, PTYPE_MATRIX_SHAPER },
 	{ { "sRGB->adobeRGB MAT VCGT" },  4, &pipeline_adobeRGB, 1.0,  0, PTYPE_MATRIX_SHAPER, 0.0000,   {1.1, 1.2, 1.3} },
 	{ { "sRGB->BT2020 MAT" },         2, &pipeline_BT2020,   4.5,  0, PTYPE_MATRIX_SHAPER },
 	{ { "sRGB->sRGB CLUT" },          0, &pipeline_sRGB,     0.0, 17, PTYPE_CLUT,          0.0005 },

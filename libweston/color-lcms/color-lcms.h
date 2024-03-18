@@ -176,12 +176,14 @@ struct cmlcms_color_transform {
 
 	struct cmlcms_color_transform_search_param search_key;
 
-	/*
-	 * Cached data in case weston_color_transform needs them.
-	 * Pre-curve and post-curve refer to the weston_color_transform
-	 * pipeline elements and have no semantic meaning. They both are a
-	 * result of optimizing an arbitrary LittleCMS pipeline, not
-	 * e.g. EOTF or VCGT per se.
+	/**
+	 * Cached data used when we can't translate the curves into parametric
+	 * ones that we implement in the renderer. So when we need to fallback
+	 * to LUT's, we use this data to compute them.
+	 *
+	 * These curves are a result of optimizing an arbitrary LittleCMS
+	 * pipeline, so they have no semantic meaning (that means that they are
+	 * not e.g. an EOTF).
 	 */
 	cmsToneCurve *pre_curve[3];
 	cmsToneCurve *post_curve[3];
