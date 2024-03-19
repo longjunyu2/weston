@@ -1,6 +1,6 @@
 .\" shorthand for double quote that works everywhere.
 .ds q \N'34'
-.TH weston.ini 5 "2019-03-26" "Weston @version@"
+.TH weston.ini 5 "2024-08-07" "Weston @version@"
 .\"---------------------------------------------------------------------
 .SH NAME
 weston.ini \- configuration file for
@@ -651,6 +651,20 @@ Sets the basic output color characteristics by loading the parameters from the
 section with the key
 .BI "name=" name
 \&. If an ICC profile is also set, the ICC profile takes precedence.
+.TP 7
+.BI "mirror-of=" ouput_name
+Makes the remote output overlap (mirror) the native output identified by the
+mirror-of value.  This is useful for sharing or mirroring a native DRM output.
+The output mirroring the DRM native one, will inherit the same video modeline
+as the DRM native one, including the refresh rate and scale of the native
+output.  Note that depending on the remote backend, automatic output resize
+will be disabled when mirroring is in effect. Mirroring a DRM native
+output to another DRM native output is yet not supported, being intended
+only for remote outputs.
+
+NOTE: The native outputs created by the DRM backend using the 'clone-of'
+are for cloning the outputs, and not sharing or mirroring. See also
+.BR weston-drm(7).
 .\"---------------------------------------------------------------------
 .SH "INPUT-METHOD SECTION"
 .TP 7
