@@ -2271,8 +2271,8 @@ drm_backend_output_configure(struct weston_output *output,
 
 /* Find the output section to use for configuring the output with the
  * named head. If an output section with the given name contains
- * a "same-as" key, ignore all other settings in the output section and
- * instead find an output section named by the "same-as". Do this
+ * a "clone-of" key, ignore all other settings in the output section and
+ * instead find an output section named by the "clone-of". Do this
  * recursively.
  */
 static struct weston_config_section *
@@ -2280,33 +2280,33 @@ drm_config_find_controlling_output_section(struct weston_config *config,
 					   const char *head_name)
 {
 	struct weston_config_section *section;
-	char *same_as;
+	char *clone_of;
 	int depth = 0;
 
-	same_as = strdup(head_name);
+	clone_of = strdup(head_name);
 	do {
 		section = weston_config_get_section(config, "output",
-						    "name", same_as);
+						    "name", clone_of);
 		if (!section && depth > 0)
 			weston_log("Configuration error: "
 				   "output section referred to with "
-				   "'same-as=%s' not found.\n", same_as);
+				   "'clone-of=%s' not found.\n", clone_of);
 
-		free(same_as);
+		free(clone_of);
 
 		if (!section)
 			return NULL;
 
 		if (++depth > 10) {
 			weston_log("Configuration error: "
-				   "'same-as' nested too deep for output '%s'.\n",
+				   "'clone-of' nested too deep for output '%s'.\n",
 				   head_name);
 			return NULL;
 		}
 
-		weston_config_section_get_string(section, "same-as",
-						 &same_as, NULL);
-	} while (same_as);
+		weston_config_section_get_string(section, "clone-of",
+						 &clone_of, NULL);
+	} while (clone_of);
 
 	return section;
 }

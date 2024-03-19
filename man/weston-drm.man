@@ -149,7 +149,7 @@ Set the DRM KMS framebuffer format for this specific output. If not set,
 If using the Pixman-renderer, use shadow framebuffers. Defaults to
 .BR true .
 .TP
-\fBsame-as\fR=\fIname\fR
+\fBclone-of\fR=\fIname\fR
 Make this output (connector) a clone of another. The argument
 .IR name " is the "
 .BR name " value of another output section. The
