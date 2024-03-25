@@ -2633,16 +2633,25 @@ weston_view_unmap(struct weston_view *view)
 	view->surface->compositor->view_list_needs_rebuild = true;
 }
 
+static void weston_surface_start_mapping(struct weston_surface *surface)
+{
+	assert(surface->is_mapped == false);
+
+	surface->is_mapping = true;
+	surface->is_mapped = true;
+	surface->compositor->view_list_needs_rebuild = true;
+	wl_signal_emit_mutable(&surface->map_signal, surface);
+}
+
 WL_EXPORT void
 weston_surface_map(struct weston_surface *surface)
 {
 	if (weston_surface_is_mapped(surface))
 		return;
 
-	surface->is_mapping = true;
-	surface->is_mapped = true;
-	surface->compositor->view_list_needs_rebuild = true;
-	wl_signal_emit_mutable(&surface->map_signal, surface);
+	assert(!weston_surface_to_subsurface(surface));
+
+	weston_surface_start_mapping(surface);
 }
 
 WL_EXPORT void
@@ -5354,25 +5363,27 @@ subsurface_committed(struct weston_surface *surface,
 		tmp = weston_coord_surface_add(tmp, new_origin);
 		weston_view_set_rel_position(view, tmp);
 	}
-	/* No need to check parent mappedness, because if parent is not
-	 * mapped, parent is not in a visible layer, so this sub-surface
-	 * will not be drawn either.
+	/* Explicitly check is_mapped here. weston_surface_is_mapped() is only
+	 * true if the parent is mapped as well and this should only be called
+	 * once, regardless of the parent state.
 	 */
-	if (!weston_surface_is_mapped(surface) &&
-	    weston_surface_has_content(surface)) {
-		weston_surface_map(surface);
-	}
+	if (!surface->is_mapped && weston_surface_has_content(surface)) {
+		struct weston_subsurface *sub = weston_surface_to_subsurface(surface);
+		struct weston_view *view;
 
-	/* Cannot call weston_view_update_transform() here, because that would
-	 * call it also for the parent surface, which might not be mapped yet.
-	 * That would lead to inconsistent state, where the window could never
-	 * be mapped.
-	 *
-	 * Instead just force the child surface to appear mapped, to make
-	 * weston_surface_is_mapped() return true, so that when the parent
-	 * surface does get mapped, this one will get included, too. See
-	 * view_list_add().
-	 */
+		/* Make sure the output and output_mask for the surface is
+		 * updated. If the parent is not yet mapped, all of this will
+		 * happen later with the parent. If the parent is already
+		 * mapped, call weston_view_update_transform() here.
+		 * Otherwise a desynced subsurface will not trigger a
+		 * repaint.
+		 */
+		if (sub->parent && weston_surface_is_mapped(sub->parent)) {
+			wl_list_for_each(view, &surface->views, surface_link)
+				weston_view_update_transform(view);
+		}
+		weston_surface_start_mapping(surface);
+	}
 }
 
 static struct weston_subsurface *
