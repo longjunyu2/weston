@@ -410,6 +410,22 @@ struct weston_color_manager {
 	 */
 	uint32_t supported_rendering_intents;
 
+	/**
+	 * Supported primaries named from Wayland CM&HDR protocol extension.
+	 *
+	 * If v (v being enum weston_color_primaries v) is a supported
+	 * primaries named, the bit v of this will be set to 1.
+	 */
+	uint32_t supported_primaries_named;
+
+	/**
+	 * Supported tf named from Wayland CM&HDR protocol extension.
+	 *
+	 * If v (v being enum weston_transfer_function v) is a supported
+	 * tf named, the bit v of this will be set to 1.
+	 */
+	uint32_t supported_tf_named;
+
 	/** Initialize color manager */
 	bool
 	(*init)(struct weston_color_manager *cm);

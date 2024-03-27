@@ -264,6 +264,8 @@ weston_color_manager_noop_create(struct weston_compositor *compositor)
 	/* We don't support anything related to the CM&HDR protocol extension */
 	cm->base.supported_color_features = 0;
 	cm->base.supported_rendering_intents = 0;
+	cm->base.supported_primaries_named = 0;
+	cm->base.supported_tf_named = 0;
 
 	return &cm->base;
 }
