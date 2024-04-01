@@ -2529,6 +2529,7 @@ static void
 wet_output_overlap_pre_enable(struct weston_head *head,
 			      struct weston_head *head_to_mirror)
 {
+	head->output->mirror_of = head_to_mirror->output;
 	weston_output_set_position(head->output, head_to_mirror->output->pos);
 }
 
@@ -3810,6 +3811,12 @@ vnc_backend_output_configure(struct weston_output *output)
 			  compositor->parsed_options);
 
 	weston_config_section_get_bool(section, "resizeable", &resizeable, true);
+
+	if (output->mirror_of && resizeable) {
+		resizeable = false;
+		weston_log("Use of mirror_of disables resizing for output %s\n", output->name);
+
+	}
 
 	wet_output_set_scale(output, section, 1, 0);
 	weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL);

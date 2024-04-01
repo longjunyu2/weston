@@ -705,6 +705,12 @@ struct weston_output {
 	 */
 	void (*detach_head)(struct weston_output *output,
 			    struct weston_head *head);
+
+	/**
+	 * When set, this output is a mirror-of another output. See
+	 * mirror-of key in [output] section.
+	 */
+	struct weston_output *mirror_of;
 };
 
 enum weston_pointer_motion_mask {
