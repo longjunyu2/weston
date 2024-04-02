@@ -53,6 +53,9 @@ struct weston_rdp_output_api {
 	/** Set mode for an output */
 	void (*output_set_mode)(struct weston_output *base,
 				struct weston_mode *mode);
+
+	/** disable output resize */
+	void (*disable_output_resize)(struct weston_output *output);
 };
 
 static inline const struct weston_rdp_output_api *
@@ -81,7 +84,7 @@ struct weston_rdp_backend_config {
 	char *server_cert;
 	char *server_key;
 	int env_socket;
-	int no_clients_resize;
+	bool resizeable;
 	int force_no_compression;
 	bool remotefx_codec;
 	int external_listener_fd;

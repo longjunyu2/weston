@@ -777,7 +777,7 @@ usage(int error_code)
 		"  --external-listener-fd=FD\tUse socket as listener connection\n"
 		"  --address=ADDR\tThe address to bind\n"
 		"  --port=PORT\t\tThe port to listen on\n"
-		"  --no-clients-resize\tThe RDP peers will be forced to the size of the desktop\n"
+		"  --no-resizeable\tThe RDP peers will be forced to the size of the desktop\n"
 		"  --rdp4-key=FILE\tThe file containing the key for RDP4 encryption\n"
 		"  --rdp-tls-cert=FILE\tThe file containing the certificate for TLS encryption\n"
 		"  --rdp-tls-key=FILE\tThe file containing the private key for TLS encryption\n"
@@ -3660,7 +3660,7 @@ weston_rdp_backend_config_init(struct weston_rdp_backend_config *config)
 	config->server_key = NULL;
 	config->env_socket = 0;
 	config->external_listener_fd = -1;
-	config->no_clients_resize = 0;
+	config->resizeable = true;
 	config->force_no_compression = 0;
 	config->remotefx_codec = true;
 	config->refresh_rate = RDP_DEFAULT_FREQ;
@@ -3711,6 +3711,11 @@ rdp_backend_output_configure(struct weston_output *output)
 	new_mode.width = width;
 	new_mode.height = height;
 
+	if (output->mirror_of) {
+		api->disable_output_resize(output);
+		weston_log("Use of mirror_of disables resizing for output %s\n", output->name);
+	}
+
 	api->output_set_mode(output, &new_mode);
 
 	wet_output_set_scale(output, section, scale, 0);
@@ -3731,6 +3736,7 @@ load_rdp_backend(struct weston_compositor *c,
 	struct wet_backend *wb;
 	bool no_remotefx_codec = false;
 	struct wet_output_config *parsed_options = wet_init_parsed_options(c);
+	bool no_resizeable = false;
 
 	if (!parsed_options)
 		return -1;
@@ -3744,7 +3750,7 @@ load_rdp_backend(struct weston_compositor *c,
 		{ WESTON_OPTION_INTEGER, "height", 0, &parsed_options->height },
 		{ WESTON_OPTION_STRING,  "address", 0, &config.bind_address },
 		{ WESTON_OPTION_INTEGER, "port", 0, &config.port },
-		{ WESTON_OPTION_BOOLEAN, "no-clients-resize", 0, &config.no_clients_resize },
+		{ WESTON_OPTION_BOOLEAN, "no-resizeable", false, &no_resizeable },
 		{ WESTON_OPTION_STRING,  "rdp4-key", 0, &config.rdp_key },
 		{ WESTON_OPTION_STRING,  "rdp-tls-cert", 0, &config.server_cert },
 		{ WESTON_OPTION_STRING,  "rdp-tls-key", 0, &config.server_key },
@@ -3755,6 +3761,7 @@ load_rdp_backend(struct weston_compositor *c,
 
 	parse_options(rdp_options, ARRAY_LENGTH(rdp_options), argc, argv);
 	config.remotefx_codec = !no_remotefx_codec;
+	config.resizeable = !no_resizeable;
 	config.renderer = renderer;
 
 	section = weston_config_get_section(wc, "rdp", NULL, NULL);

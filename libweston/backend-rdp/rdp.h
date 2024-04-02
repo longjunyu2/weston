@@ -86,7 +86,7 @@ struct rdp_backend {
 	char *server_key;
 	char *rdp_key;
 	int tls_enabled;
-	int no_clients_resize;
+	int resizeable;
 	int force_no_compression;
 	bool remotefx_codec;
 	int external_listener_fd;

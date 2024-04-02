@@ -329,6 +329,15 @@ finish_frame_handler(void *data)
 }
 
 static void
+rdp_output_disable_resize(struct weston_output *base)
+{
+	struct rdp_output *rdpOutput = container_of(base, struct rdp_output, base);
+	struct rdp_backend *b = rdpOutput->backend;
+
+	b->resizeable = false;
+}
+
+static void
 rdp_output_set_mode(struct weston_output *base, struct weston_mode *mode)
 {
 	struct rdp_output *rdpOutput = container_of(base, struct rdp_output, base);
@@ -1091,7 +1100,7 @@ xf_peer_activate(freerdp_peer* client)
 	 * We still need the xf_peer_adjust_monitor_layout() call to make sure
 	 * we've set up scaling appropriately.
 	 */
-	if (b->no_clients_resize) {
+	if (!b->resizeable) {
 		struct weston_mode *mode = output->base.current_mode;
 
 		if (mode->width != (int)settings->DesktopWidth ||
@@ -1620,7 +1629,7 @@ xf_peer_adjust_monitor_layout(freerdp_peer *client)
 		fallback = true;
 	}
 
-	if (b->no_clients_resize)
+	if (!b->resizeable)
 		fallback = true;
 
 	if (settings->MonitorCount > RDP_MAX_MONITOR) {
@@ -1658,7 +1667,7 @@ xf_peer_adjust_monitor_layout(freerdp_peer *client)
 		monitors[0].attributes.deviceScaleFactor = settings->DeviceScaleFactor;
 		monitors[0].orig_screen = 0;
 
-		if (b->no_clients_resize) {
+		if (!b->resizeable) {
 			/* If we're not allowing clients to resize us, set these
 			 * to 0 so the front end knows it needs to make something
 			 * up.
@@ -1726,7 +1735,7 @@ rdp_peer_init(freerdp_peer *client, struct rdp_backend *b)
 	client->PostConnect = xf_peer_post_connect;
 	client->Activate = xf_peer_activate;
 
-	if (!b->no_clients_resize) {
+	if (b->resizeable) {
 		settings->SupportMonitorLayoutPdu = TRUE;
 		client->AdjustMonitorsLayout = xf_peer_adjust_monitor_layout;
 	}
@@ -1805,6 +1814,7 @@ rdp_incoming_peer(freerdp_listener *instance, freerdp_peer *client)
 static const struct weston_rdp_output_api api = {
 	rdp_head_get_monitor,
 	rdp_output_set_mode,
+	rdp_output_disable_resize,
 };
 
 static const uint32_t rdp_formats[] = {
@@ -1830,7 +1840,7 @@ rdp_backend_create(struct weston_compositor *compositor,
 	b->base.destroy = rdp_destroy;
 	b->base.create_output = rdp_output_create;
 	b->rdp_key = config->rdp_key ? strdup(config->rdp_key) : NULL;
-	b->no_clients_resize = config->no_clients_resize;
+	b->resizeable = config->resizeable;
 	b->force_no_compression = config->force_no_compression;
 	b->remotefx_codec = config->remotefx_codec;
 	b->audio_in_setup = config->audio_in_setup;
@@ -2003,7 +2013,7 @@ config_init_to_defaults(struct weston_rdp_backend_config *config)
 	config->server_cert = NULL;
 	config->server_key = NULL;
 	config->env_socket = 0;
-	config->no_clients_resize = 0;
+	config->resizeable = true;
 	config->force_no_compression = 0;
 	config->remotefx_codec = true;
 	config->external_listener_fd = -1;
