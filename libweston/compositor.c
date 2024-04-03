@@ -5959,18 +5959,20 @@ weston_plane_release(struct weston_plane *plane)
 {
 	struct weston_output *output;
 
+	/* We might be releasing a primary plane, so we can't just casually
+	 * reassign paint nodes to another plane here - delete them and
+	 * force a rebuild.
+	 */
 	wl_list_for_each(output, &plane->compositor->output_list, link) {
-		struct weston_paint_node *node;
+		struct weston_paint_node *node, *pntmp;
 
-		wl_list_for_each(node, &output->paint_node_z_order_list,
-				 z_order_link) {
+		wl_list_for_each_safe(node, pntmp,
+				      &output->paint_node_list, output_link) {
 			if (node->plane != plane)
 				continue;
 
-			node->plane = NULL;
-			node->plane_next = &output->primary_plane;
-			node->status |= PAINT_NODE_PLANE_DIRTY |
-					PAINT_NODE_VISIBILITY_DIRTY;
+			output->compositor->view_list_needs_rebuild = true;
+			weston_paint_node_destroy(node);
 		}
 	}
 
