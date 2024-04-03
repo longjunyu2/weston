@@ -7412,6 +7412,8 @@ weston_compositor_remove_output(struct weston_output *output)
 	assert(output->destroying);
 	assert(output->enabled);
 
+	weston_plane_release(&output->primary_plane);
+
 	if (output->idle_repaint_source) {
 		wl_event_source_remove(output->idle_repaint_source);
 		output->idle_repaint_source = NULL;
@@ -7825,8 +7827,6 @@ weston_output_init(struct weston_output *output,
 	wl_list_init(&output->mode_list);
 
 	weston_plane_init(&output->primary_plane, compositor);
-	weston_compositor_stack_plane(compositor,
-				      &output->primary_plane, NULL);
 
 	/* Set the stock sRGB color profile for the output. Libweston users are
 	 * free to set the color profile to whatever they want later on. */
@@ -7981,12 +7981,19 @@ weston_output_enable(struct weston_output *output)
 	output->capture_info = weston_output_capture_info_create();
 	assert(output->capture_info);
 
+	/* Backends want to stack planes on top of the primary,
+	 * so we'd better set this up now.
+	 */
+	weston_compositor_stack_plane(output->compositor,
+				      &output->primary_plane, NULL);
+
 	/* Enable the output (set up the crtc or create a
 	 * window representing the output, set up the
 	 * renderer, etc)
 	 */
 	if (output->enable(output) < 0) {
 		weston_log("Enabling output \"%s\" failed.\n", output->name);
+		weston_plane_release(&output->primary_plane);
 		weston_output_color_outcome_destroy(&output->color_outcome);
 		weston_output_capture_info_destroy(&output->capture_info);
 		return -1;
@@ -8246,8 +8253,6 @@ weston_compositor_create_output(struct weston_compositor *compositor,
 WL_EXPORT void
 weston_output_destroy(struct weston_output *output)
 {
-	weston_plane_release(&output->primary_plane);
-
 	output->destroy(output);
 }
 
