@@ -2229,26 +2229,29 @@ gl_renderer_repaint_output(struct weston_output *output,
 		uint32_t *pixels = rb->pixels;
 		int width = go->fb_size.width;
 		int stride = width * (compositor->read_format->bpp >> 3);
-		pixman_box32_t *extents = &rb->base.damage.extents;
+		pixman_box32_t extents;
 		struct weston_geometry rect = {
 			.x = go->area.x,
 			.width = go->area.width,
 		};
 
+		extents = weston_matrix_transform_rect(&output->matrix,
+						       rb->base.damage.extents);
+
 		if (gr->fan_debug) {
 			rect.y = go->fb_size.height - go->area.y - go->area.height;
 			rect.height = go->area.height;
 		} else {
-			rect.y = go->fb_size.height - go->area.y - extents->y2;
-			rect.height = extents->y2 - extents->y1;
-			pixels += rect.width * (extents->y1 - (int)output->pos.c.y);
+			rect.y = go->fb_size.height - go->area.y - extents.y2;
+			rect.height = extents.y2 - extents.y1;
+			pixels += rect.width * extents.y1;
 		}
 
 		if (gr->gl_version >= gr_gl_version(3, 0) && ! gr->fan_debug) {
 			glPixelStorei(GL_PACK_ROW_LENGTH, width);
-			rect.width = extents->x2 - extents->x1;
-			rect.x += extents->x1 - (int)output->pos.c.x;
-			pixels += extents->x1 - (int)output->pos.c.x;
+			rect.width = extents.x2 - extents.x1;
+			rect.x += extents.x1;
+			pixels += extents.x1;
 		}
 
 		gl_renderer_do_read_pixels(gr, compositor->read_format, pixels,
