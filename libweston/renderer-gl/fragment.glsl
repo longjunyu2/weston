@@ -237,17 +237,6 @@ linpow(float x, float g, float a, float b, float c, float d)
 }
 
 float
-powlin(float x, float g, float a, float b, float c, float d)
-{
-	/* See WESTON_COLOR_CURVE_TYPE_POWLIN for details about POWLIN. */
-
-	if (x >= d)
-		return a * pow(x, g) + b;
-
-	return c * x;
-}
-
-float
 sample_linpow(float params[MAX_CURVESET_PARAMS], bool must_clamp,
 	      float x, compile_const int color_channel)
 {
@@ -283,42 +272,33 @@ sample_linpow_vec3(float params[MAX_CURVESET_PARAMS], bool must_clamp,
 }
 
 float
-sample_color_pre_curve_powlin(float x, compile_const int color_channel)
+powlin(float x, float g, float a, float b, float c, float d)
 {
-	float g, a, b, c, d;
+	/* See WESTON_COLOR_CURVE_TYPE_POWLIN for details about POWLIN. */
 
-	/* For each color channel we have 10 parameters. The params are
-	 * linearized in an array of size 30, in RGB order. */
-	g = color_pre_curve_params[0 + (color_channel * 10)];
-	a = color_pre_curve_params[1 + (color_channel * 10)];
-	b = color_pre_curve_params[2 + (color_channel * 10)];
-	c = color_pre_curve_params[3 + (color_channel * 10)];
-	d = color_pre_curve_params[4 + (color_channel * 10)];
+	if (x >= d)
+		return a * pow(x, g) + b;
 
-	if (color_pre_curve_clamped_input)
-		x = clamp(x, 0.0, 1.0);
-
-	/* We use mirroring for negative input values. */
-	if (x < 0.0)
-		return -powlin(-x, g, a, b, c, d);
-
-	return powlin(x, g, a, b, c, d);
+	return c * x;
 }
 
 float
-sample_color_post_curve_powlin(float x, compile_const int color_channel)
+sample_powlin(float params[MAX_CURVESET_PARAMS], bool must_clamp,
+	      float x, compile_const int color_channel)
 {
 	float g, a, b, c, d;
 
-	/* For each color channel we have 10 parameters. The params are
-	 * linearized in an array of size 30, in RGB order. */
-	g = color_post_curve_params[0 + (color_channel * 10)];
-	a = color_post_curve_params[1 + (color_channel * 10)];
-	b = color_post_curve_params[2 + (color_channel * 10)];
-	c = color_post_curve_params[3 + (color_channel * 10)];
-	d = color_post_curve_params[4 + (color_channel * 10)];
+	/*
+	 * For each color channel we have MAX_CURVE_PARAMS parameters.
+	 * The parameters for the three curves are stored in RGB order.
+	 */
+	g = params[0 + color_channel * MAX_CURVE_PARAMS];
+	a = params[1 + color_channel * MAX_CURVE_PARAMS];
+	b = params[2 + color_channel * MAX_CURVE_PARAMS];
+	c = params[3 + color_channel * MAX_CURVE_PARAMS];
+	d = params[4 + color_channel * MAX_CURVE_PARAMS];
 
-	if (color_post_curve_clamped_input)
+	if (must_clamp)
 		x = clamp(x, 0.0, 1.0);
 
 	/* We use mirroring for negative input values. */
@@ -329,10 +309,17 @@ sample_color_post_curve_powlin(float x, compile_const int color_channel)
 }
 
 vec3
+sample_powlin_vec3(float params[MAX_CURVESET_PARAMS], bool must_clamp,
+		   vec3 color)
+{
+	return vec3(sample_powlin(params, must_clamp, color.r, 0),
+		    sample_powlin(params, must_clamp, color.g, 1),
+		    sample_powlin(params, must_clamp, color.b, 2));
+}
+
+vec3
 color_pre_curve(vec3 color)
 {
-	vec3 ret;
-
 	if (c_color_pre_curve == SHADER_COLOR_CURVE_IDENTITY) {
 		return color;
 	} else if (c_color_pre_curve == SHADER_COLOR_CURVE_LUT_3x1D) {
@@ -344,10 +331,9 @@ color_pre_curve(vec3 color)
 					  color_pre_curve_clamped_input,
 					  color);
 	} else if (c_color_pre_curve == SHADER_COLOR_CURVE_POWLIN) {
-		ret.r = sample_color_pre_curve_powlin(color.r, 0);
-		ret.g = sample_color_pre_curve_powlin(color.g, 1);
-		ret.b = sample_color_pre_curve_powlin(color.b, 2);
-		return ret;
+		return sample_powlin_vec3(color_pre_curve_params,
+					  color_pre_curve_clamped_input,
+					  color);
 	} else {
 		/* Never reached, bad c_color_pre_curve. */
 		return vec3(1.0, 0.3, 1.0);
@@ -381,8 +367,6 @@ color_mapping(vec3 color)
 vec3
 color_post_curve(vec3 color)
 {
-	vec3 ret;
-
 	if (c_color_post_curve == SHADER_COLOR_CURVE_IDENTITY) {
 		return color;
 	} else if (c_color_post_curve == SHADER_COLOR_CURVE_LUT_3x1D) {
@@ -394,10 +378,9 @@ color_post_curve(vec3 color)
 					  color_post_curve_clamped_input,
 					  color);
 	} else if (c_color_post_curve == SHADER_COLOR_CURVE_POWLIN) {
-		ret.r = sample_color_post_curve_powlin(color.r, 0);
-		ret.g = sample_color_post_curve_powlin(color.g, 1);
-		ret.b = sample_color_post_curve_powlin(color.b, 2);
-		return ret;
+		return sample_powlin_vec3(color_post_curve_params,
+					  color_post_curve_clamped_input,
+					  color);
 	} else {
 		/* Never reached, bad c_color_post_curve. */
 		return vec3(1.0, 0.3, 1.0);
