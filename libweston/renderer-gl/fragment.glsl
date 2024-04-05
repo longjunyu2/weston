@@ -188,6 +188,9 @@ sample_input_texture()
 }
 
 /*
+ * Sample a 1D LUT which is a single row of a 2D texture. The 2D texture has
+ * four rows so that the centers of texels have precise y-coordinates.
+ *
  * Texture coordinates go from 0.0 to 1.0 corresponding to texture edges.
  * When we do LUT look-ups with linear filtering, the correct range to sample
  * from is not from edge to edge, but center of first texel to center of last
@@ -196,28 +199,27 @@ sample_input_texture()
  * The scale and offset are precomputed to achieve this mapping.
  */
 float
-lut_texcoord(float x, vec2 scale_offset)
+sample_lut_1d(HIGHPRECISION sampler2D lut, vec2 scale_offset,
+	      float x, compile_const int row)
 {
-	return x * scale_offset.s + scale_offset.t;
+	float tx = x * scale_offset.s + scale_offset.t;
+	float ty = (float(row) + 0.5) / 4.0;
+
+	return texture2D(lut, vec2(tx, ty)).x;
+}
+
+vec3
+sample_lut_3x1d(HIGHPRECISION sampler2D lut, vec2 scale_offset, vec3 color)
+{
+	return vec3(sample_lut_1d(lut, scale_offset, color.r, 0),
+		    sample_lut_1d(lut, scale_offset, color.g, 1),
+		    sample_lut_1d(lut, scale_offset, color.b, 2));
 }
 
 vec3
 lut_texcoord(vec3 pos, vec2 scale_offset)
 {
 	return pos * scale_offset.s + scale_offset.t;
-}
-
-/*
- * Sample a 1D LUT which is a single row of a 2D texture. The 2D texture has
- * four rows so that the centers of texels have precise y-coordinates.
- */
-float
-sample_color_pre_curve_lut_2d(float x, compile_const int row)
-{
-	float tx = lut_texcoord(x, color_pre_curve_lut_scale_offset);
-
-	return texture2D(color_pre_curve_lut_2d,
-			 vec2(tx, (float(row) + 0.5) / 4.0)).x;
 }
 
 float
@@ -342,10 +344,9 @@ color_pre_curve(vec3 color)
 	if (c_color_pre_curve == SHADER_COLOR_CURVE_IDENTITY) {
 		return color;
 	} else if (c_color_pre_curve == SHADER_COLOR_CURVE_LUT_3x1D) {
-		ret.r = sample_color_pre_curve_lut_2d(color.r, 0);
-		ret.g = sample_color_pre_curve_lut_2d(color.g, 1);
-		ret.b = sample_color_pre_curve_lut_2d(color.b, 2);
-		return ret;
+		return sample_lut_3x1d(color_pre_curve_lut_2d,
+				       color_pre_curve_lut_scale_offset,
+				       color);
 	} else if (c_color_pre_curve == SHADER_COLOR_CURVE_LINPOW) {
 		ret.r = sample_color_pre_curve_linpow(color.r, 0);
 		ret.g = sample_color_pre_curve_linpow(color.g, 1);
@@ -386,15 +387,6 @@ color_mapping(vec3 color)
 		return vec3(1.0, 0.3, 1.0);
 }
 
-float
-sample_color_post_curve_lut_2d(float x, compile_const int row)
-{
-	float tx = lut_texcoord(x, color_post_curve_lut_scale_offset);
-
-	return texture2D(color_post_curve_lut_2d,
-			 vec2(tx, (float(row) + 0.5) / 4.0)).x;
-}
-
 vec3
 color_post_curve(vec3 color)
 {
@@ -403,10 +395,9 @@ color_post_curve(vec3 color)
 	if (c_color_post_curve == SHADER_COLOR_CURVE_IDENTITY) {
 		return color;
 	} else if (c_color_post_curve == SHADER_COLOR_CURVE_LUT_3x1D) {
-		ret.r = sample_color_post_curve_lut_2d(color.r, 0);
-		ret.g = sample_color_post_curve_lut_2d(color.g, 1);
-		ret.b = sample_color_post_curve_lut_2d(color.b, 2);
-		return ret;
+		return sample_lut_3x1d(color_post_curve_lut_2d,
+				       color_post_curve_lut_scale_offset,
+				       color);
 	} else if (c_color_post_curve == SHADER_COLOR_CURVE_LINPOW) {
 		ret.r = sample_color_post_curve_linpow(color.r, 0);
 		ret.g = sample_color_post_curve_linpow(color.g, 1);
