@@ -117,7 +117,6 @@ struct wayland_output {
 	struct wayland_backend *backend;
 
 	struct {
-		bool draw_initial_frame;
 		struct wl_surface *surface;
 
 		struct wl_output *output;
@@ -472,26 +471,14 @@ wayland_output_start_repaint_loop(struct weston_output *output_base)
 {
 	struct wayland_output *output = to_wayland_output(output_base);
 	struct wayland_backend *wb;
+	struct timespec ts;
 
 	assert(output);
 
 	wb = output->backend;
 
-	/* If this is the initial frame, we need to attach a buffer so that
-	 * the compositor can map the surface and include it in its render
-	 * loop. If the surface doesn't end up in the render loop, the frame
-	 * callback won't be invoked. The buffer is transparent and of the
-	 * same size as the future real output buffer. */
-	if (output->parent.draw_initial_frame) {
-		output->parent.draw_initial_frame = false;
-
-		draw_initial_frame(output);
-	}
-
-	output->frame_cb = wl_surface_frame(output->parent.surface);
-	wl_callback_add_listener(output->frame_cb, &frame_listener, output);
-	wl_surface_commit(output->parent.surface);
-	wl_display_flush(wb->parent.wl_display);
+	weston_compositor_read_presentation_clock(wb->compositor, &ts);
+	weston_output_finish_frame(output_base, &ts, WP_PRESENTATION_FEEDBACK_INVALID);
 
 	return 0;
 }
@@ -1016,7 +1003,6 @@ wayland_output_fullscreen_shell_mode_feedback(struct wayland_output *output,
 							   &mode_feedback_listener,
 							   &mode_status);
 
-	output->parent.draw_initial_frame = false;
 	draw_initial_frame(output);
 	wl_surface_commit(output->parent.surface);
 
@@ -1238,8 +1224,6 @@ wayland_backend_create_output_surface(struct wayland_output *output)
 
 	wl_surface_set_user_data(output->parent.surface, output);
 
-	output->parent.draw_initial_frame = true;
-
 	if (b->parent.xdg_wm_base) {
 		output->parent.xdg_surface =
 		xdg_wm_base_get_xdg_surface(b->parent.xdg_wm_base,
@@ -1326,14 +1310,12 @@ wayland_output_enable(struct weston_output *base)
 
 			mode_status = wayland_output_fullscreen_shell_mode_feedback(output, &output->mode);
 
-			if (mode_status == MODE_STATUS_FAIL) {
+			if (mode_status == MODE_STATUS_FAIL)
 				zwp_fullscreen_shell_v1_present_surface(b->parent.fshell,
 									output->parent.surface,
 									ZWP_FULLSCREEN_SHELL_V1_PRESENT_METHOD_CENTER,
 									output->parent.output);
 
-				output->parent.draw_initial_frame = true;
-			}
 		}
 	} else if (b->fullscreen) {
 		wayland_output_set_fullscreen(output, 0, NULL);
