@@ -1419,13 +1419,6 @@ global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
 	}
 }
 
-static bool
-node_axis_aligned(const struct weston_view *view)
-{
-	return !view->transform.enabled ||
-		(view->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
-}
-
 /* Transform damage 'region' in global coordinates to damage 'quads' in surface
  * coordinates. 'quads' and 'nquads' are output arguments set if 'quads' is
  * NULL, no transformation happens otherwise. Caller must free 'quads' if
@@ -1456,8 +1449,15 @@ transform_damage(const struct weston_paint_node *pnode,
 	*quads = quads_alloc = malloc(nrects * sizeof *quads_alloc);
 	*nquads = nrects;
 
+	/* All the damage rects are axis-aligned in global space. This implies
+	 * that all the horizontal and vertical edges are respectively parallel
+	 * to each other. Because affine transformations preserve parallelism we
+	 * can safely assume that if the node's output matrix is affine and
+	 * stores standard output transforms (translations, flips and rotations
+	 * by 90°), then all the transformed quads are axis-aligned in surface
+	 * space. */
 	view = pnode->view;
-	axis_aligned = node_axis_aligned(view);
+	axis_aligned = pnode->valid_transform;
 	for (i = 0; i < nrects; i++) {
 		global_to_surface(&rects[i], view, polygon);
 		clipper_quad_init(&quads_alloc[i], polygon, axis_aligned);

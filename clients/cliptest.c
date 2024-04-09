@@ -69,6 +69,7 @@ struct geometry {
 	float s; /* sin phi */
 	float c; /* cos phi */
 	float phi;
+	bool axis_aligned;
 };
 
 struct weston_surface {
@@ -76,11 +77,6 @@ struct weston_surface {
 
 struct weston_view {
 	struct weston_surface *surface;
-	struct {
-		int enabled;
-		struct weston_matrix matrix;
-	} transform;
-
 	struct geometry *geometry;
 };
 
@@ -130,21 +126,17 @@ global_to_surface(pixman_box32_t *rect, struct weston_view *ev,
 	}
 }
 
-static bool
-node_axis_aligned(const struct weston_view *view)
-{
-	return !view->transform.enabled ||
-		(view->transform.matrix.type < WESTON_MATRIX_TRANSFORM_ROTATE);
-}
-
 /* ---------------------- copied ends -----------------------*/
 
 static void
 geometry_set_phi(struct geometry *g, float phi)
 {
+	float integer;
+
 	g->phi = phi;
 	g->s = sin(phi);
 	g->c = cos(phi);
+	g->axis_aligned = fabs(modff(g->c, &integer)) < 0.0001f;
 }
 
 static void
@@ -245,7 +237,7 @@ draw_box(cairo_t *cr, pixman_box32_t *box, struct weston_view *view)
 
 static void
 draw_geometry(cairo_t *cr, struct weston_view *view,
-	      struct clipper_vertex *v, int n)
+	      struct clipper_vertex *v, int n, struct clipper_quad *quad)
 {
 	struct geometry *g = view->geometry;
 	float cx, cy;
@@ -255,7 +247,7 @@ draw_geometry(cairo_t *cr, struct weston_view *view,
 	cairo_fill(cr);
 	weston_view_from_global_float(view, g->quad.x1 - 4, g->quad.y1 - 4, &cx, &cy);
 	cairo_arc(cr, cx, cy, 1.5, 0.0, 2.0 * M_PI);
-	if (view->transform.enabled == 0)
+	if (!quad->axis_aligned)
 		cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.8);
 	cairo_fill(cr);
 
@@ -286,8 +278,7 @@ redraw_handler(struct widget *widget, void *data)
 	int n;
 
 	global_to_surface(&g->quad, &cliptest->view, transformed_v);
-	clipper_quad_init(&quad, transformed_v,
-			  node_axis_aligned(&cliptest->view));
+	clipper_quad_init(&quad, transformed_v, g->axis_aligned);
 	n = clipper_quad_clip_box32(&quad, &g->surf, v);
 
 	widget_get_allocation(cliptest->widget, &allocation);
@@ -322,7 +313,7 @@ redraw_handler(struct widget *widget, void *data)
 		cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL,
 				       CAIRO_FONT_WEIGHT_BOLD);
 		cairo_set_font_size(cr, 5.0);
-		draw_geometry(cr, &cliptest->view, v, n);
+		draw_geometry(cr, &cliptest->view, v, n, &quad);
 	cairo_pop_group_to_source(cr);
 	cairo_paint(cr);
 
@@ -401,8 +392,6 @@ axis_handler(struct widget *widget, struct input *input, uint32_t time,
 
 	geometry_set_phi(geom, geom->phi +
 				(M_PI / 12.0) * wl_fixed_to_double(value));
-	cliptest->view.transform.enabled = 1;
-	cliptest->view.transform.matrix.type = WESTON_MATRIX_TRANSFORM_ROTATE;
 
 	widget_schedule_redraw(cliptest->widget);
 }
@@ -452,20 +441,12 @@ key_handler(struct window *window, struct input *input, uint32_t time,
 		break;
 	case XKB_KEY_n:
 		geometry_set_phi(g, g->phi + (M_PI / 24.0));
-		cliptest->view.transform.enabled = 1;
-		cliptest->view.transform.matrix.type =
-			WESTON_MATRIX_TRANSFORM_ROTATE;
 		break;
 	case XKB_KEY_m:
 		geometry_set_phi(g, g->phi - (M_PI / 24.0));
-		cliptest->view.transform.enabled = 1;
-		cliptest->view.transform.matrix.type =
-			WESTON_MATRIX_TRANSFORM_ROTATE;
 		break;
 	case XKB_KEY_r:
 		geometry_set_phi(g, 0.0);
-		cliptest->view.transform.enabled = 0;
-		cliptest->view.transform.matrix.type = 0;
 		break;
 	default:
 		return;
@@ -500,8 +481,6 @@ cliptest_create(struct display *display)
 	cliptest = xzalloc(sizeof *cliptest);
 	cliptest->view.surface = &cliptest->surface;
 	cliptest->view.geometry = &cliptest->geometry;
-	cliptest->view.transform.enabled = 0;
-	cliptest->view.transform.matrix.type = 0;
 	geometry_init(&cliptest->geometry);
 	geometry_init(&cliptest->ui.geometry);
 
@@ -574,16 +553,13 @@ benchmark(void)
 	geometry_set_phi(&geom, 0.0);
 
 	view.surface = &surface;
-	view.transform.enabled = 1;
-	view.transform.matrix.type = WESTON_MATRIX_TRANSFORM_ROTATE;
 	view.geometry = &geom;
 
 	reset_timer();
 	for (i = 0; i < N; i++) {
 		geometry_set_phi(&geom, (float)i / 360.0f);
 		global_to_surface(&geom.quad, &view, transformed_v);
-		clipper_quad_init(&quad, transformed_v,
-				  node_axis_aligned(&view));
+		clipper_quad_init(&quad, transformed_v, geom.axis_aligned);
 		clipper_quad_clip_box32(&quad, &geom.surf, v);
 	}
 	t = read_timer();
