@@ -4,3 +4,9 @@
 # fontconfig library because turning off fast unwind -- required to catch other
 # originating leaks from fontconfig; would stall our tests timing them out.
 leak:libfontconfig
+
+# Workarounds for the LeakSanitizer use_tls=0 workaround,
+# see tests/meson.build
+leak:wl_shm_buffer_begin_access
+leak:g_malloc0
+leak:/ld-*.so*
