@@ -46,7 +46,10 @@
 
 struct image {
 	struct window *window;
-	struct widget *widget;
+
+	/* Decorations, buttons, etc. */
+	struct widget *frame_widget;
+
 	struct display *display;
 	char *filename;
 	cairo_surface_t *image;
@@ -82,7 +85,7 @@ clamp_view(struct image *image)
 
 	sw = image->width * scale;
 	sh = image->height * scale;
-	widget_get_allocation(image->widget, &allocation);
+	widget_get_allocation(image->frame_widget, &allocation);
 
 	if (sw < allocation.width) {
 		image->matrix.x0 =
@@ -118,7 +121,7 @@ redraw_handler(struct widget *widget, void *data)
 
 	surface = window_get_surface(image->window);
 	cr = cairo_create(surface);
-	widget_get_allocation(image->widget, &allocation);
+	widget_get_allocation(image->frame_widget, &allocation);
 	cairo_rectangle(cr, allocation.x, allocation.y,
 			allocation.width, allocation.height);
 	cairo_clip(cr);
@@ -190,7 +193,7 @@ enter_handler(struct widget *widget,
 	struct image *image = data;
 	struct rectangle allocation;
 
-	widget_get_allocation(image->widget, &allocation);
+	widget_get_allocation(image->frame_widget, &allocation);
 	x -= allocation.x;
 	y -= allocation.y;
 
@@ -222,7 +225,7 @@ motion_handler(struct widget *widget,
 	struct image *image = data;
 	struct rectangle allocation;
 
-	widget_get_allocation(image->widget, &allocation);
+	widget_get_allocation(image->frame_widget, &allocation);
 	x -= allocation.x;
 	y -= allocation.y;
 
@@ -349,7 +352,7 @@ close_handler(void *data)
 	if (*image->image_counter == 0)
 		display_exit(image->display);
 
-	widget_destroy(image->widget);
+	widget_destroy(image->frame_widget);
 	window_destroy(image->window);
 
 	free(image);
@@ -381,7 +384,7 @@ image_create(struct display *display, const char *filename,
 	}
 
 	image->window = window_create(display);
-	image->widget = window_frame_create(image->window, image);
+	image->frame_widget = window_frame_create(image->window, image);
 	window_set_title(image->window, title);
 	window_set_appid(image->window, "org.freedesktop.weston.wayland-image");
 	image->display = display;
@@ -390,19 +393,19 @@ image_create(struct display *display, const char *filename,
 	image->initialized = false;
 
 	window_set_user_data(image->window, image);
-	widget_set_redraw_handler(image->widget, redraw_handler);
-	widget_set_resize_handler(image->widget, resize_handler);
+	widget_set_redraw_handler(image->frame_widget, redraw_handler);
+	widget_set_resize_handler(image->frame_widget, resize_handler);
 	window_set_keyboard_focus_handler(image->window,
 					  keyboard_focus_handler);
 	window_set_fullscreen_handler(image->window, fullscreen_handler);
 	window_set_close_handler(image->window, close_handler);
 
-	widget_set_enter_handler(image->widget, enter_handler);
-	widget_set_motion_handler(image->widget, motion_handler);
-	widget_set_button_handler(image->widget, button_handler);
-	widget_set_axis_handler(image->widget, axis_handler);
+	widget_set_enter_handler(image->frame_widget, enter_handler);
+	widget_set_motion_handler(image->frame_widget, motion_handler);
+	widget_set_button_handler(image->frame_widget, button_handler);
+	widget_set_axis_handler(image->frame_widget, axis_handler);
 	window_set_key_handler(image->window, key_handler);
-	widget_schedule_resize(image->widget, 500, 400);
+	widget_schedule_resize(image->frame_widget, 500, 400);
 
 	return image;
 }
