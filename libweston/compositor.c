@@ -2501,7 +2501,9 @@ weston_view_unmap(struct weston_view *view)
 	weston_view_damage_below(view);
 	weston_view_set_output(view, NULL);
 	view->is_mapped = false;
-	weston_layer_entry_remove(&view->layer_link);
+	wl_list_remove(&view->layer_link.link);
+	wl_list_init(&view->layer_link.link);
+	view->layer_link.layer = NULL;
 	wl_list_remove(&view->link);
 	wl_list_init(&view->link);
 	view->output_mask = 0;
@@ -2575,7 +2577,10 @@ weston_view_destroy(struct weston_view *view)
 	if (!wl_list_empty(&view->link))
 		view->surface->compositor->view_list_needs_rebuild = true;
 	wl_list_remove(&view->link);
-	weston_layer_entry_remove(&view->layer_link);
+
+	wl_list_remove(&view->layer_link.link);
+	wl_list_init(&view->layer_link.link);
+	view->layer_link.layer = NULL;
 
 	pixman_region32_fini(&view->visible);
 	pixman_region32_fini(&view->geometry.scissor);
@@ -3966,14 +3971,6 @@ weston_view_set_alpha(struct weston_view *view, float alpha)
 	weston_view_update_transform(view);
 }
 
-WL_EXPORT void
-weston_layer_entry_insert(struct weston_layer_entry *list,
-			  struct weston_layer_entry *entry)
-{
-	wl_list_insert(&list->link, &entry->link);
-	entry->layer = list->layer;
-}
-
 /** Move a weston_view to a layer
  *
  * This moves a view to a given point within a layer, identified by a
@@ -3999,7 +3996,9 @@ weston_view_move_to_layer(struct weston_view *view,
 		weston_view_geometry_dirty_internal(view);
 	}
 
-	weston_layer_entry_remove(&view->layer_link);
+	wl_list_remove(&view->layer_link.link);
+	wl_list_init(&view->layer_link.link);
+	view->layer_link.layer = NULL;
 
 	if (!layer) {
 		weston_view_unmap(view);
@@ -4007,7 +4006,9 @@ weston_view_move_to_layer(struct weston_view *view,
 	}
 
 	/* Add the view to the new layer and damage its new region. */
-	weston_layer_entry_insert(layer, &view->layer_link);
+	wl_list_insert(&layer->link, &view->layer_link.link);
+	view->layer_link.layer = layer->layer;
+
 	view->is_mapped = true;
 	weston_view_geometry_dirty_internal(view);
 	weston_view_update_transform(view);
@@ -4016,27 +4017,6 @@ weston_view_move_to_layer(struct weston_view *view,
 	if (!was_mapped)
 		wl_signal_emit_mutable(&view->map_signal, view);
 }
-
-WL_EXPORT void
-weston_layer_entry_remove(struct weston_layer_entry *entry)
-{
-	struct weston_paint_node *pnode, *pntmp;
-	struct weston_view *view;
-
-	/* Remove all paint nodes because we have no idea what a layer change
-	 * does to view visibility on any output.
-	 */
-	view = container_of(entry, struct weston_view, layer_link);
-	view->surface->compositor->view_list_needs_rebuild = true;
-
-	wl_list_for_each_safe(pnode, pntmp, &view->paint_node_list, view_link)
-		weston_paint_node_destroy(pnode);
-
-	wl_list_remove(&entry->link);
-	wl_list_init(&entry->link);
-	entry->layer = NULL;
-}
-
 
 /** Initialize the weston_layer struct.
  *

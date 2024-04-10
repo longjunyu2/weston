@@ -2063,11 +2063,6 @@ weston_view_move_to_layer(struct weston_view *view,
 			  struct weston_layer_entry *layer);
 
 void
-weston_layer_entry_insert(struct weston_layer_entry *list,
-			  struct weston_layer_entry *entry);
-void
-weston_layer_entry_remove(struct weston_layer_entry *entry);
-void
 weston_layer_init(struct weston_layer *layer,
 		  struct weston_compositor *compositor);
 void
