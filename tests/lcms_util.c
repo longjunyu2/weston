@@ -1,7 +1,7 @@
 /*
  * Copyright 2021 Advanced Micro Devices, Inc.
  * Copyright 2022 Collabora, Ltd.
- * Copyright (c) 1998-2022 Marti Maria Saguer
+ * Copyright (c) 1998-2023 Marti Maria Saguer
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -281,23 +281,98 @@ roundtrip_verification(cmsPipeline *DToB, cmsPipeline *BToD, float tolerance)
 	assert(stat.two_norm.max < tolerance);
 }
 
+static const struct weston_vector ZEROS = {
+	.f = { 0.0, 0.0, 0.0, 1.0 }
+};
+static const struct weston_vector PCS_BLACK = {
+	.f = {
+		cmsPERCEPTUAL_BLACK_X,
+		cmsPERCEPTUAL_BLACK_Y,
+		cmsPERCEPTUAL_BLACK_Z,
+		1.0
+	}
+};
+
+/* Whether BPC matrix applies never, after or before transformation */
+enum bpc_dir {
+	BPC_DIR_NONE,
+	BPC_DIR_DTOB,
+	BPC_DIR_BTOD,
+};
+
 struct transform_sampler_context {
 	cmsHTRANSFORM t;
+	struct weston_matrix bpc;
+	enum bpc_dir dir;
 };
 
 static cmsInt32Number
 transform_sampler(const float src[], float dst[], void *cargo)
 {
 	const struct transform_sampler_context *tsc = cargo;
+	struct weston_vector stmp = { .f = { src[0], src[1], src[2], 1.0 } };
+	struct weston_vector dtmp = { .f = { 0.0, 0.0, 0.0, 1.0 } };
 
-	cmsDoTransform(tsc->t, src, dst, 1);
+	if (tsc->dir == BPC_DIR_BTOD)
+		weston_matrix_transform(&tsc->bpc, &stmp);
 
-	return 1;
+	cmsDoTransform(tsc->t, stmp.f, dtmp.f, 1);
+
+	if (tsc->dir == BPC_DIR_DTOB)
+		weston_matrix_transform(&tsc->bpc, &dtmp);
+
+	for (int i = 0; i < 3; i++)
+		dst[i] = dtmp.f[i];
+
+	return 1; /* Success. */
+}
+
+/*
+ * Black point compensation, copied from LittleCMS 2.16, cmscnvrt.c
+ * Adapted to Weston code base.
+ */
+static void
+ComputeBlackPointCompensation(struct weston_matrix *m,
+			      const struct weston_vector *src_bp,
+			      const struct weston_vector *dst_bp)
+{
+	double ax, ay, az, bx, by, bz, tx, ty, tz;
+
+	// Now we need to compute a matrix plus an offset m and of such of
+	// [m]*bpin + off = bpout
+	// [m]*D50  + off = D50
+	//
+	// This is a linear scaling in the form ax+b, where
+	// a = (bpout - D50) / (bpin - D50)
+	// b = - D50* (bpout - bpin) / (bpin - D50)
+
+	tx = src_bp->f[0] - cmsD50_XYZ()->X;
+	ty = src_bp->f[1] - cmsD50_XYZ()->Y;
+	tz = src_bp->f[2] - cmsD50_XYZ()->Z;
+
+	ax = (dst_bp->f[0] - cmsD50_XYZ()->X) / tx;
+	ay = (dst_bp->f[1] - cmsD50_XYZ()->Y) / ty;
+	az = (dst_bp->f[2] - cmsD50_XYZ()->Z) / tz;
+
+	bx = - cmsD50_XYZ()-> X * (dst_bp->f[0] - src_bp->f[0]) / tx;
+	by = - cmsD50_XYZ()-> Y * (dst_bp->f[1] - src_bp->f[1]) / ty;
+	bz = - cmsD50_XYZ()-> Z * (dst_bp->f[2] - src_bp->f[2]) / tz;
+
+	/*
+	 *     [ax,  0,  0, bx ]
+	 * m = [ 0, ay,  0, by ]
+	 *     [ 0,  0, az, bz ]
+	 *     [ 0,  0,  0,  1 ]
+	 */
+	weston_matrix_init(m);
+	weston_matrix_scale(m, ax, ay, az);
+	weston_matrix_translate(m, bx, by, bz);
 }
 
 static cmsStage *
 create_cLUT_from_transform(cmsContext context_id, const cmsHTRANSFORM t,
-			   int dim_size)
+			   int dim_size,
+			   enum bpc_dir dir)
 {
 	struct transform_sampler_context tsc;
 	cmsStage *cLUT_stage;
@@ -305,6 +380,18 @@ create_cLUT_from_transform(cmsContext context_id, const cmsHTRANSFORM t,
 	assert(dim_size);
 
 	tsc.t = t;
+	tsc.dir = dir;
+	switch (tsc.dir) {
+	case BPC_DIR_NONE:
+		weston_matrix_init(&tsc.bpc);
+		break;
+	case BPC_DIR_DTOB:
+		ComputeBlackPointCompensation(&tsc.bpc, &ZEROS, &PCS_BLACK);
+		break;
+	case BPC_DIR_BTOD:
+		ComputeBlackPointCompensation(&tsc.bpc, &PCS_BLACK, &ZEROS);
+		break;
+	}
 
 	cLUT_stage = cmsStageAllocCLutFloat(context_id, dim_size, 3, 3, NULL);
 	cmsStageSampleCLutFloat(cLUT_stage, transform_sampler, &tsc, 0);
@@ -340,6 +427,7 @@ build_lcms_clut_profile_output(cmsContext context_id,
 	enum transfer_fn eotf_fn = transfer_fn_invert(inv_eotf_fn);
 	cmsHPROFILE hRGB;
 	cmsPipeline *DToB0, *BToD0;
+	cmsPipeline *DToB1, *BToD1;
 	cmsStage *stage;
 	cmsStage *stage_inv_eotf;
 	cmsStage *stage_eotf;
@@ -392,39 +480,58 @@ build_lcms_clut_profile_output(cmsContext context_id,
 	/*
 	 * Pipeline from PCS (optical) to device (electrical)
 	 */
-	BToD0 = cmsPipelineAlloc(context_id, 3, 3);
 
+	/* Perceptual PCS black point is not zeros, so we need BPC */
+	BToD0 = cmsPipelineAlloc(context_id, 3, 3);
 	stage = create_cLUT_from_transform(context_id, pcs_to_linear_device,
-					   clut_dim_size);
+					   clut_dim_size, BPC_DIR_BTOD);
 	cmsPipelineInsertStage(BToD0, cmsAT_END, stage);
 	cmsPipelineInsertStage(BToD0, cmsAT_END, cmsStageDup(stage_inv_eotf));
 
+	/* Media-relative colorimetric does not force BPC */
+	BToD1 = cmsPipelineAlloc(context_id, 3, 3);
+	stage = create_cLUT_from_transform(context_id, pcs_to_linear_device,
+					   clut_dim_size, BPC_DIR_NONE);
+	cmsPipelineInsertStage(BToD1, cmsAT_END, stage);
+	cmsPipelineInsertStage(BToD1, cmsAT_END, cmsStageDup(stage_inv_eotf));
+
 	cmsWriteTag(hRGB, cmsSigBToD0Tag, BToD0);
-	cmsLinkTag(hRGB, cmsSigBToD1Tag, cmsSigBToD0Tag);
+	cmsWriteTag(hRGB, cmsSigBToD1Tag, BToD1);
 	cmsLinkTag(hRGB, cmsSigBToD2Tag, cmsSigBToD0Tag);
-	cmsLinkTag(hRGB, cmsSigBToD3Tag, cmsSigBToD0Tag);
+	cmsLinkTag(hRGB, cmsSigBToD3Tag, cmsSigBToD1Tag);
 
 	/*
 	 * Pipeline from device (electrical) to PCS (optical)
 	 */
-	DToB0 = cmsPipelineAlloc(context_id, 3, 3);
 
+	/* Perceptual PCS black point is not zeros, so we need BPC */
+	DToB0 = cmsPipelineAlloc(context_id, 3, 3);
 	cmsPipelineInsertStage(DToB0, cmsAT_END, cmsStageDup(stage_eotf));
 	stage = create_cLUT_from_transform(context_id, linear_device_to_pcs,
-					   clut_dim_size);
+					   clut_dim_size, BPC_DIR_DTOB);
 	cmsPipelineInsertStage(DToB0, cmsAT_END, stage);
 
+	/* Media-relative colorimetric does not force BPC */
+	DToB1 = cmsPipelineAlloc(context_id, 3, 3);
+	cmsPipelineInsertStage(DToB1, cmsAT_END, cmsStageDup(stage_eotf));
+	stage = create_cLUT_from_transform(context_id, linear_device_to_pcs,
+					   clut_dim_size, BPC_DIR_NONE);
+	cmsPipelineInsertStage(DToB1, cmsAT_END, stage);
+
 	cmsWriteTag(hRGB, cmsSigDToB0Tag, DToB0);
-	cmsLinkTag(hRGB, cmsSigDToB1Tag, cmsSigDToB0Tag);
+	cmsWriteTag(hRGB, cmsSigDToB1Tag, DToB1);
 	cmsLinkTag(hRGB, cmsSigDToB2Tag, cmsSigDToB0Tag);
-	cmsLinkTag(hRGB, cmsSigDToB3Tag, cmsSigDToB0Tag);
+	cmsLinkTag(hRGB, cmsSigDToB3Tag, cmsSigDToB1Tag);
 
 	vcgt_tag_add_to_profile(context_id, hRGB, vcgt_exponents);
 
 	roundtrip_verification(DToB0, BToD0, clut_roundtrip_tolerance);
+	roundtrip_verification(DToB1, BToD1, clut_roundtrip_tolerance);
 
 	cmsPipelineFree(BToD0);
 	cmsPipelineFree(DToB0);
+	cmsPipelineFree(BToD1);
+	cmsPipelineFree(DToB1);
 	cmsStageFree(stage_eotf);
 	cmsStageFree(stage_inv_eotf);
 
