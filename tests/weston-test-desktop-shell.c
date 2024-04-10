@@ -101,7 +101,6 @@ desktop_surface_committed(struct weston_desktop_surface *desktop_surface,
 				      dts->view->surface);
 	offset = weston_coord_surface_invert(offset);
 	weston_view_set_position_with_offset(dts->view, pos, offset);
-	weston_layer_entry_insert(&dts->layer.view_list, &dts->view->layer_link);
 	weston_view_move_to_layer(dts->view, &dts->layer.view_list);
 }
 
