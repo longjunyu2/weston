@@ -36,6 +36,7 @@ struct lcms_pipeline {
 	const char *color_space;
 	/**
 	 * Chromaticities for output profile
+	 * White point is assumed to be D65.
 	 */
 	cmsCIExyYTRIPLE prim_output;
 	/**
@@ -46,11 +47,6 @@ struct lcms_pipeline {
 	 * Transform matrix from sRGB to target chromaticities in prim_output
 	 */
 	struct lcmsMAT3 mat;
-	/**
-	 * matrix from prim_output to XYZ, for example matrix conversion
-	 * sRGB->XYZ, adobeRGB->XYZ, bt2020->XYZ
-	 */
-	struct lcmsMAT3 mat2XYZ;
 	/**
 	 * tone curve enum
 	 */

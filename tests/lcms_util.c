@@ -32,11 +32,12 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <libweston/matrix.h>
 #include "shared/helpers.h"
 #include "color_util.h"
 #include "lcms_util.h"
 
-static cmsCIExyY wp_d65 = { 0.31271, 0.32902, 1.0 };
+static const cmsCIExyY wp_d65 = { 0.31271, 0.32902, 1.0 };
 
 /*
  * MPE tone curves can only use LittleCMS parametric curve types 6-8 and not
@@ -280,32 +281,33 @@ roundtrip_verification(cmsPipeline *DToB, cmsPipeline *BToD, float tolerance)
 	assert(stat.two_norm.max < tolerance);
 }
 
+struct transform_sampler_context {
+	cmsHTRANSFORM t;
+};
+
 static cmsInt32Number
-sampler_matrix(const float src[], float dst[], void *cargo)
+transform_sampler(const float src[], float dst[], void *cargo)
 {
-	const struct lcmsMAT3 *mat = cargo;
-	struct color_float in = { .r = src[0], .g = src[1], .b = src[2] };
-	struct color_float cf;
-	unsigned i;
+	const struct transform_sampler_context *tsc = cargo;
 
-	cf = color_float_apply_matrix(mat, in);
-
-	for (i = 0; i < COLOR_CHAN_NUM; i++)
-		dst[i] = cf.rgb[i];
+	cmsDoTransform(tsc->t, src, dst, 1);
 
 	return 1;
 }
 
 static cmsStage *
-create_cLUT_from_matrix(cmsContext context_id, const struct lcmsMAT3 *mat,
-			int dim_size)
+create_cLUT_from_transform(cmsContext context_id, const cmsHTRANSFORM t,
+			   int dim_size)
 {
+	struct transform_sampler_context tsc;
 	cmsStage *cLUT_stage;
 
 	assert(dim_size);
 
+	tsc.t = t;
+
 	cLUT_stage = cmsStageAllocCLutFloat(context_id, dim_size, 3, 3, NULL);
-	cmsStageSampleCLutFloat(cLUT_stage, sampler_matrix, (void *)mat, 0);
+	cmsStageSampleCLutFloat(cLUT_stage, transform_sampler, &tsc, 0);
 
 	return cLUT_stage;
 }
@@ -341,9 +343,41 @@ build_lcms_clut_profile_output(cmsContext context_id,
 	cmsStage *stage;
 	cmsStage *stage_inv_eotf;
 	cmsStage *stage_eotf;
-	struct lcmsMAT3 mat2XYZ_inv;
+	cmsToneCurve *identity_curves[3];
+	cmsHPROFILE linear_device;
+	cmsHPROFILE pcs;
+	cmsHTRANSFORM linear_device_to_pcs;
+	cmsHTRANSFORM pcs_to_linear_device;
 
-	lcmsMAT3_invert(&mat2XYZ_inv, &pipeline->mat2XYZ);
+	identity_curves[0] = identity_curves[1] = identity_curves[2] =
+		cmsBuildGamma(context_id, 1.0);
+
+	linear_device = cmsCreateRGBProfileTHR(context_id, &wp_d65,
+					       &pipeline->prim_output,
+					       identity_curves);
+	assert(cmsIsMatrixShaper(linear_device));
+	cmsFreeToneCurve(identity_curves[0]);
+
+	pcs = cmsCreateXYZProfileTHR(context_id);
+
+	/*
+	 * Since linear_device is a matrix-shaper profile, all rendering intents
+	 * share the same device<->PCS transformations. We only need to pick
+	 * an arbitrary rendering intent that allows to turn BPC both on and off.
+	 */
+	linear_device_to_pcs = cmsCreateTransformTHR(context_id,
+						     linear_device, TYPE_RGB_FLT,
+						     pcs, TYPE_XYZ_FLT,
+						     INTENT_RELATIVE_COLORIMETRIC,
+						     cmsFLAGS_NOOPTIMIZE);
+	pcs_to_linear_device = cmsCreateTransformTHR(context_id,
+						     pcs, TYPE_XYZ_FLT,
+						     linear_device, TYPE_RGB_FLT,
+						     INTENT_RELATIVE_COLORIMETRIC,
+						     cmsFLAGS_NOOPTIMIZE);
+
+	cmsCloseProfile(linear_device);
+	cmsCloseProfile(pcs);
 
 	hRGB = cmsCreateProfilePlaceholder(context_id);
 	cmsSetProfileVersion(hRGB, 4.3);
@@ -360,7 +394,8 @@ build_lcms_clut_profile_output(cmsContext context_id,
 	 */
 	BToD0 = cmsPipelineAlloc(context_id, 3, 3);
 
-	stage = create_cLUT_from_matrix(context_id, &mat2XYZ_inv, clut_dim_size);
+	stage = create_cLUT_from_transform(context_id, pcs_to_linear_device,
+					   clut_dim_size);
 	cmsPipelineInsertStage(BToD0, cmsAT_END, stage);
 	cmsPipelineInsertStage(BToD0, cmsAT_END, cmsStageDup(stage_inv_eotf));
 
@@ -375,7 +410,8 @@ build_lcms_clut_profile_output(cmsContext context_id,
 	DToB0 = cmsPipelineAlloc(context_id, 3, 3);
 
 	cmsPipelineInsertStage(DToB0, cmsAT_END, cmsStageDup(stage_eotf));
-	stage = create_cLUT_from_matrix(context_id, &pipeline->mat2XYZ, clut_dim_size);
+	stage = create_cLUT_from_transform(context_id, linear_device_to_pcs,
+					   clut_dim_size);
 	cmsPipelineInsertStage(DToB0, cmsAT_END, stage);
 
 	cmsWriteTag(hRGB, cmsSigDToB0Tag, DToB0);
@@ -391,6 +427,9 @@ build_lcms_clut_profile_output(cmsContext context_id,
 	cmsPipelineFree(DToB0);
 	cmsStageFree(stage_eotf);
 	cmsStageFree(stage_inv_eotf);
+
+	cmsDeleteTransform(linear_device_to_pcs);
+	cmsDeleteTransform(pcs_to_linear_device);
 
 	return hRGB;
 }

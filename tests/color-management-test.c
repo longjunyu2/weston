@@ -61,9 +61,6 @@ const struct lcms_pipeline pipeline_sRGB = {
 	.mat = LCMSMAT3(1.0, 0.0, 0.0,
 			0.0, 1.0, 0.0,
 			0.0, 0.0, 1.0),
-	.mat2XYZ = LCMSMAT3(0.436037, 0.385124, 0.143039,
-			    0.222482, 0.716913, 0.060605,
-			    0.013922, 0.097078, 0.713899),
 	.post_fn = TRANSFER_FN_SRGB_EOTF_INVERSE
 };
 
