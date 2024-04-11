@@ -43,6 +43,7 @@
 
 #include "window.h"
 #include "shared/cairo-util.h"
+#include "shared/image-loader.h"
 
 struct image {
 	struct window *window;
@@ -396,10 +397,13 @@ set_empty_input_region(struct widget *widget, struct display *display)
 
 static struct image *
 image_create(struct display *display, const char *filename,
-	     int *image_counter)
+	     int *image_counter, int render_intent)
 {
 	struct image *image;
+	struct weston_image *wimage;
 	char *b, *copy, title[512];
+	char *err_msg;
+	bool ret;
 
 	image = zalloc(sizeof *image);
 	if (image == NULL)
@@ -453,6 +457,37 @@ image_create(struct display *display, const char *filename,
 	widget_set_button_handler(image->image_widget, image_button_handler);
 	widget_set_axis_handler(image->image_widget, image_axis_handler);
 
+	wimage = load_cairo_surface_get_user_data(image->image);
+	assert(wimage);
+	if (wimage->icc_profile_data && render_intent != -1) {
+		fprintf(stderr, "Image contains ICC file embedded, let's try to use the Wayland\n" \
+				"color-management protocol to set the surface image description\n" \
+				"using this ICC file.\n");
+		ret = widget_set_image_description_icc(image->image_widget,
+						       wimage->icc_profile_data->fd,
+						       wimage->icc_profile_data->length,
+						       wimage->icc_profile_data->offset,
+						       render_intent, &err_msg);
+		if (ret) {
+			fprintf(stderr, "Successfully set surface image description " \
+					"using ICC file.\n");
+		} else {
+			fprintf(stderr, "Failed to set surface image description:\n%s\n",
+					err_msg);
+			free(err_msg);
+		}
+	}
+	/* TODO: investigate if/how to get colorimetry info from the
+	 * PNG/JPEG/etc image. Then use that to create a parametric image
+	 * description and set it as the widget image description. Also, if
+	 * clients do not enforce us to avoid setting an image description
+	 * (TODO: we still didn't add the CLI option for clients to choose that)
+	 * but no colorimetry data is present, we can create a sRGB image
+	 * description (through parameters) and set it as the image description
+	 * to use. For now Weston do not support creating image description from
+	 * parameters, that's why we've added only the code above that depends
+	 * on ICC profiles. */
+
 	widget_schedule_resize(image->frame_widget, 500, 400);
 
 	return image;
@@ -464,6 +499,7 @@ main(int argc, char *argv[])
 	struct display *d;
 	int i;
 	int image_counter = 0;
+	int render_intent;
 
 	if (argc <= 1 || argv[1][0]=='-') {
 		printf("Usage: %s image...\n", argv[0]);
@@ -477,8 +513,12 @@ main(int argc, char *argv[])
 		return -1;
 	}
 
+	/* TODO: get render intent from command line. If not given, fallback to
+	 * perceptual, which is the default for the CM&HDR protocol extension. */
+	render_intent = RENDER_INTENT_PERCEPTUAL;
+
 	for (i = 1; i < argc; i++)
-		image_create(d, argv[i], &image_counter);
+		image_create(d, argv[i], &image_counter, render_intent);
 
 	if (image_counter > 0)
 		display_run(d);
