@@ -75,6 +75,7 @@ struct weston_desktop_surface {
 	struct {
 		struct wl_list grab_link;
 	};
+	struct wl_list grabbing_seats;
 };
 
 static void
@@ -174,6 +175,8 @@ weston_desktop_surface_destroy(struct weston_desktop_surface *surface)
 
 	wl_list_for_each_safe(view, next_view, &surface->view_list, link)
 		weston_desktop_view_destroy(view);
+
+	weston_desktop_seat_end_grabs_on_seats(&surface->grabbing_seats);
 
 	free(surface->title);
 	free(surface->app_id);
@@ -304,6 +307,7 @@ weston_desktop_surface_create(struct weston_desktop *desktop,
 	wl_list_init(&surface->children_link);
 	wl_list_init(&surface->view_list);
 	wl_list_init(&surface->grab_link);
+	wl_list_init(&surface->grabbing_seats);
 
 	wl_signal_init(&surface->metadata_signal);
 
@@ -882,6 +886,12 @@ weston_desktop_surface_popup_dismiss(struct weston_desktop_surface *surface)
 	wl_list_remove(&surface->grab_link);
 	wl_list_init(&surface->grab_link);
 	weston_desktop_surface_close(surface);
+}
+
+struct wl_list *
+weston_desktop_surface_get_grab_seat_list(struct weston_desktop_surface *surface)
+{
+	return &surface->grabbing_seats;
 }
 
 WL_EXPORT void

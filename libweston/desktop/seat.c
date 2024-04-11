@@ -47,6 +47,7 @@ struct weston_desktop_seat {
 		bool initial_up;
 		struct wl_client *client;
 		struct wl_list surfaces;
+		struct wl_list grab_surface_link;
 		struct weston_desktop_surface *grab_surface;
 		struct wl_listener grab_surface_destroy_listener;
 	} popup_grab;
@@ -388,13 +389,32 @@ weston_desktop_seat_popup_grab_get_topmost_surface(struct weston_desktop_seat *s
 }
 
 static void
+weston_desktop_seat_set_grab_surface(struct weston_desktop_seat *seat,
+				     struct weston_desktop_surface *surface)
+{
+	struct wl_list *list;
+
+	list = weston_desktop_surface_get_grab_seat_list(surface);
+	wl_list_insert(list->prev, &seat->popup_grab.grab_surface_link);
+	seat->popup_grab.grab_surface = surface;
+}
+
+static void
+weston_desktop_seat_clear_grab_surface(struct weston_desktop_seat *seat)
+{
+	wl_list_remove(&seat->popup_grab.grab_surface_link);
+	wl_list_init(&seat->popup_grab.grab_surface_link);
+	seat->popup_grab.grab_surface = NULL;
+}
+
+static void
 popup_grab_grab_surface_destroy(struct wl_listener *listener, void *data)
 {
 	struct weston_desktop_seat *seat =
 		wl_container_of(listener, seat,
 				popup_grab.grab_surface_destroy_listener);
 
-	seat->popup_grab.grab_surface = NULL;
+	weston_desktop_seat_clear_grab_surface(seat);
 }
 
 bool
@@ -447,7 +467,7 @@ weston_desktop_seat_popup_grab_start(struct weston_desktop_seat *seat,
 		struct weston_surface *parent_surface;
 
 		weston_keyboard_start_grab(keyboard, &seat->popup_grab.keyboard);
-		seat->popup_grab.grab_surface = parent;
+		weston_desktop_seat_set_grab_surface(seat, parent);
 
 		parent_surface = weston_desktop_surface_get_surface(parent);
 		seat->popup_grab.grab_surface_destroy_listener.notify =
@@ -516,7 +536,7 @@ weston_desktop_seat_popup_grab_end(struct weston_desktop_seat *seat)
 
 	seat->popup_grab.client = NULL;
 	if (seat->popup_grab.grab_surface) {
-		seat->popup_grab.grab_surface = NULL;
+		weston_desktop_seat_clear_grab_surface(seat);
 		wl_list_remove(&seat->popup_grab.grab_surface_destroy_listener.link);
 	}
 }
@@ -572,4 +592,14 @@ weston_seat_break_desktop_grabs(struct weston_seat *wseat)
 	struct weston_desktop_seat *seat = weston_desktop_seat_from_seat(wseat);
 
 	weston_desktop_seat_popup_grab_end(seat);
+}
+
+void
+weston_desktop_seat_end_grabs_on_seats(struct wl_list *list)
+{
+	struct weston_desktop_seat *seat, *next;
+
+	wl_list_for_each_safe(seat, next, list, popup_grab.grab_surface_link)
+		weston_desktop_seat_popup_grab_end(seat);
+
 }

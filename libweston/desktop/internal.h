@@ -227,6 +227,12 @@ weston_desktop_surface_popup_ungrab(struct weston_desktop_surface *popup,
 void
 weston_desktop_surface_popup_dismiss(struct weston_desktop_surface *surface);
 
+struct wl_list *
+weston_desktop_surface_get_grab_seat_list(struct weston_desktop_surface *surface);
+
+void
+weston_desktop_seat_end_grabs_on_seats(struct wl_list *list);
+
 struct weston_desktop_surface *
 weston_desktop_seat_popup_grab_get_topmost_surface(struct weston_desktop_seat *seat);
 bool
