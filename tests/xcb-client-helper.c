@@ -380,23 +380,6 @@ window_x11_unmap(struct window_x11 *window)
 	xcb_flush(window->conn->connection);
 }
 
-static xcb_generic_event_t *
-poll_for_event(xcb_connection_t *conn)
-{
-	int fd = xcb_get_file_descriptor(conn);
-	struct pollfd pollfds = {};
-	int rpol;
-
-	pollfds.fd = fd;
-	pollfds.events = POLLIN;
-
-	rpol = ppoll(&pollfds, 1, NULL, NULL);
-	if (rpol > 0 && (pollfds.revents & POLLIN))
-		return xcb_wait_for_event(conn);
-
-	return NULL;
-}
-
 static void
 window_x11_set_cursor(struct window_x11 *window, const char *cursor_name)
 {
@@ -478,7 +461,7 @@ handle_events_x11(struct window_x11 *window)
 			break;
 		}
 
-		ev = poll_for_event(window->conn->connection);
+		ev = xcb_wait_for_event(window->conn->connection);
 		if (!ev) {
 			fprintf(stderr, "Error, no event received, "
 					"although we requested for one!\n");
