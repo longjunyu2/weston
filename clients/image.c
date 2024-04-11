@@ -193,15 +193,6 @@ image_resize_handler(struct widget *widget,
 			      allocation.width, allocation.height);
 }
 
-static void
-keyboard_focus_handler(struct window *window,
-		       struct input *device, void *data)
-{
-	struct image *image = data;
-
-	window_schedule_redraw(image->window);
-}
-
 static int
 image_enter_handler(struct widget *widget,
 		    struct input *input,
@@ -300,6 +291,35 @@ zoom(struct image *image, double scale)
 }
 
 static void
+image_axis_handler(struct widget *widget, struct input *input, uint32_t time,
+		   uint32_t axis, wl_fixed_t value, void *data)
+{
+	struct image *image = data;
+
+	if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL &&
+	    input_get_modifiers(input) == MOD_CONTROL_MASK) {
+		/* set zoom level to 2% per 10 axis units */
+		zoom(image, (1.0 - wl_fixed_to_double(value) / 500.0));
+
+		window_schedule_redraw(image->window);
+	} else if (input_get_modifiers(input) == 0) {
+		if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL)
+			move_viewport(image, 0, wl_fixed_to_double(value));
+		else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL)
+			move_viewport(image, wl_fixed_to_double(value), 0);
+	}
+}
+
+static void
+keyboard_focus_handler(struct window *window,
+		       struct input *device, void *data)
+{
+	struct image *image = data;
+
+	window_schedule_redraw(image->window);
+}
+
+static void
 key_handler(struct window *window, struct input *input, uint32_t time,
 	    uint32_t key, uint32_t sym, enum wl_keyboard_key_state state,
 	    void *data)
@@ -327,26 +347,6 @@ key_handler(struct window *window, struct input *input, uint32_t time,
 		clamp_view(image);
 		window_schedule_redraw(image->window);
 		break;
-	}
-}
-
-static void
-image_axis_handler(struct widget *widget, struct input *input, uint32_t time,
-		   uint32_t axis, wl_fixed_t value, void *data)
-{
-	struct image *image = data;
-
-	if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL &&
-	    input_get_modifiers(input) == MOD_CONTROL_MASK) {
-		/* set zoom level to 2% per 10 axis units */
-		zoom(image, (1.0 - wl_fixed_to_double(value) / 500.0));
-
-		window_schedule_redraw(image->window);
-	} else if (input_get_modifiers(input) == 0) {
-		if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL)
-			move_viewport(image, 0, wl_fixed_to_double(value));
-		else if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL)
-			move_viewport(image, wl_fixed_to_double(value), 0);
 	}
 }
 
