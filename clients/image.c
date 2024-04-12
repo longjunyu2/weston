@@ -121,7 +121,7 @@ redraw_handler(struct widget *widget, void *data)
 
 	surface = window_get_surface(image->window);
 	cr = cairo_create(surface);
-	widget_get_allocation(image->frame_widget, &allocation);
+	widget_get_allocation(widget, &allocation);
 	cairo_rectangle(cr, allocation.x, allocation.y,
 			allocation.width, allocation.height);
 	cairo_clip(cr);
@@ -193,7 +193,7 @@ enter_handler(struct widget *widget,
 	struct image *image = data;
 	struct rectangle allocation;
 
-	widget_get_allocation(image->frame_widget, &allocation);
+	widget_get_allocation(widget, &allocation);
 	x -= allocation.x;
 	y -= allocation.y;
 
@@ -225,7 +225,7 @@ motion_handler(struct widget *widget,
 	struct image *image = data;
 	struct rectangle allocation;
 
-	widget_get_allocation(image->frame_widget, &allocation);
+	widget_get_allocation(widget, &allocation);
 	x -= allocation.x;
 	y -= allocation.y;
 
