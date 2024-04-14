@@ -545,6 +545,28 @@ window_get_appid(struct window *window);
 void
 window_set_text_cursor_position(struct window *window, int32_t x, int32_t y);
 
+enum render_intent {
+	RENDER_INTENT_PERCEPTUAL,
+	RENDER_INTENT_RELATIVE,
+	RENDER_INTENT_RELATIVE_BPC,
+	RENDER_INTENT_SATURATION,
+	RENDER_INTENT_ABSOLUTE,
+};
+
+struct render_intent_info {
+	enum render_intent intent;
+	uint32_t protocol_intent;
+	const char *desc;
+};
+
+const struct render_intent_info *
+render_intent_info_from(enum render_intent intent);
+
+bool
+widget_set_image_description_icc(struct widget *widget, int icc_fd,
+				 uint32_t length, uint32_t offset,
+				 enum render_intent intent, char **err_msg);
+
 int
 widget_set_tooltip(struct widget *parent, char *entry, float x, float y);
 

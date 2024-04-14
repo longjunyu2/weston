@@ -56,6 +56,7 @@
 #include "shared/xalloc.h"
 #include <libweston/zalloc.h>
 #include "xdg-shell-client-protocol.h"
+#include "color-management-v1-client-protocol.h"
 #include "text-cursor-position-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
@@ -90,10 +91,14 @@ struct display {
 	struct wl_data_device_manager *data_device_manager;
 	struct text_cursor_position *text_cursor_position;
 	struct xdg_wm_base *xdg_shell;
+	struct xx_color_manager_v2 *color_manager;
 	struct zwp_tablet_manager_v2 *tablet_manager;
 	struct zwp_relative_pointer_manager_v1 *relative_pointer_manager;
 	struct zwp_pointer_constraints_v1 *pointer_constraints;
 	uint32_t serial;
+
+	uint32_t color_manager_features;
+	uint32_t color_manager_rendering_intents;
 
 	int display_fd;
 	bool display_fd_was_read;
@@ -211,6 +216,8 @@ struct surface {
 	int redraw_needed;
 	struct wl_callback *frame_cb;
 	uint32_t last_time;
+
+	struct xx_color_management_surface_v2 *cm_surface;
 
 	struct rectangle allocation;
 	struct rectangle server_allocation;
@@ -472,6 +479,44 @@ struct shm_pool {
 	void *data;
 };
 
+struct cm_image_description {
+	struct xx_image_description_v2 *image_desc;
+	enum cm_image_desc_status {
+		CM_IMAGE_DESC_NOT_CREATED = 0,
+		CM_IMAGE_DESC_READY,
+		CM_IMAGE_DESC_FAILED,
+	} status;
+};
+
+static const struct render_intent_info
+render_intent_info_table[] = {
+        {
+                .intent = RENDER_INTENT_PERCEPTUAL,
+                .desc = "Perceptual",
+                .protocol_intent = XX_COLOR_MANAGER_V2_RENDER_INTENT_PERCEPTUAL,
+        },
+        {
+                .intent = RENDER_INTENT_RELATIVE,
+                .desc = "Media-relative colorimetric",
+                .protocol_intent = XX_COLOR_MANAGER_V2_RENDER_INTENT_RELATIVE,
+        },
+        {
+                .intent = RENDER_INTENT_RELATIVE_BPC,
+                .desc = "Media-relative colorimetric + black point compensation",
+                .protocol_intent = XX_COLOR_MANAGER_V2_RENDER_INTENT_RELATIVE_BPC,
+        },
+        {
+                .intent = RENDER_INTENT_SATURATION,
+                .desc = "Saturation",
+                .protocol_intent = XX_COLOR_MANAGER_V2_RENDER_INTENT_SATURATION,
+        },
+        {
+                .intent = RENDER_INTENT_ABSOLUTE,
+                .desc = "ICC-absolute colorimetric",
+                .protocol_intent = XX_COLOR_MANAGER_V2_RENDER_INTENT_ABSOLUTE,
+        },
+};
+
 enum {
 	CURSOR_DEFAULT = 100,
 	CURSOR_UNSET
@@ -521,6 +566,139 @@ debug_print(void *proxy, int line, const char *func, const char *fmt, ...)
 #define DBG_OBJ(...) do {} while (0)
 
 #endif
+
+static void
+cm_image_desc_ready(void *data, struct xx_image_description_v2 *xx_image_description_v2,
+		    uint32_t identity)
+{
+	struct cm_image_description *cm_image_desc = data;
+
+	cm_image_desc->status = CM_IMAGE_DESC_READY;
+}
+
+static void
+cm_image_desc_failed(void *data, struct xx_image_description_v2 *xx_image_description_v2,
+		     uint32_t cause, const char *msg)
+{
+	struct cm_image_description *cm_image_desc = data;
+
+	fprintf(stderr, "failed to create image description: %u - %s\n",
+		cause, msg);
+
+	cm_image_desc->status = CM_IMAGE_DESC_FAILED;
+}
+
+static const struct xx_image_description_v2_listener cm_image_desc_listener = {
+	.ready = cm_image_desc_ready,
+	.failed = cm_image_desc_failed,
+};
+
+const struct render_intent_info *
+render_intent_info_from(enum render_intent intent)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_LENGTH(render_intent_info_table); i++)
+		if (render_intent_info_table[i].intent == intent)
+			return &render_intent_info_table[i];
+
+	return NULL;
+}
+
+bool
+widget_set_image_description_icc(struct widget *widget, int icc_fd,
+				 uint32_t length, uint32_t offset,
+				 enum render_intent intent, char **err_msg)
+{
+	struct xx_image_description_creator_icc_v2 *icc_creator;
+	struct display *display = widget->window->display;
+	struct surface *surface = widget->surface;
+	struct xx_color_manager_v2 *color_manager_wrapper;
+	struct wl_event_queue *queue;
+	struct cm_image_description cm_image_desc;
+	const struct render_intent_info *intent_info;
+	int ret = 0;
+
+	if (!display->color_manager) {
+		str_printf(err_msg,
+			   "%s extension not supported by the Wayland " \
+			   "compositor, ignoring image color profile.",
+			   xx_color_manager_v2_interface.name);
+		return false;
+	}
+
+	if (!((display->color_manager_features >> XX_COLOR_MANAGER_V2_FEATURE_ICC_V2_V4) & 1)) {
+		str_printf(err_msg,
+			   "Wayland compositor does not support creating image " \
+			   "descriptions from ICC files, ignoring color profile.");
+		return false;
+	}
+
+	intent_info = render_intent_info_from(intent);
+	assert(intent_info && "error: unknown rendering intent\n");
+
+	if (!((display->color_manager_rendering_intents >> intent_info->protocol_intent) & 1)) {
+		str_printf(err_msg,
+			   "Wayland compositor does not support creating image " \
+			   "descriptions with the following rendering intent: %s. " \
+			   "Ignoring color profile.", intent_info->desc);
+		return false;
+	}
+
+	color_manager_wrapper = wl_proxy_create_wrapper(display->color_manager);
+	queue = wl_display_create_queue(display->display);
+	wl_proxy_set_queue((struct wl_proxy *)color_manager_wrapper, queue);
+
+	/* Create ICC image description creator and set the ICC file. */
+	icc_creator = xx_color_manager_v2_new_icc_creator(color_manager_wrapper);
+	wl_proxy_wrapper_destroy(color_manager_wrapper);
+	xx_image_description_creator_icc_v2_set_icc_file(icc_creator,
+							 icc_fd, offset, length);
+
+	/* Create the image description. It will also destroy the ICC creator. */
+	cm_image_desc.status = CM_IMAGE_DESC_NOT_CREATED;
+	cm_image_desc.image_desc = xx_image_description_creator_icc_v2_create(icc_creator);
+	xx_image_description_v2_add_listener(cm_image_desc.image_desc,
+					     &cm_image_desc_listener, &cm_image_desc);
+
+	/* Wait until compositor creates the image description or gracefully
+	 * fail to do that. */
+	while (ret != -1 && cm_image_desc.status == CM_IMAGE_DESC_NOT_CREATED)
+		ret = wl_display_dispatch_queue(display->display, queue);
+	if (ret == -1) {
+		xx_image_description_v2_destroy(cm_image_desc.image_desc);
+		wl_event_queue_destroy(queue);
+		str_printf(err_msg,
+			   "Disconnected from the Wayland compositor, " \
+			   "wl_display_dispatch() failed: %s", strerror(errno));
+		return false;
+	}
+
+	/* Gracefully failed to create image description. Error already printed
+	 * in the handler. */
+	if (cm_image_desc.status == CM_IMAGE_DESC_FAILED) {
+		xx_image_description_v2_destroy(cm_image_desc.image_desc);
+		wl_event_queue_destroy(queue);
+		str_printf(err_msg,
+			   "Image description creation gracefully failed.");
+		return false;
+	}
+	assert(cm_image_desc.status == CM_IMAGE_DESC_READY);
+
+	if (!surface->cm_surface)
+		surface->cm_surface =
+			xx_color_manager_v2_get_surface(display->color_manager,
+							surface->surface);
+
+	xx_color_management_surface_v2_set_image_description(surface->cm_surface,
+							     cm_image_desc.image_desc,
+							     intent_info->protocol_intent);
+
+	xx_image_description_v2_destroy(cm_image_desc.image_desc);
+	wl_event_queue_destroy(queue);
+
+	return true;
+}
 
 static void
 surface_to_buffer_size (enum wl_output_transform buffer_transform, int32_t buffer_scale, int32_t *width, int32_t *height)
@@ -1398,6 +1576,9 @@ surface_destroy(struct surface *surface)
 
 	if (surface->viewport)
 		wp_viewport_destroy(surface->viewport);
+
+	if (surface->cm_surface)
+		xx_color_management_surface_v2_destroy(surface->cm_surface);
 
 	wl_surface_destroy(surface->surface);
 
@@ -6490,6 +6671,45 @@ display_bind_tablets(struct display *d, uint32_t id)
 }
 
 static void
+cm_supported_intent(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+		    uint32_t render_intent)
+{
+	struct display *d = data;
+
+	d->color_manager_rendering_intents |= (1 << render_intent);
+}
+
+static void
+cm_supported_feature(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+		     uint32_t feature)
+{
+	struct display *d = data;
+
+	d->color_manager_features |= (1 << feature);
+}
+
+static void
+cm_supported_tf_named(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+		      uint32_t tf_code)
+{
+	/* unused in this file */
+}
+
+static void
+cm_supported_primaries_named(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+			     uint32_t primaries_code)
+{
+	/* unused in this file */
+}
+
+static const struct xx_color_manager_v2_listener cm_listener = {
+	.supported_intent = cm_supported_intent,
+	.supported_feature = cm_supported_feature,
+	.supported_tf_named = cm_supported_tf_named,
+	.supported_primaries_named = cm_supported_primaries_named,
+};
+
+static void
 global_destroy(struct display *disp, struct global *g)
 {
 	if (disp->global_handler_remove) {
@@ -6557,6 +6777,12 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t id,
 					&wp_viewporter_interface, 1);
 	} else if (strcmp(interface, "zwp_tablet_manager_v2") == 0) {
 		display_bind_tablets(d, id);
+	} else if (strcmp(interface, "xx_color_manager_v2") == 0) {
+		d->color_manager =
+			wl_registry_bind(registry, id,
+					 &xx_color_manager_v2_interface, 1);
+		xx_color_manager_v2_add_listener(d->color_manager,
+						 &cm_listener, d);
 	}
 
 	if (d->global_handler)
@@ -6693,7 +6919,10 @@ display_create(int *argc, char *argv[])
 	d->registry = wl_display_get_registry(d->display);
 	wl_registry_add_listener(d->registry, &registry_listener, d);
 
-	if (wl_display_roundtrip(d->display) < 0) {
+	/* Two roundtrips to get the global and then the events of listeners
+	 * that we register on such globals. */
+	if (wl_display_roundtrip(d->display) < 0 ||
+	    wl_display_roundtrip(d->display) < 0) {
 		fprintf(stderr, "Failed to process Wayland connection: %s\n",
 			strerror(errno));
 		display_destroy(d);
@@ -6774,6 +7003,9 @@ display_destroy(struct display *display)
 
 	if (display->xdg_shell)
 		xdg_wm_base_destroy(display->xdg_shell);
+
+	if (display->color_manager)
+		xx_color_manager_v2_destroy(display->color_manager);
 
 	if (display->shm)
 		wl_shm_destroy(display->shm);

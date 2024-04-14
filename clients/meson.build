@@ -4,6 +4,8 @@ endif
 
 srcs_toytoolkit = [
 	'window.c',
+	color_management_v1_client_protocol_h,
+	color_management_v1_protocol_c,
 	xdg_shell_client_protocol_h,
 	xdg_shell_protocol_c,
 	text_cursor_position_client_protocol_h,
