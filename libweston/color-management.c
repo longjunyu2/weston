@@ -51,7 +51,10 @@ struct cm_image_desc {
         struct wl_resource *owner;
         struct weston_color_manager *cm;
 
-        /* Reference to the color profile that it is backing up. */
+        /* Reference to the color profile that it is backing up. An image
+         * description without a cprof is valid, and that simply means that it
+         * isn't ready (i.e. we didn't send the 'ready' event because we are
+         * still in the process of creating the color profile). */
         struct weston_color_profile *cprof;
 
         /* Depending how the image description is created, the protocol states
@@ -249,6 +252,14 @@ image_description_get_information(struct wl_client *client,
                                        XX_IMAGE_DESCRIPTION_V2_ERROR_NOT_READY,
                                        "we gracefully failed to create this image " \
                                        "description");
+                return;
+        }
+
+        /* Invalid image description for this request, as it isn't ready yet. */
+        if (!cm_image_desc->cprof) {
+                wl_resource_post_error(cm_image_desc_res,
+                                       XX_IMAGE_DESCRIPTION_V2_ERROR_NOT_READY,
+                                       "image description not ready yet");
                 return;
         }
 
@@ -577,6 +588,15 @@ cm_surface_set_image_description(struct wl_client *client,
         /* Invalid image description for this request, as we gracefully failed
          * to create it. */
         if (!cm_image_desc) {
+                /* TODO: the version of the xx protocol that we are using still
+                 * does not have an error for this. Fix when we update to the
+                 * next version. */
+                wl_resource_post_no_memory(cm_surface_res);
+                return;
+        }
+
+        /* Invalid image description for this request, as it isn't ready yet. */
+        if (!cm_image_desc->cprof) {
                 /* TODO: the version of the xx protocol that we are using still
                  * does not have an error for this. Fix when we update to the
                  * next version. */
