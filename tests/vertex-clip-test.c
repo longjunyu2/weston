@@ -44,7 +44,6 @@ struct vertex_clip_test_data {
 	};
 	struct clipper_vertex polygon[8];
 	struct clipper_vertex clipped[8];
-	int polygon_n;
 	int clipped_n;
 	bool aligned;
 };
@@ -86,7 +85,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
 		.polygon   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
 		.clipped   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
-		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
@@ -95,7 +93,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
 		.polygon   = QUAD(51.0f, 51.0f,  99.0f, 101.0f),
 		.clipped   = QUAD(51.0f, 51.0f,  99.0f, 100.0f),
-		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
@@ -104,7 +101,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
 		.polygon   = QUAD(51.0f, 49.0f,  99.0f,  99.0f),
 		.clipped   = QUAD(51.0f, 50.0f,  99.0f,  99.0f),
-		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
@@ -113,7 +109,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
 		.polygon   = QUAD(49.0f, 51.0f,  99.0f,  99.0f),
 		.clipped   = QUAD(50.0f, 51.0f,  99.0f,  99.0f),
-		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
@@ -122,7 +117,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
 		.polygon   = QUAD(51.0f, 51.0f, 101.0f,  99.0f),
 		.clipped   = QUAD(51.0f, 51.0f, 100.0f,  99.0f),
-		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
@@ -132,7 +126,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 		.polygon   = {{ 25.0f, 75.0f}, {75.0f,  25.0f},
 			      {125.0f, 75.0f}, {75.0f, 125.0f}},
 		.clipped   = QUAD(50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon_n = 4,
 		.clipped_n = 4,
 	},
 
@@ -145,7 +138,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 			      {100.0f,  62.5f}, {100.0f,  87.5f},
 			      { 87.5f, 100.0f}, { 62.5f, 100.0f},
 			      { 50.0f,  87.5f}, { 50.0f,  62.5f}},
-		.polygon_n = 4,
 		.clipped_n = 8,
 	},
 
@@ -158,7 +150,6 @@ static const struct vertex_clip_test_data clip_expected_data[] = {
 			      { 50.0f,  87.5f}, { 62.5f, 100.0f},
 			      { 87.5f, 100.0f}, {100.0f,  87.5f},
 			      {100.0f,  62.5f}, { 87.5f,  50.0f}},
-		.polygon_n = 4,
 		.clipped_n = 8,
 	},
 };
@@ -169,17 +160,9 @@ TEST_P(clip_expected, clip_expected_data)
 	struct clipper_vertex clipped[8];
 	int clipped_n;
 
-	clipped_n = clipper_clip(tdata->polygon, tdata->polygon_n, tdata->box,
-				 clipped);
+	clipped_n = clipper_clip(tdata->polygon, tdata->box, clipped);
 
 	assert_vertices(clipped, clipped_n, tdata->clipped, tdata->clipped_n);
-}
-
-TEST(clip_size_too_high)
-{
-	struct clipper_vertex polygon[8] = {}, box[2] = {};
-
-	assert(clipper_clip(polygon, 9, box, NULL) == -1);
 }
 
 /* clipper_quad_clip() tests: */

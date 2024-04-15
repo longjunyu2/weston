@@ -295,8 +295,7 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
  * https://www.codeguru.com/cplusplus/polygon-clipping/
  */
 WESTON_EXPORT_FOR_TESTS int
-clipper_clip(const struct clipper_vertex *polygon,
-	     size_t polygon_len,
+clipper_clip(const struct clipper_vertex polygon[4],
 	     const struct clipper_vertex box[2],
 	     struct clipper_vertex *restrict vertices)
 {
@@ -304,12 +303,9 @@ clipper_clip(const struct clipper_vertex *polygon,
 	struct polygon8 p, tmp;
 	int i, n;
 
-	if (polygon_len > 8)
-		return -1;
-
 	memcpy(ctx.box, box, 2 * sizeof *box);
-	memcpy(p.pos, polygon, polygon_len * sizeof *polygon);
-	p.n = polygon_len;
+	memcpy(p.pos, polygon, 4 * sizeof *polygon);
+	p.n = 4;
 	tmp.n = clip_polygon_left(&ctx, &p, tmp.pos);
 	p.n = clip_polygon_right(&ctx, &tmp, p.pos);
 	tmp.n = clip_polygon_top(&ctx, &p, tmp.pos);
@@ -390,7 +386,7 @@ clipper_quad_clip(struct clipper_quad *quad,
 
 	/* Then use our general purpose clipping algorithm:
 	 */
-	n = clipper_clip(quad->polygon, 4, box, vertices);
+	n = clipper_clip(quad->polygon, box, vertices);
 
 	if (n < 3)
 		return 0;
