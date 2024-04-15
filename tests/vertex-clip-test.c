@@ -77,94 +77,6 @@ assert_vertices(const struct clipper_vertex *clipped, int clipped_n,
 	}
 }
 
-/* clipper_clip() tests: */
-
-static const struct vertex_clip_test_data clip_expected_data[] = {
-	/* Quad inside box. */
-	{
-		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
-		.clipped   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
-		.clipped_n = 4,
-	},
-
-	/* Quad bottom edge outside of box. */
-	{
-		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = QUAD(51.0f, 51.0f,  99.0f, 101.0f),
-		.clipped   = QUAD(51.0f, 51.0f,  99.0f, 100.0f),
-		.clipped_n = 4,
-	},
-
-	/* Quad top edge outside of box. */
-	{
-		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = QUAD(51.0f, 49.0f,  99.0f,  99.0f),
-		.clipped   = QUAD(51.0f, 50.0f,  99.0f,  99.0f),
-		.clipped_n = 4,
-	},
-
-	/* Quad left edge outside of box. */
-	{
-		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = QUAD(49.0f, 51.0f,  99.0f,  99.0f),
-		.clipped   = QUAD(50.0f, 51.0f,  99.0f,  99.0f),
-		.clipped_n = 4,
-	},
-
-	/* Quad right edge outside of box. */
-	{
-		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = QUAD(51.0f, 51.0f, 101.0f,  99.0f),
-		.clipped   = QUAD(51.0f, 51.0f, 100.0f,  99.0f),
-		.clipped_n = 4,
-	},
-
-	/* Rotated quad with edges adjacent to box corners. */
-	{
-		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = {{ 25.0f, 75.0f}, {75.0f,  25.0f},
-			      {125.0f, 75.0f}, {75.0f, 125.0f}},
-		.clipped   = QUAD(50.0f, 50.0f, 100.0f, 100.0f),
-		.clipped_n = 4,
-	},
-
-	/* Rotated quad with edges cutting out box corners. */
-	{
-		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = {{ 37.5f,  75.0f}, { 75.0f,  37.5f},
-			      {112.5f,  75.0f}, { 75.0f, 112.5f}},
-		.clipped   = {{ 62.5f,  50.0f}, { 87.5f,  50.0f},
-			      {100.0f,  62.5f}, {100.0f,  87.5f},
-			      { 87.5f, 100.0f}, { 62.5f, 100.0f},
-			      { 50.0f,  87.5f}, { 50.0f,  62.5f}},
-		.clipped_n = 8,
-	},
-
-	/* Same as above using counter-clockwise winding. */
-	{
-		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
-		.polygon   = {{ 37.5f,  75.0f}, { 75.0f, 112.5f},
-			      {112.5f,  75.0f}, { 75.0f,  37.5f}},
-		.clipped   = {{ 62.5f,  50.0f}, { 50.0f,  62.5f},
-			      { 50.0f,  87.5f}, { 62.5f, 100.0f},
-			      { 87.5f, 100.0f}, {100.0f,  87.5f},
-			      {100.0f,  62.5f}, { 87.5f,  50.0f}},
-		.clipped_n = 8,
-	},
-};
-
-TEST_P(clip_expected, clip_expected_data)
-{
-	struct vertex_clip_test_data *tdata = data;
-	struct clipper_vertex clipped[8];
-	int clipped_n;
-
-	clipped_n = clipper_clip(tdata->polygon, tdata->box, clipped);
-
-	assert_vertices(clipped, clipped_n, tdata->clipped, tdata->clipped_n);
-}
-
 /* clipper_quad_clip() tests: */
 
 static const struct vertex_clip_test_data quad_clip_expected_data[] = {
@@ -659,6 +571,89 @@ static const struct vertex_clip_test_data quad_clip_expected_data[] = {
 		.clipped   = {{-0.25f,  0.25f}, { 0.25f,  0.25f},
 			      { 0.25f, -0.25f}, {-0.25f, -0.25f}},
 		.clipped_n = 4,
+	},
+
+	/* General purpose clipper tests: */
+
+	/* Quad inside box. */
+	{
+		.aligned   = false,
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
+		.clipped   = QUAD(51.0f, 51.0f,  99.0f,  99.0f),
+		.clipped_n = 4,
+	},
+
+	/* Quad bottom edge outside of box. */
+	{
+		.aligned   = false,
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 51.0f,  99.0f, 101.0f),
+		.clipped   = QUAD(51.0f, 51.0f,  99.0f, 100.0f),
+		.clipped_n = 4,
+	},
+
+	/* Quad top edge outside of box. */
+	{
+		.aligned   = false,
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 49.0f,  99.0f,  99.0f),
+		.clipped   = QUAD(51.0f, 50.0f,  99.0f,  99.0f),
+		.clipped_n = 4,
+	},
+
+	/* Quad left edge outside of box. */
+	{
+		.aligned   = false,
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(49.0f, 51.0f,  99.0f,  99.0f),
+		.clipped   = QUAD(50.0f, 51.0f,  99.0f,  99.0f),
+		.clipped_n = 4,
+	},
+
+	/* Quad right edge outside of box. */
+	{
+		.aligned   = false,
+		.box       = BOX (50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = QUAD(51.0f, 51.0f, 101.0f,  99.0f),
+		.clipped   = QUAD(51.0f, 51.0f, 100.0f,  99.0f),
+		.clipped_n = 4,
+	},
+
+	/* Rotated quad with edges adjacent to box corners. */
+	{
+		.aligned   = false,
+		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = {{ 25.0f, 75.0f}, {75.0f,  25.0f},
+			      {125.0f, 75.0f}, {75.0f, 125.0f}},
+		.clipped   = QUAD(50.0f, 50.0f, 100.0f, 100.0f),
+		.clipped_n = 4,
+	},
+
+	/* Rotated quad with edges cutting out box corners. */
+	{
+		.aligned   = false,
+		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = {{ 37.5f,  75.0f}, { 75.0f,  37.5f},
+			      {112.5f,  75.0f}, { 75.0f, 112.5f}},
+		.clipped   = {{ 62.5f,  50.0f}, { 87.5f,  50.0f},
+			      {100.0f,  62.5f}, {100.0f,  87.5f},
+			      { 87.5f, 100.0f}, { 62.5f, 100.0f},
+			      { 50.0f,  87.5f}, { 50.0f,  62.5f}},
+		.clipped_n = 8,
+	},
+
+	/* Same as above using counter-clockwise winding. */
+	{
+		.aligned   = false,
+		.box       = BOX(50.0f, 50.0f, 100.0f, 100.0f),
+		.polygon   = {{ 37.5f,  75.0f}, { 75.0f, 112.5f},
+			      {112.5f,  75.0f}, { 75.0f,  37.5f}},
+		.clipped   = {{ 62.5f,  50.0f}, { 50.0f,  62.5f},
+			      { 50.0f,  87.5f}, { 62.5f, 100.0f},
+			      { 87.5f, 100.0f}, {100.0f,  87.5f},
+			      {100.0f,  62.5f}, { 87.5f,  50.0f}},
+		.clipped_n = 8,
 	},
 
 	/* Miscellaneous cases: */

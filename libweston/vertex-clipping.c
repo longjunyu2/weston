@@ -291,13 +291,21 @@ clip_polygon_bottom(struct clip_context *ctx, const struct polygon8 *src,
 	return ctx->vertices - dst;
 }
 
-/* General purpose polygon clipping algorithm based on Sutherland-Hodgman:
+/* General purpose clipping function. Compute the boundary vertices of the
+ * intersection of a 'polygon' and a clipping 'box'. 'polygon' points to an
+ * array of 4 vertices defining a convex polygon of any winding order. 'box'
+ * points to an array of 2 vertices where the values of the 1st vertex are less
+ * than or equal to the values of the 2nd vertex. Up to 8 resulting vertices,
+ * using 'polygon' winding order, are written to 'vertices'. The return value is
+ * the number of vertices created.
+ *
+ * Based on Sutherland-Hodgman algorithm:
  * https://www.codeguru.com/cplusplus/polygon-clipping/
  */
-WESTON_EXPORT_FOR_TESTS int
-clipper_clip(const struct clipper_vertex polygon[4],
-	     const struct clipper_vertex box[2],
-	     struct clipper_vertex *restrict vertices)
+static int
+clip(const struct clipper_vertex polygon[4],
+     const struct clipper_vertex box[2],
+     struct clipper_vertex *restrict vertices)
 {
 	struct clip_context ctx;
 	struct polygon8 p, tmp;
@@ -386,7 +394,7 @@ clipper_quad_clip(struct clipper_quad *quad,
 
 	/* Then use our general purpose clipping algorithm:
 	 */
-	n = clipper_clip(quad->polygon, box, vertices);
+	n = clip(quad->polygon, box, vertices);
 
 	if (n < 3)
 		return 0;
