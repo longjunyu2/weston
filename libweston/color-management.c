@@ -691,7 +691,13 @@ cm_surface_resource_destroy(struct wl_resource *cm_surface_res)
         /* TODO: if wl_list_empty(&surface->cm_surface_resource_list), we need
          * to unset_image_description for the surface. The protocol states that
          * we need to do that after the last cm_surface object for a wl_surface
-         * is destroyed. */
+         * is destroyed.
+         *
+         * We still didn't add the code for that because there are discussions
+         * on the protocol upstream to allow a single cm_surface per surface.
+         * Once that reaches a conclusion and the changes land on the xx version
+         * of the protocol, we need to update this.
+         */
 }
 
 static const struct xx_color_management_surface_v2_interface
