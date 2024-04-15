@@ -595,7 +595,7 @@ create_icc_based_image_description(struct color_manager *cm,
 	int32_t icc_fd;
 	struct stat st;
 
-	icc_fd = open(icc_path, 'r');
+	icc_fd = open(icc_path, O_RDONLY);
 	assert(icc_fd >= 0);
 
 	assert(fstat(icc_fd, &st) == 0);
@@ -844,7 +844,7 @@ TEST(set_bad_icc_size_zero)
 	image_descr_creator_icc =
 		xx_color_manager_v2_new_icc_creator(cm.manager);
 
-	icc_fd = open(srgb_icc_profile_path, 'r');
+	icc_fd = open(srgb_icc_profile_path, O_RDONLY);
 	assert(icc_fd >= 0);
 
 	/* Try setting ICC file with a bad size, it should fail. */
@@ -903,7 +903,7 @@ TEST(set_icc_twice)
 	image_descr_creator_icc =
 		xx_color_manager_v2_new_icc_creator(cm.manager);
 
-	icc_fd = open(srgb_icc_profile_path, 'r');
+	icc_fd = open(srgb_icc_profile_path, O_RDONLY);
 	assert(icc_fd >= 0);
 	assert(fstat(icc_fd, &st) == 0);
 
