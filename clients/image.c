@@ -50,6 +50,9 @@ struct image {
 	/* Decorations, buttons, etc. */
 	struct widget *frame_widget;
 
+	/* Where we draw the image content. */
+	struct widget *image_widget;
+
 	struct display *display;
 	char *filename;
 	cairo_surface_t *image;
@@ -109,27 +112,45 @@ clamp_view(struct image *image)
 }
 
 static void
-redraw_handler(struct widget *widget, void *data)
+frame_redraw_handler(struct widget *widget, void *data)
+{
+	struct rectangle allocation;
+	cairo_t *cr;
+
+	widget_get_allocation(widget, &allocation);
+
+	cr = widget_cairo_create(widget);
+	cairo_rectangle(cr, allocation.x, allocation.y,
+			allocation.width, allocation.height);
+	cairo_set_source_rgba(cr, 0, 0, 0, 1);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_fill(cr);
+	cairo_destroy(cr);
+}
+
+static void
+frame_resize_handler(struct widget *widget,
+		     int32_t width, int32_t height, void *data)
+{
+	struct image *image = data;
+
+	clamp_view(image);
+}
+
+static void
+image_redraw_handler(struct widget *widget, void *data)
 {
 	struct image *image = data;
 	struct rectangle allocation;
 	cairo_t *cr;
-	cairo_surface_t *surface;
 	double width, height, doc_aspect, window_aspect, scale;
-	cairo_matrix_t matrix;
-	cairo_matrix_t translate;
 
-	surface = window_get_surface(image->window);
-	cr = cairo_create(surface);
 	widget_get_allocation(widget, &allocation);
+
+	cr = widget_cairo_create(widget);
 	cairo_rectangle(cr, allocation.x, allocation.y,
 			allocation.width, allocation.height);
-	cairo_clip(cr);
-	cairo_push_group(cr);
-	cairo_translate(cr, allocation.x, allocation.y);
-
-	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
-	cairo_set_source_rgba(cr, 0, 0, 0, 1);
+	cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
 	cairo_paint(cr);
 
 	if (!image->initialized) {
@@ -151,29 +172,25 @@ redraw_handler(struct widget *widget, void *data)
 		clamp_view(image);
 	}
 
-	matrix = image->matrix;
-	cairo_matrix_init_translate(&translate, allocation.x, allocation.y);
-	cairo_matrix_multiply(&matrix, &matrix, &translate);
-	cairo_set_matrix(cr, &matrix);
-
+	cairo_set_matrix(cr, &image->matrix);
 	cairo_set_source_surface(cr, image->image, 0, 0);
 	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 	cairo_paint(cr);
-
-	cairo_pop_group_to_source(cr);
-	cairo_paint(cr);
 	cairo_destroy(cr);
-
-	cairo_surface_destroy(surface);
 }
 
 static void
-resize_handler(struct widget *widget,
-	       int32_t width, int32_t height, void *data)
+image_resize_handler(struct widget *widget,
+		     int32_t width, int32_t height, void *data)
 {
 	struct image *image = data;
+	struct rectangle allocation;
 
-	clamp_view(image);
+	widget_get_allocation(image->frame_widget, &allocation);
+
+	widget_set_allocation(widget,
+			      allocation.x, allocation.y,
+			      allocation.width, allocation.height);
 }
 
 static void
@@ -186,9 +203,9 @@ keyboard_focus_handler(struct window *window,
 }
 
 static int
-enter_handler(struct widget *widget,
-	      struct input *input,
-	      float x, float y, void *data)
+image_enter_handler(struct widget *widget,
+		    struct input *input,
+		    float x, float y, void *data)
 {
 	struct image *image = data;
 	struct rectangle allocation;
@@ -218,9 +235,9 @@ move_viewport(struct image *image, double dx, double dy)
 }
 
 static int
-motion_handler(struct widget *widget,
-	       struct input *input, uint32_t time,
-	       float x, float y, void *data)
+image_motion_handler(struct widget *widget,
+		     struct input *input, uint32_t time,
+		     float x, float y, void *data)
 {
 	struct image *image = data;
 	struct rectangle allocation;
@@ -240,11 +257,11 @@ motion_handler(struct widget *widget,
 }
 
 static void
-button_handler(struct widget *widget,
-	       struct input *input, uint32_t time,
-	       uint32_t button,
-	       enum wl_pointer_button_state state,
-	       void *data)
+image_button_handler(struct widget *widget,
+		     struct input *input, uint32_t time,
+		     uint32_t button,
+		     enum wl_pointer_button_state state,
+		     void *data)
 {
 	struct image *image = data;
 
@@ -314,8 +331,8 @@ key_handler(struct window *window, struct input *input, uint32_t time,
 }
 
 static void
-axis_handler(struct widget *widget, struct input *input, uint32_t time,
-	     uint32_t axis, wl_fixed_t value, void *data)
+image_axis_handler(struct widget *widget, struct input *input, uint32_t time,
+		   uint32_t axis, wl_fixed_t value, void *data)
 {
 	struct image *image = data;
 
@@ -352,10 +369,25 @@ close_handler(void *data)
 	if (*image->image_counter == 0)
 		display_exit(image->display);
 
+	widget_destroy(image->image_widget);
 	widget_destroy(image->frame_widget);
 	window_destroy(image->window);
 
 	free(image);
+}
+
+static void
+set_empty_input_region(struct widget *widget, struct display *display)
+{
+	struct wl_compositor *compositor;
+	struct wl_surface *surface;
+	struct wl_region *region;
+
+	compositor = display_get_compositor(display);
+	surface = widget_get_wl_surface(widget);
+	region = wl_compositor_create_region(compositor);
+	wl_surface_set_input_region(surface, region);
+	wl_region_destroy(region);
 }
 
 static struct image *
@@ -384,7 +416,6 @@ image_create(struct display *display, const char *filename,
 	}
 
 	image->window = window_create(display);
-	image->frame_widget = window_frame_create(image->window, image);
 	window_set_title(image->window, title);
 	window_set_appid(image->window, "org.freedesktop.weston.wayland-image");
 	image->display = display;
@@ -393,18 +424,31 @@ image_create(struct display *display, const char *filename,
 	image->initialized = false;
 
 	window_set_user_data(image->window, image);
-	widget_set_redraw_handler(image->frame_widget, redraw_handler);
-	widget_set_resize_handler(image->frame_widget, resize_handler);
 	window_set_keyboard_focus_handler(image->window,
 					  keyboard_focus_handler);
 	window_set_fullscreen_handler(image->window, fullscreen_handler);
 	window_set_close_handler(image->window, close_handler);
-
-	widget_set_enter_handler(image->frame_widget, enter_handler);
-	widget_set_motion_handler(image->frame_widget, motion_handler);
-	widget_set_button_handler(image->frame_widget, button_handler);
-	widget_set_axis_handler(image->frame_widget, axis_handler);
 	window_set_key_handler(image->window, key_handler);
+
+	image->frame_widget = window_frame_create(image->window, image);
+	widget_set_redraw_handler(image->frame_widget, frame_redraw_handler);
+	widget_set_resize_handler(image->frame_widget, frame_resize_handler);
+
+	image->image_widget = window_add_subsurface(image->window, image,
+						    SUBSURFACE_SYNCHRONIZED);
+	/* We set the input region of the subsurface where the image is draw as
+	 * NULL, as the input region of the parent surface is automatically set
+	 * by the toytoolkit. But as the window that finds the widget in a
+	 * certain (x, y) position looks for surfaces that are on top first, it
+	 * will call the image_widget handlers for input related stuff. */
+	set_empty_input_region(image->image_widget, display);
+	widget_set_redraw_handler(image->image_widget, image_redraw_handler);
+	widget_set_resize_handler(image->image_widget, image_resize_handler);
+	widget_set_enter_handler(image->image_widget, image_enter_handler);
+	widget_set_motion_handler(image->image_widget, image_motion_handler);
+	widget_set_button_handler(image->image_widget, image_button_handler);
+	widget_set_axis_handler(image->image_widget, image_axis_handler);
+
 	widget_schedule_resize(image->frame_widget, 500, 400);
 
 	return image;
