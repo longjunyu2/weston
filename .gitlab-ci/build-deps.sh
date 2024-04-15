@@ -64,7 +64,7 @@ pip3 install $PIP_ARGS sphinx_rtd_theme==1.0.0
 # The fork pulls in this support from the original GitHub PR, rebased on top of
 # a newer upstream version which fixes AArch64 support.
 if [[ -n "$KERNEL_DEFCONFIG" ]]; then
-	git clone --depth=1 --branch=v6.3 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux
+	git clone --depth=1 --branch=v6.9 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux
 	cd linux
 
 	if [[ "${BUILD_ARCH}" = "x86-64" ]]; then

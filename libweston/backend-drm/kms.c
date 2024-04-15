@@ -42,6 +42,10 @@
 #include "pixel-formats.h"
 #include "presentation-time-server-protocol.h"
 
+#ifndef DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP
+#define DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP 0x15
+#endif
+
 struct drm_property_enum_info plane_type_enums[] = {
 	[WDRM_PLANE_TYPE_PRIMARY] = {
 		.name = "Primary",
@@ -1891,19 +1895,11 @@ init_kms_caps(struct drm_device *device)
 
 	drmSetClientCap(device->drm.fd, DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1);
 
-#if 0
-	/* FIXME: DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP isn't merged into mainline so
-	 * we can't really use it at this point. Until then, make it so we
-	 * don't support it. After it gets merged, we can flip this back such
-	 * that we don't need to revert the entire tearing work, and we can
-	 * still get it all back, when the capability is actually available in
-	 * the kernel. */
 	ret = drmGetCap(device->drm.fd, DRM_CAP_ATOMIC_ASYNC_PAGE_FLIP, &cap);
-	if (ret != 0)
-		cap = 0;
-#endif
-	device->tearing_supported = 0;
-	weston_log("DRM: does not support async page flipping\n");
+	if (ret == 0)
+		device->tearing_supported = cap;
+	weston_log("DRM: %s Atomic async page flip\n",
+		    device->tearing_supported ? "supports" : "does not support");
 
 	/*
 	 * KMS support for hardware planes cannot properly synchronize
