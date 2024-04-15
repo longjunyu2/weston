@@ -67,7 +67,11 @@ const struct lcms_pipeline pipeline_sRGB = {
 struct image_description {
 	struct xx_image_description_v2 *xx_image_descr;
 
-	bool ready;
+	enum image_description_status {
+		CM_IMAGE_DESC_NOT_CREATED = 0,
+		CM_IMAGE_DESC_READY,
+		CM_IMAGE_DESC_FAILED,
+	} status;
 
 	/* color_manager::image_descr_list */
 	struct wl_list link;
@@ -136,13 +140,17 @@ image_descr_ready(void *data, struct xx_image_description_v2 *xx_image_descripti
 {
 	struct image_description *image_descr = data;
 
-	image_descr->ready = true;
+	image_descr->status = CM_IMAGE_DESC_READY;
 }
 
 static void
 image_descr_failed(void *data, struct xx_image_description_v2 *xx_image_description_v2,
 		   uint32_t cause, const char *msg)
 {
+	struct image_description *image_descr = data;
+
+	image_descr->status = CM_IMAGE_DESC_FAILED;
+
 	testlog("Failed to create image description:\n" \
 		"    cause: %u, msg: %s\n", cause, msg);
 }
@@ -699,6 +707,16 @@ image_descr_get_information(struct image_description *image_descr)
 	return image_descr_info;
 }
 
+static void
+wait_until_image_description_ready(struct client *client,
+				   struct image_description *image_descr)
+{
+	while (image_descr->status == CM_IMAGE_DESC_NOT_CREATED)
+		assert(wl_display_dispatch(client->wl_display) >= 0);
+
+	assert(image_descr->status == CM_IMAGE_DESC_READY);
+}
+
 TEST(output_get_image_description)
 {
 	struct client *client;
@@ -711,9 +729,7 @@ TEST(output_get_image_description)
 
 	/* Get image description from output */
 	image_descr = get_output_image_description(&cm);
-	client_roundtrip(client);
-
-	assert(image_descr->ready);
+	wait_until_image_description_ready(client, image_descr);
 
 	/* Get output image description information */
 	image_descr_info = image_descr_get_information(image_descr);
@@ -736,9 +752,7 @@ TEST(surface_get_preferred_image_description)
 
 	/* Get preferred image description from surface */
 	image_descr = get_surface_preferred_image_description(&cm);
-	client_roundtrip(client);
-
-	assert(image_descr->ready);
+	wait_until_image_description_ready(client, image_descr);
 
 	/* Get surface image description information */
 	image_descr_info = image_descr_get_information(image_descr);
@@ -937,7 +951,7 @@ TEST(create_icc_image_description_no_info)
 	/* Create image description based on ICC profile */
 	image_descr = create_icc_based_image_description(&cm, image_descr_creator_icc,
 							 srgb_icc_profile_path);
-	client_roundtrip(client);
+	wait_until_image_description_ready(client, image_descr);
 
 	/* Get image description information, and that should fail. Images
 	 * descriptions that we create do not accept this request. */
@@ -966,7 +980,7 @@ TEST(set_surface_image_description)
 	/* Create image description based on ICC profile */
 	image_descr = create_icc_based_image_description(&cm, image_descr_creator_icc,
 							 srgb_icc_profile_path);
-	client_roundtrip(client);
+	wait_until_image_description_ready(client, image_descr);
 
 	/* Set surface image description */
 	xx_color_management_surface_v2_set_image_description(cm.surface,
