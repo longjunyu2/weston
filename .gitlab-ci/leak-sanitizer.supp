@@ -9,4 +9,5 @@ leak:libfontconfig
 # see tests/meson.build
 leak:wl_shm_buffer_begin_access
 leak:g_malloc0
+leak:sysprof_collector_get
 leak:/ld-*.so*
