@@ -43,6 +43,7 @@
 
 #include "window.h"
 #include "shared/cairo-util.h"
+#include "shared/helpers.h"
 #include "shared/image-loader.h"
 
 struct image {
@@ -493,6 +494,15 @@ image_create(struct display *display, const char *filename,
 	return image;
 }
 
+static void
+print_usage(const char *program_name)
+{
+	fprintf(stderr, "Usage:\n  %s [OPTIONS] [FILENAME0] [FILENAME1] ...\n\n" \
+			"Options:\n", program_name);
+
+	fprintf(stderr, "-h or --help to open this HELP dialogue.\n");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -500,9 +510,15 @@ main(int argc, char *argv[])
 	int i;
 	int image_counter = 0;
 	int render_intent;
+	bool opt_help = false;
+	struct weston_option cli_options[] = {
+		{ WESTON_OPTION_BOOLEAN, "help", 'h', &opt_help },
+	};
 
-	if (argc <= 1 || argv[1][0]=='-') {
-		printf("Usage: %s image...\n", argv[0]);
+	parse_options(cli_options, ARRAY_LENGTH(cli_options), &argc, argv);
+
+	if (argc <= 1 || opt_help) {
+		print_usage(argv[0]);
 		return 1;
 	}
 
