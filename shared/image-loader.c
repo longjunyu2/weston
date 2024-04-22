@@ -31,10 +31,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <png.h>
 #include <pixman.h>
 
 #include "shared/helpers.h"
+#include "shared/os-compatibility.h"
 #include "shared/xalloc.h"
 #include "image-loader.h"
 
@@ -56,6 +58,37 @@ static void
 pixman_image_destroy_func(pixman_image_t *image, void *data)
 {
 	free(data);
+}
+
+static struct icc_profile_data *
+icc_profile_data_create(void *profdata, uint32_t proflen)
+{
+	struct icc_profile_data *icc_profile_data;
+	int fd;
+	void *data;
+
+	fd = os_create_anonymous_file(proflen);
+	if (fd < 0) {
+		fprintf(stderr, "failed to create anonymous file: %s\n",
+				strerror(errno));
+		return NULL;
+	}
+
+	data = mmap(NULL, proflen, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (data == MAP_FAILED) {
+		close(fd);
+		fprintf(stderr, "mmap failed: %s\n", strerror(errno));
+		return NULL;
+	}
+	memcpy(data, profdata, proflen);
+	munmap(data, proflen);
+
+	icc_profile_data = xzalloc(sizeof(*icc_profile_data));
+	icc_profile_data->fd = fd;
+	icc_profile_data->length = proflen;
+	icc_profile_data->offset = 0;
+
+	return icc_profile_data;
 }
 
 #ifdef HAVE_JPEG
@@ -92,6 +125,9 @@ load_jpeg(FILE *fp, uint32_t image_load_flags)
 	int stride, first;
 	JSAMPLE *data, *rows[4];
 	jmp_buf env;
+
+	if (image_load_flags & WESTON_IMAGE_LOAD_ICC)
+		fprintf(stderr, "We still don't support reading ICC profile from JPEG\n");
 
 	if (!(image_load_flags & WESTON_IMAGE_LOAD_IMAGE))
 		return NULL;
@@ -211,44 +247,20 @@ png_error_callback(png_structp png, png_const_charp error_msg)
     longjmp (png_jmpbuf (png), 1);
 }
 
-static struct weston_image *
-load_png(FILE *fp, uint32_t image_load_flags)
+struct png_image_data {
+	png_byte *volatile data;
+	png_byte **volatile row_pointers;
+};
+
+static pixman_image_t *
+load_png_image(FILE *fp, png_struct *png, png_info *info,
+	       struct png_image_data *png_image_data)
 {
-	struct weston_image *image;
-	png_struct *png;
-	png_info *info;
-	png_byte *volatile data = NULL;
-	png_byte **volatile row_pointers = NULL;
 	png_uint_32 width, height;
 	int depth, color_type, interlace, stride;
 	unsigned int i;
 	pixman_image_t *pixman_image;
 
-	if (!(image_load_flags & WESTON_IMAGE_LOAD_IMAGE))
-		return NULL;
-
-	png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL,
-				     png_error_callback, NULL);
-	if (!png)
-		return NULL;
-
-	info = png_create_info_struct(png);
-	if (!info) {
-		png_destroy_read_struct(&png, NULL, NULL);
-		return NULL;
-	}
-
-	if (setjmp(png_jmpbuf(png))) {
-		if (data)
-			free(data);
-		if (row_pointers)
-			free(row_pointers);
-		png_destroy_read_struct(&png, &info, NULL);
-		return NULL;
-	}
-
-	png_set_read_fn(png, fp, read_func);
-	png_read_info(png, info);
 	png_get_IHDR(png, info,
 		     &width, &height, &depth,
 		     &color_type, &interlace, NULL, NULL);
@@ -282,44 +294,108 @@ load_png(FILE *fp, uint32_t image_load_flags)
 		     &width, &height, &depth,
 		     &color_type, &interlace, NULL, NULL);
 
-
 	stride = stride_for_width(width);
-	data = malloc(stride * height);
-	if (!data) {
-		png_destroy_read_struct(&png, &info, NULL);
+	png_image_data->data = malloc(stride * height);
+	if (!png_image_data->data)
 		return NULL;
-	}
 
-	row_pointers = malloc(height * sizeof row_pointers[0]);
-	if (row_pointers == NULL) {
-		free(data);
-		png_destroy_read_struct(&png, &info, NULL);
+	png_image_data->row_pointers = malloc(height * sizeof png_image_data->row_pointers[0]);
+	if (png_image_data->row_pointers == NULL)
 		return NULL;
-	}
 
 	for (i = 0; i < height; i++)
-		row_pointers[i] = &data[i * stride];
+		png_image_data->row_pointers[i] = &png_image_data->data[i * stride];
 
-	png_read_image(png, row_pointers);
+	png_read_image(png, png_image_data->row_pointers);
 	png_read_end(png, info);
 
-	free(row_pointers);
-	png_destroy_read_struct(&png, &info, NULL);
+	free(png_image_data->row_pointers);
+	png_image_data->row_pointers = NULL;
 
-	pixman_image = pixman_image_create_bits(PIXMAN_a8r8g8b8,
-				width, height, (uint32_t *) data, stride);
+	pixman_image = pixman_image_create_bits(PIXMAN_a8r8g8b8, width, height,
+						(uint32_t *) png_image_data->data,
+						stride);
 
-	pixman_image_set_destroy_function(pixman_image,
-				pixman_image_destroy_func, data);
+	pixman_image_set_destroy_function(pixman_image, pixman_image_destroy_func,
+					  png_image_data->data);
+	png_image_data->data = NULL;
 
-	image = xzalloc(sizeof(*image));
-	image->pixman_image = pixman_image;
-	if (!image->pixman_image) {
-		weston_image_destroy(image);
+	return pixman_image;
+}
+
+static int
+load_png_icc(FILE *fp, png_struct *png, png_info *info,
+	     struct icc_profile_data **icc_profile_data)
+{
+        png_charp name;
+        int compression_type;
+        png_bytep profdata;
+        png_uint_32 proflen;
+	png_uint_32 ret;
+
+	ret = png_get_iCCP(png, info, &name, &compression_type, &profdata, &proflen);
+	if (ret != PNG_INFO_iCCP) {
+		/* Not an error, the file simply does not have an ICC embedded. */
+		*icc_profile_data = NULL;
+		return 0;
+	}
+
+	*icc_profile_data = icc_profile_data_create(profdata, proflen);
+	if (*icc_profile_data == NULL)
+		return -1;
+
+	return 0;
+}
+
+static struct weston_image *
+load_png(FILE *fp, uint32_t image_load_flags)
+{
+	struct weston_image *image = NULL;
+	struct png_image_data png_image_data = { 0 };
+	png_struct *png;
+	png_info *info;
+	int ret;
+
+	png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL,
+				     png_error_callback, NULL);
+	if (!png)
+		return NULL;
+
+	info = png_create_info_struct(png);
+	if (!info) {
+		png_destroy_read_struct(&png, NULL, NULL);
 		return NULL;
 	}
 
+	if (setjmp(png_jmpbuf(png)))
+		goto err;
+
+	png_set_read_fn(png, fp, read_func);
+	png_read_info(png, info);
+
+	image = xzalloc(sizeof(*image));
+
+	if (image_load_flags & WESTON_IMAGE_LOAD_IMAGE) {
+		image->pixman_image = load_png_image(fp, png, info, &png_image_data);
+		if (!image->pixman_image)
+			goto err;
+	}
+	if (image_load_flags & WESTON_IMAGE_LOAD_ICC) {
+		ret = load_png_icc(fp, png, info, &image->icc_profile_data);
+		if (ret < 0)
+			goto err;
+	}
+
+	png_destroy_read_struct(&png, &info, NULL);
 	return image;
+
+err:
+	free(png_image_data.data);
+	free(png_image_data.row_pointers);
+	png_destroy_read_struct(&png, &info, NULL);
+	if (image)
+		weston_image_destroy(image);
+	return NULL;
 }
 
 #ifdef HAVE_WEBP
@@ -334,6 +410,9 @@ load_webp(FILE *fp, uint32_t image_load_flags)
 	int len;
 	VP8StatusCode status;
 	WebPIDecoder *idec;
+
+	if (image_load_flags & WESTON_IMAGE_LOAD_ICC)
+		fprintf(stderr, "We still don't support reading ICC profile from WebP\n");
 
 	if (!(image_load_flags & WESTON_IMAGE_LOAD_IMAGE))
 		return NULL;
@@ -431,6 +510,11 @@ static const struct image_loader loaders[] = {
  * To normally load the image, use the flag WESTON_IMAGE_LOAD_IMAGE. If this
  * function fails to load the image, it returns NULL. Otherwise the image will
  * be stored in weston_image::pixman_image.
+ *
+ * As ICC profiles are not always embedded on image files, even if
+ * WESTON_IMAGE_LOAD_ICC is one of the given flags, the returned
+ * weston_image::icc_profile_data may be NULL. But if something fails, this
+ * function returns NULL.
  */
 struct weston_image *
 weston_image_load(const char *filename, uint32_t image_load_flags)
@@ -488,6 +572,11 @@ weston_image_destroy(struct weston_image *image)
 {
 	if (image->pixman_image)
 		pixman_image_unref(image->pixman_image);
+
+	if (image->icc_profile_data) {
+		close(image->icc_profile_data->fd);
+		free(image->icc_profile_data);
+	}
 
 	free(image);
 }
