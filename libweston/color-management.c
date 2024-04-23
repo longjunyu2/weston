@@ -44,6 +44,8 @@ enum supports_get_info {
  * This is the object that backs the image description abstraction from the
  * protocol. We may have multiple images descriptions for the same color
  * profile.
+ *
+ * Image description that we failed to create do not have such backing object.
  */
 struct cm_image_desc {
         struct wl_resource *owner;
@@ -240,15 +242,13 @@ image_description_get_information(struct wl_client *client,
         struct cm_image_desc_info *cm_image_desc_info;
         bool success;
 
-        /* If the client tries to get the output image description but we
-         * destroy the output before that, we create the image description but
-         * without a backing struct cm_image_desc object. In such case, the only
-         * request the client can make is the one to destroy the object. */
+        /* Invalid image description for this request, as we gracefully failed
+         * to create it. */
         if (!cm_image_desc) {
                 wl_resource_post_error(cm_image_desc_res,
                                        XX_IMAGE_DESCRIPTION_V2_ERROR_NOT_READY,
-                                       "we didn't send ready so client is not allowed "
-                                       "to get_information for this object");
+                                       "we gracefully failed to create this image " \
+                                       "description");
                 return;
         }
 
@@ -308,9 +308,8 @@ image_description_resource_destroy(struct wl_resource *cm_image_desc_res)
         struct cm_image_desc *cm_image_desc =
                 wl_resource_get_user_data(cm_image_desc_res);
 
-        /* If the client tries to get an output image description but we destroy
-         * the output before that, we create the image description but without a
-         * backing struct cm_image_desc object. */
+        /* Image description that we failed to create do not have a backing
+         * struct cm_image_desc object. */
         if (!cm_image_desc)
                 return;
 
@@ -563,7 +562,7 @@ cm_surface_set_image_description(struct wl_client *client,
         struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
         struct cm_image_desc *cm_image_desc =
                 wl_resource_get_user_data(cm_image_desc_res);
-        struct weston_color_manager *cm = cm_image_desc->cm;
+        struct weston_color_manager *cm;
         const struct weston_render_intent_info *render_intent;
 
         /* The surface might have been already gone, in such case cm_surface is
@@ -574,6 +573,18 @@ cm_surface_set_image_description(struct wl_client *client,
                                        "the wl_surface has already been destroyed");
                 return;
         }
+
+        /* Invalid image description for this request, as we gracefully failed
+         * to create it. */
+        if (!cm_image_desc) {
+                /* TODO: the version of the xx protocol that we are using still
+                 * does not have an error for this. Fix when we update to the
+                 * next version. */
+                wl_resource_post_no_memory(cm_surface_res);
+                return;
+        }
+
+        cm = cm_image_desc->cm;
 
         render_intent = weston_render_intent_info_from_protocol(surface->compositor,
                                                                 protocol_render_intent);
@@ -827,7 +838,7 @@ do_length_and_offset_fit(struct cm_creator_icc *cm_creator_icc)
         return true;
 }
 
-static void
+static int
 create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm_image_desc,
                                                         struct cm_creator_icc *cm_creator_icc)
 {
@@ -844,7 +855,7 @@ create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm
                 xx_image_description_v2_send_failed(cm_image_desc->owner,
                                                     XX_IMAGE_DESCRIPTION_V2_CAUSE_OPERATING_SYSTEM,
                                                     "length + offset does not fit off_t");
-                return;
+                return -1;
         }
 
         /* Create buffer to read ICC profile. As they may have up to 4Mb, we
@@ -852,7 +863,7 @@ create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm
         icc_prof_data = zalloc(cm_creator_icc->icc_data_length);
         if (!icc_prof_data) {
                 wl_resource_post_no_memory(cm_creator_icc->owner);
-                return;
+                return -1;
         }
 
         /* Read ICC file.
@@ -880,7 +891,7 @@ create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm
                                                             XX_IMAGE_DESCRIPTION_V2_CAUSE_OPERATING_SYSTEM,
                                                             err_msg);
                         free(err_msg);
-                        return;
+                        return -1;
                 } else if (pread_ret == 0) {
                         /* We were expecting to read more than 0 bytes, but we
                          * didn't. That means that we've tried to read beyond
@@ -890,7 +901,7 @@ create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm
                         wl_resource_post_error(cm_creator_icc->owner,
                                                XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_OUT_OF_FILE,
                                                "tried to read ICC beyond EOF");
-                        return;
+                        return -1;
                 }
                 bytes_read += (size_t)pread_ret;
         }
@@ -915,12 +926,13 @@ create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm
                                                     XX_IMAGE_DESCRIPTION_V2_CAUSE_UNSUPPORTED,
                                                     err_msg);
                 free(err_msg);
-                return;
+                return -1;
         }
 
         cm_image_desc->cprof = cprof;
         xx_image_description_v2_send_ready(cm_image_desc->owner,
                                            cm_image_desc->cprof->id);
+        return 0;
 }
 
 /**
@@ -938,6 +950,7 @@ cm_creator_icc_create(struct wl_client *client, struct wl_resource *resource,
         struct weston_color_manager *cm = compositor->color_manager;
         uint32_t version = wl_resource_get_version(cm_creator_icc->owner);
         struct cm_image_desc *cm_image_desc;
+        int ret;
 
         if (cm_creator_icc->icc_data_length == 0) {
                 wl_resource_post_error(resource,
@@ -956,8 +969,16 @@ cm_creator_icc_create(struct wl_client *client, struct wl_resource *resource,
         }
 
         /* Create the cprof for the image description. */
-        create_image_description_color_profile_from_icc_creator(cm_image_desc,
-                                                                cm_creator_icc);
+        ret = create_image_description_color_profile_from_icc_creator(cm_image_desc,
+                                                                      cm_creator_icc);
+        if (ret < 0) {
+                /* If something went wrong and we failed to create the image
+                 * description, let's set the resource userdata to NULL. We use
+                 * that to be able to tell if a client is trying to use an
+                 * (invalid) image description that we failed to create. */
+                wl_resource_set_user_data(cm_image_desc->owner, NULL);
+                cm_image_desc_destroy(cm_image_desc);
+        }
 
         /* Destroy the cm_creator_icc resource. This is a destructor request. */
         wl_resource_destroy(cm_creator_icc->owner);
