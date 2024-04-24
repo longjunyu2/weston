@@ -35,6 +35,7 @@
 #include <pixman.h>
 
 #include "shared/helpers.h"
+#include "shared/xalloc.h"
 #include "image-loader.h"
 
 #ifdef HAVE_JPEG
@@ -80,16 +81,20 @@ error_exit(j_common_ptr cinfo)
 	longjmp(cinfo->client_data, 1);
 }
 
-static pixman_image_t *
-load_jpeg(FILE *fp)
+static struct weston_image *
+load_jpeg(FILE *fp, uint32_t image_load_flags)
 {
+	struct weston_image *image;
 	struct jpeg_decompress_struct cinfo;
 	struct jpeg_error_mgr jerr;
-	pixman_image_t *pixman_image = NULL;
+	pixman_image_t *pixman_image;
 	unsigned int i;
 	int stride, first;
 	JSAMPLE *data, *rows[4];
 	jmp_buf env;
+
+	if (!(image_load_flags & WESTON_IMAGE_LOAD_IMAGE))
+		return NULL;
 
 	cinfo.err = jpeg_std_error(&jerr);
 	jerr.error_exit = error_exit;
@@ -135,13 +140,16 @@ load_jpeg(FILE *fp)
 	pixman_image_set_destroy_function(pixman_image,
 				pixman_image_destroy_func, data);
 
-	return pixman_image;
+	image = xzalloc(sizeof(*image));
+	image->pixman_image = pixman_image;
+
+	return image;
 }
 
 #else
 
-static pixman_image_t *
-load_jpeg(FILE *fp)
+static struct weston_image *
+load_jpeg(FILE *fp, uint32_t image_load_flags)
 {
 	fprintf(stderr, "JPEG support disabled at compile-time\n");
 	return NULL;
@@ -203,9 +211,10 @@ png_error_callback(png_structp png, png_const_charp error_msg)
     longjmp (png_jmpbuf (png), 1);
 }
 
-static pixman_image_t *
-load_png(FILE *fp)
+static struct weston_image *
+load_png(FILE *fp, uint32_t image_load_flags)
 {
+	struct weston_image *image;
 	png_struct *png;
 	png_info *info;
 	png_byte *volatile data = NULL;
@@ -213,7 +222,10 @@ load_png(FILE *fp)
 	png_uint_32 width, height;
 	int depth, color_type, interlace, stride;
 	unsigned int i;
-	pixman_image_t *pixman_image = NULL;
+	pixman_image_t *pixman_image;
+
+	if (!(image_load_flags & WESTON_IMAGE_LOAD_IMAGE))
+		return NULL;
 
 	png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL,
 				     png_error_callback, NULL);
@@ -300,19 +312,31 @@ load_png(FILE *fp)
 	pixman_image_set_destroy_function(pixman_image,
 				pixman_image_destroy_func, data);
 
-	return pixman_image;
+	image = xzalloc(sizeof(*image));
+	image->pixman_image = pixman_image;
+	if (!image->pixman_image) {
+		weston_image_destroy(image);
+		return NULL;
+	}
+
+	return image;
 }
 
 #ifdef HAVE_WEBP
 
-static pixman_image_t *
-load_webp(FILE *fp)
+static struct weston_image *
+load_webp(FILE *fp, uint32_t image_load_flags)
 {
+	struct weston_image *image;
+	pixman_image_t *pixman_image;
 	WebPDecoderConfig config;
 	uint8_t buffer[16 * 1024];
 	int len;
 	VP8StatusCode status;
 	WebPIDecoder *idec;
+
+	if (!(image_load_flags & WESTON_IMAGE_LOAD_IMAGE))
+		return NULL;
 
 	if (!WebPInitDecoderConfig(&config)) {
 		fprintf(stderr, "Library version mismatch!\n");
@@ -362,17 +386,21 @@ load_webp(FILE *fp)
 	WebPIDelete(idec);
 	WebPFreeDecBuffer(&config.output);
 
-	return pixman_image_create_bits(PIXMAN_a8r8g8b8,
-					config.input.width,
-					config.input.height,
-					(uint32_t *) config.output.u.RGBA.rgba,
-					config.output.u.RGBA.stride);
+	pixman_image = pixman_image_create_bits(PIXMAN_a8r8g8b8,
+						config.input.width, config.input.height,
+						(uint32_t *) config.output.u.RGBA.rgba,
+						config.output.u.RGBA.stride);
+
+	image = xzalloc(sizeof(*image));
+	image->pixman_image = pixman_image;
+
+	return image;
 }
 
 #else
 
-static pixman_image_t *
-load_webp(FILE *fp)
+static struct weston_image *
+load_webp(FILE *fp, uint32_t image_load_flags)
 {
 	fprintf(stderr, "WebP support disabled at compile-time\n");
 	return NULL;
@@ -384,7 +412,7 @@ load_webp(FILE *fp)
 struct image_loader {
 	unsigned char header[4];
 	int header_size;
-	pixman_image_t *(*load)(FILE *fp);
+	struct weston_image *(*load)(FILE *fp, uint32_t image_load_flags);
 };
 
 static const struct image_loader loaders[] = {
@@ -393,10 +421,21 @@ static const struct image_loader loaders[] = {
 	{ { 'R', 'I', 'F', 'F' }, 4, load_webp }
 };
 
-pixman_image_t *
-load_image(const char *filename)
+/**
+ * Given a filename, loads the associated image.
+ *
+ * \param filename The full image filename, i.e. the path plus filename.
+ * \param image_load_flags Combination of enum weston_image_load_flags.
+ * \return A struct weston_image on success, NULL on failure.
+ *
+ * To normally load the image, use the flag WESTON_IMAGE_LOAD_IMAGE. If this
+ * function fails to load the image, it returns NULL. Otherwise the image will
+ * be stored in weston_image::pixman_image.
+ */
+struct weston_image *
+weston_image_load(const char *filename, uint32_t image_load_flags)
 {
-	pixman_image_t *image = NULL;
+	struct weston_image *image = NULL;
 	unsigned char header[4];
 	FILE *fp;
 	unsigned int i;
@@ -420,7 +459,7 @@ load_image(const char *filename)
 	for (i = 0; i < ARRAY_LENGTH(loaders); i++) {
 		if (memcmp(header, loaders[i].header,
 			   loaders[i].header_size) == 0) {
-			image = loaders[i].load(fp);
+			image = loaders[i].load(fp, image_load_flags);
 			break;
 		}
 	}
@@ -437,4 +476,35 @@ load_image(const char *filename)
 	}
 
 	return image;
+}
+
+/**
+ * Destroy a struct weston_image object.
+ *
+ * \param image The struct weston_image to destroy.
+ */
+void
+weston_image_destroy(struct weston_image *image)
+{
+	if (image->pixman_image)
+		pixman_image_unref(image->pixman_image);
+
+	free(image);
+}
+
+pixman_image_t *
+load_image(const char *filename)
+{
+	struct weston_image *image;
+	pixman_image_t *pixman_image;
+
+	image = weston_image_load(filename, WESTON_IMAGE_LOAD_IMAGE);
+	if (!image)
+		return NULL;
+
+	pixman_image = image->pixman_image;
+
+	free(image);
+
+	return pixman_image;
 }
