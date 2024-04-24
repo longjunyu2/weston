@@ -371,6 +371,8 @@ close_handler(void *data)
 
 	cairo_surface_destroy(image->image);
 
+	free(image->filename);
+
 	widget_destroy(image->image_widget);
 	widget_destroy(image->frame_widget);
 	window_destroy(image->window);
