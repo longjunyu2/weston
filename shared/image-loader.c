@@ -222,7 +222,7 @@ load_png(FILE *fp)
 
 	info = png_create_info_struct(png);
 	if (!info) {
-		png_destroy_read_struct(&png, &info, NULL);
+		png_destroy_read_struct(&png, NULL, NULL);
 		return NULL;
 	}
 
