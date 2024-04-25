@@ -369,6 +369,8 @@ close_handler(void *data)
 	if (*image->image_counter == 0)
 		display_exit(image->display);
 
+	cairo_surface_destroy(image->image);
+
 	widget_destroy(image->image_widget);
 	widget_destroy(image->frame_widget);
 	window_destroy(image->window);
