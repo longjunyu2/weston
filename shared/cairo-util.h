@@ -52,6 +52,9 @@ rounded_rect(cairo_t *cr, int x0, int y0, int x1, int y1, int radius);
 cairo_surface_t *
 load_cairo_surface(const char *filename);
 
+struct weston_image *
+load_cairo_surface_get_user_data(cairo_surface_t *surface);
+
 struct theme {
 	cairo_surface_t *active_frame;
 	cairo_surface_t *inactive_frame;

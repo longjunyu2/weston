@@ -351,9 +351,9 @@ rounded_rect(cairo_t *cr, int x0, int y0, int x1, int y1, int radius)
 static void
 loaded_cairo_surface_destructor(void *data)
 {
-	pixman_image_t *image = data;
+	struct weston_image *image = data;
 
-	pixman_image_unref(image);
+	weston_image_destroy(image);
 }
 
 static const cairo_user_data_key_t weston_cairo_util_load_cairo_surface_key;
@@ -363,19 +363,20 @@ load_cairo_surface(const char *filename)
 {
 	cairo_surface_t *surface;
 	cairo_status_t ret;
-	pixman_image_t *image;
+	struct weston_image *image;
 	int width, height, stride;
 	void *data;
 
-	image = load_image(filename);
+	image = weston_image_load(filename, WESTON_IMAGE_LOAD_IMAGE |
+					    WESTON_IMAGE_LOAD_ICC);
 	if (image == NULL) {
 		return NULL;
 	}
 
-	data = pixman_image_get_data(image);
-	width = pixman_image_get_width(image);
-	height = pixman_image_get_height(image);
-	stride = pixman_image_get_stride(image);
+	data = pixman_image_get_data(image->pixman_image);
+	width = pixman_image_get_width(image->pixman_image);
+	height = pixman_image_get_height(image->pixman_image);
+	stride = pixman_image_get_stride(image->pixman_image);
 
 	surface = cairo_image_surface_create_for_data(data, CAIRO_FORMAT_ARGB32,
 						      width, height, stride);
@@ -394,8 +395,15 @@ load_cairo_surface(const char *filename)
 
 fail:
 	cairo_surface_destroy(surface);
-	pixman_image_unref(image);
+	weston_image_destroy(image);
 	return NULL;
+}
+
+struct weston_image *
+load_cairo_surface_get_user_data(cairo_surface_t *surface)
+{
+	return cairo_surface_get_user_data(surface,
+					   &weston_cairo_util_load_cairo_surface_key);
 }
 
 void
