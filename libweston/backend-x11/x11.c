@@ -617,27 +617,27 @@ x11_output_set_icon(struct x11_backend *b,
 {
 	uint32_t *icon;
 	int32_t width, height;
-	pixman_image_t *image;
+	struct weston_image *image;
 
-	image = load_image(filename);
+	image = weston_image_load(filename, WESTON_IMAGE_LOAD_IMAGE);
 	if (!image)
 		return;
-	width = pixman_image_get_width(image);
-	height = pixman_image_get_height(image);
+	width = pixman_image_get_width(image->pixman_image);
+	height = pixman_image_get_height(image->pixman_image);
 	icon = malloc(width * height * 4 + 8);
 	if (!icon) {
-		pixman_image_unref(image);
+		weston_image_destroy(image);
 		return;
 	}
 
 	icon[0] = width;
 	icon[1] = height;
-	memcpy(icon + 2, pixman_image_get_data(image), width * height * 4);
+	memcpy(icon + 2, pixman_image_get_data(image->pixman_image), width * height * 4);
 	xcb_change_property(b->conn, XCB_PROP_MODE_REPLACE, output->window,
 			    b->atom.net_wm_icon, b->atom.cardinal, 32,
 			    width * height + 2, icon);
 	free(icon);
-	pixman_image_unref(image);
+	weston_image_destroy(image);
 }
 
 static void

@@ -641,20 +641,3 @@ weston_image_destroy(struct weston_image *image)
 
 	free(image);
 }
-
-pixman_image_t *
-load_image(const char *filename)
-{
-	struct weston_image *image;
-	pixman_image_t *pixman_image;
-
-	image = weston_image_load(filename, WESTON_IMAGE_LOAD_IMAGE);
-	if (!image)
-		return NULL;
-
-	pixman_image = image->pixman_image;
-
-	free(image);
-
-	return pixman_image;
-}

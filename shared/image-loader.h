@@ -50,7 +50,4 @@ weston_image_load(const char *filename, uint32_t image_load_flags);
 void
 weston_image_destroy(struct weston_image *image);
 
-pixman_image_t *
-load_image(const char *filename);
-
 #endif
