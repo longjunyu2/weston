@@ -25,6 +25,9 @@
  * SOFTWARE.
  */
 
+/* For annotating shader compile-time constant arguments */
+#define compile_const const
+
 /* enum gl_shader_texcoord_input */
 #define SHADER_TEXCOORD_INPUT_ATTRIB  0
 #define SHADER_TEXCOORD_INPUT_SURFACE 1
@@ -47,13 +50,14 @@ attribute vec2 texcoord;
 /* Match the varying precision to the fragment shader */
 varying FRAG_PRECISION vec2 v_texcoord;
 
+compile_const int c_texcoord_input = DEF_TEXCOORD_INPUT;
+
 void main()
 {
 	gl_Position = proj * vec4(position, 0.0, 1.0);
 
-#if DEF_TEXCOORD_INPUT == SHADER_TEXCOORD_INPUT_ATTRIB
-	v_texcoord = texcoord;
-#elif DEF_TEXCOORD_INPUT == SHADER_TEXCOORD_INPUT_SURFACE
-	v_texcoord = vec2(surface_to_buffer * vec4(position, 0.0, 1.0));
-#endif
+	if (c_texcoord_input == SHADER_TEXCOORD_INPUT_ATTRIB)
+		v_texcoord = texcoord;
+	else if (c_texcoord_input == SHADER_TEXCOORD_INPUT_SURFACE)
+		v_texcoord = vec2(surface_to_buffer * vec4(position, 0.0, 1.0));
 }
