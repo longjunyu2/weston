@@ -1429,8 +1429,8 @@ draw_mesh(struct gl_renderer *gr,
 	if (nlines == 0)
 		return;
 
-	/* Fan debugging is rendered as lines colored with the solid shader
-	 * variant filtered per sub-mesh using vertex colors. */
+	/* Wireframe debugging is rendered as lines colored with the solid
+	 * shader variant filtered per sub-mesh using vertex colors. */
 	alt = (struct gl_shader_config) {
 		.req = {
 			.variant = SHADER_VARIANT_SOLID,
@@ -1470,7 +1470,7 @@ repaint_region(struct gl_renderer *gr,
 	uint16_t *strips, *lines = NULL;
 	int i, j, n, nrects, positions_size, colors_size, strips_size;
 	int lines_size, nvtx = 0, nstrips = 0, nlines = 0;
-	bool wireframe = gr->fan_debug;
+	bool wireframe = gr->wireframe_debug;
 
 	/* Build-time sub-mesh constants. Clipping emits 8 vertices max.
 	 * store_strips() and store_lines() respectively store 10 and 26 indices
@@ -2207,22 +2207,22 @@ gl_renderer_repaint_output(struct weston_output *output,
 			   go->area.width, go->area.height);
 	}
 
-	/* In fan debug mode, redraw everything to make sure that we clear any
-	 * fans left over from previous draws on this buffer.
-	 * This precludes the use of EGL_EXT_swap_buffers_with_damage and
+	/* In wireframe debug mode, redraw everything to make sure that we clear
+	 * any wireframes left over from previous draws on this buffer. This
+	 * precludes the use of EGL_EXT_swap_buffers_with_damage and
 	 * EGL_KHR_partial_update, since we damage the whole area. */
-	if (gr->fan_debug) {
+	if (gr->wireframe_debug) {
 		pixman_region32_t undamaged;
 		pixman_region32_init(&undamaged);
 		pixman_region32_subtract(&undamaged, &output->region,
 					 output_damage);
-		gr->fan_debug = false;
+		gr->wireframe_debug = false;
 		repaint_views(output, &undamaged);
-		gr->fan_debug = true;
+		gr->wireframe_debug = true;
 		pixman_region32_fini(&undamaged);
 	}
 
-	if (gr->has_egl_partial_update && !gr->fan_debug) {
+	if (gr->has_egl_partial_update && !gr->wireframe_debug) {
 		int n_egl_rects;
 		EGLint *egl_rects;
 
@@ -2268,7 +2268,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 	if (go->egl_surface != EGL_NO_SURFACE) {
 		EGLBoolean ret;
 
-		if (gr->swap_buffers_with_damage && !gr->fan_debug) {
+		if (gr->swap_buffers_with_damage && !gr->wireframe_debug) {
 			int n_egl_rects;
 			EGLint *egl_rects;
 
@@ -2318,7 +2318,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 		extents = weston_matrix_transform_rect(&output->matrix,
 						       rb->base.damage.extents);
 
-		if (gr->fan_debug) {
+		if (gr->wireframe_debug) {
 			rect.y = go->fb_size.height - go->area.y - go->area.height;
 			rect.height = go->area.height;
 		} else {
@@ -2327,7 +2327,8 @@ gl_renderer_repaint_output(struct weston_output *output,
 			pixels += rect.width * extents.y1;
 		}
 
-		if (gr->gl_version >= gr_gl_version(3, 0) && ! gr->fan_debug) {
+		if (gr->gl_version >= gr_gl_version(3, 0) &&
+		    ! gr->wireframe_debug) {
 			glPixelStorei(GL_PACK_ROW_LENGTH, width);
 			rect.width = extents.x2 - extents.x1;
 			rect.x += extents.x1;
@@ -4130,8 +4131,8 @@ gl_renderer_destroy(struct weston_compositor *ec)
 
 	if (gr->fragment_binding)
 		weston_binding_destroy(gr->fragment_binding);
-	if (gr->fan_binding)
-		weston_binding_destroy(gr->fan_binding);
+	if (gr->wireframe_binding)
+		weston_binding_destroy(gr->wireframe_binding);
 
 	weston_log_scope_destroy(gr->shader_scope);
 	weston_log_scope_destroy(gr->renderer_scope);
@@ -4336,14 +4337,14 @@ fragment_debug_binding(struct weston_keyboard *keyboard,
 }
 
 static void
-fan_debug_repaint_binding(struct weston_keyboard *keyboard,
-			  const struct timespec *time,
-			  uint32_t key, void *data)
+wireframe_debug_repaint_binding(struct weston_keyboard *keyboard,
+				const struct timespec *time,
+				uint32_t key, void *data)
 {
 	struct weston_compositor *compositor = data;
 	struct gl_renderer *gr = get_renderer(compositor);
 
-	gr->fan_debug = !gr->fan_debug;
+	gr->wireframe_debug = !gr->wireframe_debug;
 	weston_compositor_damage_all(compositor);
 }
 
@@ -4579,9 +4580,9 @@ gl_renderer_setup(struct weston_compositor *ec)
 		weston_compositor_add_debug_binding(ec, KEY_S,
 						    fragment_debug_binding,
 						    ec);
-	gr->fan_binding =
+	gr->wireframe_binding =
 		weston_compositor_add_debug_binding(ec, KEY_F,
-						    fan_debug_repaint_binding,
+						    wireframe_debug_repaint_binding,
 						    ec);
 
 	weston_log("GL ES %d.%d - renderer features:\n",

@@ -154,9 +154,9 @@ struct gl_renderer {
 	struct weston_log_scope *renderer_scope;
 
 	bool fragment_shader_debug;
-	bool fan_debug;
+	bool wireframe_debug;
 	struct weston_binding *fragment_binding;
-	struct weston_binding *fan_binding;
+	struct weston_binding *wireframe_binding;
 
 	EGLenum platform;
 	EGLDisplay egl_display;

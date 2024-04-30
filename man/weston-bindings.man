@@ -151,7 +151,7 @@ Enable fragment debugging for gl-renderer.
 .RE
 - KEY_F :
 .RS 4
-Enable fan debugging for gl-renderer.
+Enable wireframe debugging for gl-renderer.
 .RE
 - KEY_R :
 .RS 4
