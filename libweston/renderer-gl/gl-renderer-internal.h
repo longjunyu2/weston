@@ -88,6 +88,7 @@ struct gl_shader_requirements
 	unsigned variant:4; /* enum gl_shader_texture_variant */
 	bool input_is_premult:1;
 	bool green_tint:1;
+	bool wireframe:1;
 
 	unsigned color_pre_curve:2; /* enum gl_shader_color_curve */
 	unsigned color_mapping:2; /* enum gl_shader_color_mapping */
@@ -96,7 +97,7 @@ struct gl_shader_requirements
 	 * The total size of all bitfields plus pad_bits_ must fill up exactly
 	 * how many bytes the compiler allocates for them together.
 	 */
-	unsigned pad_bits_:19;
+	unsigned pad_bits_:18;
 };
 static_assert(sizeof(struct gl_shader_requirements) ==
 	      4 /* total bitfield size in bytes */,
@@ -166,7 +167,8 @@ struct gl_renderer {
 
 	/* Vertex streams. */
 	struct wl_array position_stream;
-	struct wl_array indices;
+	struct wl_array color_stream;
+	struct wl_array indices[2];
 
 	EGLDeviceEXT egl_device;
 	const char *drm_device;

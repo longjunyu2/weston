@@ -238,8 +238,11 @@ create_vertex_shader_config_string(const struct gl_shader_requirements *req)
 	char *str;
 
 	size = asprintf(&str,
-			"#define DEF_TEXCOORD_INPUT %s\n",
-			gl_shader_texcoord_input_to_string(req->texcoord_input));
+			"#define DEF_TEXCOORD_INPUT %s\n"
+			"#define DEF_WIREFRAME %s\n",
+			gl_shader_texcoord_input_to_string(req->texcoord_input),
+			req->wireframe ? "true" : "false");
+
 	if (size < 0)
 		return NULL;
 	return str;
@@ -254,12 +257,14 @@ create_fragment_shader_config_string(const struct gl_shader_requirements *req)
 	size = asprintf(&str,
 			"#define DEF_GREEN_TINT %s\n"
 			"#define DEF_INPUT_IS_PREMULT %s\n"
+			"#define DEF_WIREFRAME %s\n"
 			"#define DEF_COLOR_PRE_CURVE %s\n"
 			"#define DEF_COLOR_MAPPING %s\n"
 			"#define DEF_COLOR_POST_CURVE %s\n"
 			"#define DEF_VARIANT %s\n",
 			req->green_tint ? "true" : "false",
 			req->input_is_premult ? "true" : "false",
+			req->wireframe ? "true" : "false",
 			gl_shader_color_curve_to_string(req->color_pre_curve),
 			gl_shader_color_mapping_to_string(req->color_mapping),
 			gl_shader_color_curve_to_string(req->color_post_curve),
@@ -328,6 +333,8 @@ gl_shader_create(struct gl_renderer *gr,
 	glBindAttribLocation(shader->program, 0, "position");
 	if (requirements->texcoord_input == SHADER_TEXCOORD_INPUT_ATTRIB)
 		glBindAttribLocation(shader->program, 1, "texcoord");
+	if (requirements->wireframe)
+		glBindAttribLocation(shader->program, 2, "color");
 
 	glLinkProgram(shader->program);
 	glGetProgramiv(shader->program, GL_LINK_STATUS, &status);

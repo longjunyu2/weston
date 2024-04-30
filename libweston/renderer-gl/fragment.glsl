@@ -75,12 +75,13 @@ precision HIGHPRECISION float;
  * snippet.
  */
 compile_const int c_variant = DEF_VARIANT;
-compile_const bool c_input_is_premult = DEF_INPUT_IS_PREMULT;
-compile_const bool c_green_tint = DEF_GREEN_TINT;
 compile_const int c_color_pre_curve = DEF_COLOR_PRE_CURVE;
 compile_const int c_color_mapping = DEF_COLOR_MAPPING;
 compile_const int c_color_post_curve = DEF_COLOR_POST_CURVE;
 
+compile_const bool c_input_is_premult = DEF_INPUT_IS_PREMULT;
+compile_const bool c_green_tint = DEF_GREEN_TINT;
+compile_const bool c_wireframe = DEF_WIREFRAME;
 compile_const bool c_need_color_pipeline =
 	c_color_pre_curve != SHADER_COLOR_CURVE_IDENTITY ||
 	c_color_mapping != SHADER_COLOR_MAPPING_IDENTITY ||
@@ -122,6 +123,7 @@ uniform sampler2D tex;
 #endif
 
 varying HIGHPRECISION vec2 v_texcoord;
+varying HIGHPRECISION vec4 v_color;
 uniform sampler2D tex1;
 uniform sampler2D tex2;
 uniform float view_alpha;
@@ -412,6 +414,9 @@ main()
 
 	/* Electrical (non-linear) RGBA values, may be premult or not */
 	color = sample_input_texture();
+
+	if (c_wireframe)
+		color *= v_color;
 
 	if (c_need_color_pipeline)
 		color = color_pipeline(color); /* Produces straight alpha */

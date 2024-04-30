@@ -1311,6 +1311,66 @@ transform_damage(const struct weston_paint_node *pnode,
 		free(rects);
 }
 
+/* Colorise a wireframe sub-mesh. 8 colors (32 bytes) are stored unconditionally
+ * into 'color_stream'.
+ */
+static void
+store_wireframes(uint32_t *color_stream)
+{
+	static const uint32_t colors[] =
+		{ 0xff0000ff, 0xff00ff00, 0xffff0000, 0xfffffff };
+	static size_t idx = 0;
+	int i;
+
+	for (i = 0; i < 8; i++)
+		color_stream[i] = colors[idx % ARRAY_LENGTH(colors)];
+
+	idx++;
+}
+
+/* Triangulate a wireframe sub-mesh of 'count' vertices as indexed lines. 'bias'
+ * is added to each index. 'count' must be less than or equal to 8. 32 indices
+ * (64 bytes) are stored unconditionally into 'indices'. The return value is the
+ * index count.
+ */
+static int
+store_lines(size_t count,
+	    uint16_t bias,
+	    uint16_t *indices)
+ {
+	/* Look-up table of triangle lines with last entry storing the index
+	 * count. Padded to 32 elements for compilers to emit packed adds. */
+	static const uint16_t lines[][32] = {
+		{}, {}, {}, {
+			2, 0, 0, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  6
+		},{
+			3, 0, 0, 1, 1, 2, 2, 3, 3, 1, 0, 0, 0, 0, 0,  0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10
+		},{
+			4, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 1, 1, 3, 0,  0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14
+		},{
+			5, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 1, 1,  4,
+			4, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18
+		},{
+			6, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,  1,
+			1, 5, 5, 2, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22
+		},{
+			7, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,  7,
+			7, 1, 1, 6, 6, 2, 2, 5, 5, 3, 0, 0, 0, 0, 0, 26
+		},
+	};
+	int i;
+
+	assert(count < ARRAY_LENGTH(lines));
+
+	for (i = 0; i < 32; i++)
+		indices[i] = lines[count][i] + bias;
+
+	return lines[count][31];
+}
+
 /* Triangulate a sub-mesh of 'count' vertices as an indexed triangle strip.
  * 'bias' is added to each index. In order to chain sub-meshes, the last index
  * is followed by 2 indices creating 4 degenerate triangles. 'count' must be
@@ -1319,9 +1379,9 @@ transform_damage(const struct weston_paint_node *pnode,
  * indices.
  */
 static int
-store_indices(size_t count,
-	      uint16_t bias,
-	      uint16_t *indices)
+store_strips(size_t count,
+	     uint16_t bias,
+	     uint16_t *indices)
  {
 	/* Look-up table of triangle strips with last entry storing the index
 	 * count. Padded to 16 elements for compilers to emit packed adds. */
@@ -1349,9 +1409,15 @@ draw_mesh(struct gl_renderer *gr,
 	  struct weston_paint_node *pnode,
 	  const struct gl_shader_config *sconf,
 	  const struct clipper_vertex *positions,
+	  const uint32_t *colors,
 	  const uint16_t *strip,
-	  int nstrip)
+	  int nstrip,
+	  const uint16_t *lines,
+	  int nlines)
 {
+	struct gl_shader_config alt;
+	struct weston_color_transform *ctransf;
+
 	assert(nstrip > 0);
 
 	if (!gl_renderer_use_program(gr, sconf))
@@ -1359,6 +1425,35 @@ draw_mesh(struct gl_renderer *gr,
 
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, positions);
 	glDrawElements(GL_TRIANGLE_STRIP, nstrip, GL_UNSIGNED_SHORT, strip);
+
+	if (nlines == 0)
+		return;
+
+	/* Fan debugging is rendered as lines colored with the solid shader
+	 * variant filtered per sub-mesh using vertex colors. */
+	alt = (struct gl_shader_config) {
+		.req = {
+			.variant = SHADER_VARIANT_SOLID,
+			.input_is_premult = true,
+			.wireframe = true,
+		},
+		.projection = sconf->projection,
+		.view_alpha = 1.0f,
+		.unicolor = { 1.0f, 1.0f, 1.0f, 1.0f },
+	};
+	ctransf = pnode->output->color_outcome->from_sRGB_to_blend;
+	if (!gl_shader_config_set_color_transform(gr, &alt, ctransf)) {
+		weston_log("GL-renderer: %s failed to generate a color "
+			   "transformation.\n", __func__);
+		return;
+	}
+	if (!gl_renderer_use_program(gr, &alt))
+		return;
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_FALSE, 0, colors);
+	glDrawElements(GL_LINES, nlines, GL_UNSIGNED_SHORT, lines);
+	glDisableVertexAttribArray(2);
 }
 
 static void
@@ -1371,14 +1466,18 @@ repaint_region(struct gl_renderer *gr,
 {
 	pixman_box32_t *rects;
 	struct clipper_vertex *positions;
-	uint16_t *indices;
-	int i, j, n, nrects, positions_size, indices_size;
-	int nvtx = 0, nidx = 0;
+	uint32_t *colors = NULL;
+	uint16_t *strips, *lines = NULL;
+	int i, j, n, nrects, positions_size, colors_size, strips_size;
+	int lines_size, nvtx = 0, nstrips = 0, nlines = 0;
+	bool wireframe = gr->fan_debug;
 
 	/* Build-time sub-mesh constants. Clipping emits 8 vertices max.
-	 * store_indices() stores at most 10 indices. */
+	 * store_strips() and store_lines() respectively store 10 and 26 indices
+	 * at most. */
 	const int nvtx_max = 8;
-	const int nidx_max = 10;
+	const int nstrips_max = 10;
+	const int nlines_max = 26;
 
 	rects = pixman_region32_rectangles(region, &nrects);
 	assert((nrects > 0) && (nquads > 0));
@@ -1386,10 +1485,16 @@ repaint_region(struct gl_renderer *gr,
 	/* Worst case allocation sizes per sub-mesh. */
 	n = nquads * nrects;
 	positions_size = n * nvtx_max * sizeof *positions;
-	indices_size = ROUND_UP_N(n * nidx_max * sizeof *indices, 32);
+	colors_size = ROUND_UP_N(n * nvtx_max * sizeof *colors, 32);
+	strips_size = ROUND_UP_N(n * nstrips_max * sizeof *strips, 32);
+	lines_size = ROUND_UP_N(n * nlines_max * sizeof *lines, 64);
 
 	positions = wl_array_add(&gr->position_stream, positions_size);
-	indices = wl_array_add(&gr->indices, indices_size);
+	strips = wl_array_add(&gr->indices[0], strips_size);
+	if (wireframe) {
+		colors = wl_array_add(&gr->color_stream, colors_size);
+		lines = wl_array_add(&gr->indices[1], lines_size);
+	}
 
 	/* A node's damage mesh is created by clipping damage quads to surface
 	 * rects and by chaining the resulting sub-meshes into an indexed
@@ -1413,24 +1518,33 @@ repaint_region(struct gl_renderer *gr,
 		for (j = 0; j < nrects; j++) {
 			n = clipper_quad_clip_box32(&quads[i], &rects[j],
 						    &positions[nvtx]);
-			nidx += store_indices(n, nvtx, &indices[nidx]);
+			nstrips += store_strips(n, nvtx, &strips[nstrips]);
+			if (wireframe) {
+				store_wireframes(&colors[nvtx]);
+				nlines += store_lines(n, nvtx, &lines[nlines]);
+			}
 			nvtx += n;
 
 			/* Highly unlikely flush to prevent index wraparound.
 			 * Subtracting 2 removes the last chaining indices. */
 			if ((nvtx + nvtx_max) > UINT16_MAX) {
-				draw_mesh(gr, pnode, sconf, positions, indices,
-					  nidx - 2);
-				nvtx = nidx = 0;
+				draw_mesh(gr, pnode, sconf, positions, colors,
+					  strips, nstrips - 2, lines, nlines);
+				nvtx = nstrips = nlines = 0;
 			}
 		}
 	}
 
 	if (nvtx)
-		draw_mesh(gr, pnode, sconf, positions, indices, nidx - 2);
+		draw_mesh(gr, pnode, sconf, positions, colors, strips,
+			  nstrips - 2, lines, nlines);
 
 	gr->position_stream.size = 0;
-	gr->indices.size = 0;
+	gr->indices[0].size = 0;
+	if (wireframe) {
+		gr->color_stream.size = 0;
+		gr->indices[1].size = 0;
+	}
 }
 
 static void
@@ -4010,7 +4124,9 @@ gl_renderer_destroy(struct weston_compositor *ec)
 	eglReleaseThread();
 
 	wl_array_release(&gr->position_stream);
-	wl_array_release(&gr->indices);
+	wl_array_release(&gr->color_stream);
+	wl_array_release(&gr->indices[0]);
+	wl_array_release(&gr->indices[1]);
 
 	if (gr->fragment_binding)
 		weston_binding_destroy(gr->fragment_binding);
