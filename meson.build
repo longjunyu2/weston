@@ -94,6 +94,17 @@ foreach hdr : optional_system_headers
 	endif
 endforeach
 
+optional_builtins = {
+	'builtin_clz': 'return __builtin_clz(1);',
+	'builtin_bswap32': 'return __builtin_bswap32(0);',
+	'builtin_popcount': 'return __builtin_popcount(0);',
+}
+foreach name, check : optional_builtins
+	if cc.links('int main(void) { @0@ }'.format(check), name: name)
+		config_h.set('HAVE_' + name.to_upper(), 1)
+	endif
+endforeach
+
 env_modmap = ''
 
 config_h.set('_GNU_SOURCE', '1')

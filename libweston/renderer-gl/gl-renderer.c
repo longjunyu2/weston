@@ -242,7 +242,7 @@ static inline const char *
 dump_format(uint32_t format, char out[4])
 {
 #if BYTE_ORDER == BIG_ENDIAN
-	format = __builtin_bswap32(format);
+	format = bswap32(format);
 #endif
 	memcpy(out, &format, 4);
 	return out;

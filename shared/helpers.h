@@ -22,6 +22,8 @@
 #ifndef WESTON_HELPERS_H
 #define WESTON_HELPERS_H
 
+#include "config.h"
+
 #include <stdint.h>
 
 #ifdef  __cplusplus
@@ -232,6 +234,46 @@ do {                        \
 #else
 #define unreachable(str) assert(!str)
 #endif
+
+/**
+ * Returns number of bits set in 32-bit value x.
+ *
+ * @param x a 32-bit value.
+ * @return the number of bits set.
+ */
+static inline int
+bitcount32(uint32_t x)
+{
+#if defined(HAVE_BUILTIN_POPCOUNT)
+	return __builtin_popcount(x);
+#else
+	int n;
+
+	for (n = 0; x; n++)
+		x &= x - 1;
+
+	return n;
+#endif
+}
+
+/**
+ * Returns 32-bit value x in reversed byte order.
+ *
+ * @param x a 32-bit value.
+ * @return the reversed 32-bit value.
+ */
+static inline uint32_t
+bswap32(uint32_t x)
+{
+#if defined(HAVE_BUILTIN_BSWAP32)
+	return __builtin_bswap32(x);
+#else
+	return (x >> 24) |
+		((x >> 8) & 0x0000ff00) |
+		((x << 8) & 0x00ff0000) |
+		(x << 24);
+#endif
+}
 
 #ifdef  __cplusplus
 }

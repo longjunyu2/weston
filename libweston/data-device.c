@@ -201,7 +201,7 @@ data_offer_set_actions(struct wl_client *client,
 
 	if (preferred_action &&
 	    (!(preferred_action & dnd_actions) ||
-	     __builtin_popcount(preferred_action) > 1)) {
+	     bitcount32(preferred_action) > 1)) {
 		wl_resource_post_error(offer->resource,
 				       WL_DATA_OFFER_ERROR_INVALID_ACTION,
 				       "invalid action %x", preferred_action);
