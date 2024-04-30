@@ -7651,6 +7651,8 @@ weston_output_set_color_profile(struct weston_output *output,
  * supported on the output. Enabling an output with an unsupported EOTF mode
  * has undefined visual results.
  *
+ * TODO: Enforce mode validity.
+ *
  * The initial EOTF mode is SDR.
  *
  * \ingroup output
