@@ -181,12 +181,14 @@ do { \
  * @param cond Expression to check for truth
  * @param msg Message to print on failure
  */
+#if !(defined(__cplusplus) && __cplusplus >= 201103L)
 #ifndef static_assert
 # ifdef _Static_assert
 #  define static_assert(cond, msg) _Static_assert(cond, msg)
 # else
 #  define static_assert(cond, msg)
 # endif
+#endif
 #endif
 
 /** Ensure argument is of given type */
