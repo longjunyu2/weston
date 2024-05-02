@@ -129,3 +129,18 @@ do {										\
 				    __FILE__, __LINE__, #bit, b, #value, v);	\
 	cond;									\
 })
+
+#define weston_assert_legal_bits(compositor, value, mask)			\
+({										\
+	struct weston_compositor *ec = compositor;				\
+	uint64_t v_ = (value);							\
+	uint64_t m_ = (mask);							\
+	uint64_t ill = v_ & ~m_;							\
+	bool cond = ill == 0;							\
+	if (!cond)								\
+		custom_assert_fail_(ec, "%s:%u: Assertion failed! "		\
+				    "Value %s (0x%" PRIx64 ") contains illegal bits 0x%" PRIx64 ". " \
+				    "Legal mask is %s (0x%" PRIx64 ").\n",	\
+				    __FILE__, __LINE__, #value, v_, ill, #mask, m_); \
+	cond;									\
+})

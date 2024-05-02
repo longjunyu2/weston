@@ -136,4 +136,12 @@ TEST(asserts)
 	uint64_t max_uint64 = UINT64_MAX;
 	ret = weston_assert_uint64_eq(compositor, max_uint64, 0);
 	abort_if_not(ret == false);
+
+	uint64_t val = 0x200010001000ffff;
+	uint64_t msk = 0x00000000fffffff3;
+	ret = weston_assert_legal_bits(compositor, val, msk);
+	abort_if_not(ret == false);
+
+	ret = weston_assert_legal_bits(compositor, val, UINT64_MAX);
+	abort_if_not(ret);
 }

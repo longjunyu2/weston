@@ -6805,7 +6805,8 @@ WL_EXPORT void
 weston_head_set_supported_eotf_mask(struct weston_head *head,
 				    uint32_t eotf_mask)
 {
-	assert((eotf_mask & ~WESTON_EOTF_MODE_ALL_MASK) == 0);
+	weston_assert_legal_bits(head->compositor,
+				 eotf_mask, WESTON_EOTF_MODE_ALL_MASK);
 
 	if (head->supported_eotf_mask == eotf_mask)
 		return;
