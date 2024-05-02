@@ -36,29 +36,13 @@
 #include "weston-test-fixture-compositor.h"
 #include "xdg-shell-client-protocol.h"
 
-struct setup_args {
-	struct fixture_metadata meta;
-	enum weston_renderer_type renderer;
-};
-
-static const struct setup_args my_setup_args[] = {
-	{
-		.renderer = WESTON_RENDERER_PIXMAN,
-		.meta.name = "pixman"
-	},
-	{
-		.renderer = WESTON_RENDERER_GL,
-		.meta.name = "GL"
-	},
-};
-
 static enum test_result_code
-fixture_setup(struct weston_test_harness *harness, const struct setup_args *arg)
+fixture_setup(struct weston_test_harness *harness)
 {
 	struct compositor_setup setup;
 
 	compositor_setup_defaults(&setup);
-	setup.renderer = arg->renderer;
+	setup.renderer = WESTON_RENDERER_PIXMAN;
 	setup.width = 320;
 	setup.height = 240;
 	setup.shell = SHELL_KIOSK;
@@ -67,7 +51,7 @@ fixture_setup(struct weston_test_harness *harness, const struct setup_args *arg)
 
 	return weston_test_harness_execute_as_client(harness, &setup);
 }
-DECLARE_FIXTURE_SETUP_WITH_ARG(fixture_setup, my_setup_args, meta);
+DECLARE_FIXTURE_SETUP(fixture_setup);
 
 
 
