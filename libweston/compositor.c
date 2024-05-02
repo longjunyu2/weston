@@ -7662,7 +7662,7 @@ WL_EXPORT void
 weston_output_set_eotf_mode(struct weston_output *output,
 			    enum weston_eotf_mode eotf_mode)
 {
-	assert(!output->enabled);
+	weston_assert_false(output->compositor, output->enabled);
 
 	output->eotf_mode = eotf_mode;
 }

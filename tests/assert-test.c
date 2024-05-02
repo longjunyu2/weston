@@ -86,6 +86,12 @@ TEST(asserts)
 	ret = weston_assert_true(compositor, true);
 	abort_if_not(ret);
 
+	ret = weston_assert_false(compositor, true);
+	abort_if_not(ret == false);
+
+	ret = weston_assert_false(compositor, false);
+	abort_if_not(ret);
+
 	ret = weston_assert_true(compositor, true && false);
 	abort_if_not(ret == false);
 
