@@ -66,6 +66,12 @@
 
 #define BUFFER_DAMAGE_COUNT 2
 
+enum gl_debug_mode {
+	DEBUG_MODE_NONE = 0,
+	DEBUG_MODE_SHADERS,
+	DEBUG_MODE_LAST,
+};
+
 enum gl_border_status {
 	BORDER_STATUS_CLEAN = 0,
 	BORDER_TOP_DIRTY = 1 << GL_RENDERER_BORDER_TOP,
@@ -1394,6 +1400,7 @@ draw_mesh(struct gl_renderer *gr,
 		sconf->req.wireframe = wireframe;
 		sconf->wireframe_tex = gr->wireframe_tex;
 	}
+	sconf->req.green_tint = gr->debug_mode == DEBUG_MODE_SHADERS;
 
 	if (!gl_renderer_use_program(gr, sconf))
 		gl_renderer_send_shader_error(pnode); /* Use fallback shader. */
@@ -4149,8 +4156,8 @@ gl_renderer_destroy(struct weston_compositor *ec)
 	wl_array_release(&gr->barycentric_stream);
 	wl_array_release(&gr->indices);
 
-	if (gr->fragment_binding)
-		weston_binding_destroy(gr->fragment_binding);
+	if (gr->debug_mode_binding)
+		weston_binding_destroy(gr->debug_mode_binding);
 	if (gr->wireframe_binding)
 		weston_binding_destroy(gr->wireframe_binding);
 
@@ -4353,18 +4360,15 @@ fail:
 }
 
 static void
-fragment_debug_binding(struct weston_keyboard *keyboard,
-		       const struct timespec *time,
-		       uint32_t key, void *data)
+debug_mode_binding(struct weston_keyboard *keyboard,
+		   const struct timespec *time,
+		   uint32_t key, void *data)
 {
-	struct weston_compositor *ec = data;
-	struct gl_renderer *gr = get_renderer(ec);
-	struct weston_output *output;
+	struct weston_compositor *compositor = data;
+	struct gl_renderer *gr = get_renderer(compositor);
 
-	gr->fragment_shader_debug = !gr->fragment_shader_debug;
-
-	wl_list_for_each(output, &ec->output_list, link)
-		weston_output_damage(output);
+	gr->debug_mode = (gr->debug_mode + 1) % DEBUG_MODE_LAST;
+	weston_compositor_damage_all(compositor);
 }
 
 static void
@@ -4608,10 +4612,9 @@ gl_renderer_setup(struct weston_compositor *ec)
 		return -1;
 	}
 
-	gr->fragment_binding =
-		weston_compositor_add_debug_binding(ec, KEY_S,
-						    fragment_debug_binding,
-						    ec);
+	gr->debug_mode_binding =
+		weston_compositor_add_debug_binding(ec, KEY_M,
+						    debug_mode_binding, ec);
 	gr->wireframe_binding =
 		weston_compositor_add_debug_binding(ec, KEY_F,
 						    wireframe_debug_repaint_binding,

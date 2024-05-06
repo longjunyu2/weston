@@ -145,9 +145,9 @@ Enable/Disable overlay planes.
 .RS 4
 Start VAAPI recorder.
 .RE
-- KEY_S : 
+- KEY_M :
 .RS 4
-Enable fragment debugging for gl-renderer.
+Cycle through gl-renderer debug modes: none, shaders.
 .RE
 - KEY_F :
 .RS 4

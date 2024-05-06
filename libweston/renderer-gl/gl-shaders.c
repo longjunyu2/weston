@@ -587,9 +587,6 @@ gl_renderer_get_program(struct gl_renderer *gr,
 
 	assert(reqs.pad_bits_ == 0);
 
-	if (gr->fragment_shader_debug)
-		reqs.green_tint = true;
-
 	if (gr->current_shader &&
 	    gl_shader_requirements_cmp(&reqs, &gr->current_shader->key) == 0)
 		return gr->current_shader;
