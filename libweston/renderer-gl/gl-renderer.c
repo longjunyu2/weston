@@ -1450,10 +1450,11 @@ draw_mesh(struct gl_renderer *gr,
 	if (!gl_renderer_use_program(gr, &alt))
 		return;
 
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_FALSE, 0, colors);
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_COLOR);
+	glVertexAttribPointer(SHADER_ATTRIB_LOC_COLOR, 4, GL_UNSIGNED_BYTE,
+			      GL_FALSE, 0, colors);
 	glDrawElements(GL_LINES, nlines, GL_UNSIGNED_SHORT, lines);
-	glDisableVertexAttribArray(2);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_COLOR);
 }
 
 static void
@@ -1652,7 +1653,7 @@ repaint_views(struct weston_output *output, pixman_region32_t *damage)
 	struct weston_paint_node *pnode;
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 
 	wl_list_for_each_reverse(pnode, &output->paint_node_z_order_list,
 				 z_order_link) {
@@ -1660,7 +1661,7 @@ repaint_views(struct weston_output *output, pixman_region32_t *damage)
 			draw_paint_node(pnode, damage);
 	}
 
-	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 }
 
 static int
@@ -1784,15 +1785,17 @@ draw_output_border_texture(struct gl_renderer *gr,
 		0.0f, 1.0f,
 	};
 
-	GLfloat verts[] = {
+	GLfloat position[] = {
 		x, y,
 		x + width, y,
 		x + width, y + height,
 		x, y + height
 	};
 
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, verts);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, texcoord);
+	glVertexAttribPointer(SHADER_ATTRIB_LOC_POSITION, 2, GL_FLOAT, GL_FALSE,
+			      0, position);
+	glVertexAttribPointer(SHADER_ATTRIB_LOC_TEXCOORD, 2, GL_FLOAT, GL_FALSE,
+			      0, texcoord);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
 }
 
@@ -1885,8 +1888,8 @@ draw_output_borders(struct weston_output *output,
 			    2.0 / fb->width, -2.0 / fb->height, 1);
 
 	glActiveTexture(GL_TEXTURE0);
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
 
 	for (side = 0; side < 4; side++) {
 		struct weston_geometry g;
@@ -1899,8 +1902,8 @@ draw_output_borders(struct weston_output *output,
 					   g.x, g.y, g.width, g.height);
 	}
 
-	glDisableVertexAttribArray(1);
-	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 }
 
 static void
@@ -2102,8 +2105,8 @@ blit_shadow_to_output(struct weston_output *output,
 	weston_region_global_to_output(&translated_damage, output,
 				       &translated_damage);
 
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
 
 	rects = pixman_region32_rectangles(&translated_damage, &n_rects);
 	for (i = 0; i < n_rects; i++) {
@@ -2118,16 +2121,15 @@ blit_shadow_to_output(struct weston_output *output,
 		verts[6] = rects[i].x1 / width;
 		verts[7] = (height - rects[i].y2) / height;
 
-		/* position: */
-		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, verts);
-		/* texcoord: */
-		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, verts);
-
+		glVertexAttribPointer(SHADER_ATTRIB_LOC_POSITION, 2, GL_FLOAT,
+				      GL_FALSE, 0, verts);
+		glVertexAttribPointer(SHADER_ATTRIB_LOC_TEXCOORD, 2, GL_FLOAT,
+				      GL_FALSE, 0, verts);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 	}
 
-	glDisableVertexAttribArray(1);
-	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	pixman_region32_fini(&translated_damage);
@@ -3663,18 +3665,15 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 	if (!gl_renderer_use_program(gr, &sconf))
 		goto out;
 
-	/* position: */
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, verts);
-	glEnableVertexAttribArray(0);
-
-	/* texcoord: */
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, verts);
-	glEnableVertexAttribArray(1);
-
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
+	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
+	glVertexAttribPointer(SHADER_ATTRIB_LOC_POSITION, 2, GL_FLOAT, GL_FALSE,
+			      0, verts);
+	glVertexAttribPointer(SHADER_ATTRIB_LOC_TEXCOORD, 2, GL_FLOAT, GL_FALSE,
+			      0, verts);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-
-	glDisableVertexAttribArray(1);
-	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
+	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 
 	if (gr->has_pack_reverse)
 		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_FALSE);

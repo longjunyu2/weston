@@ -72,6 +72,12 @@ enum gl_shader_color_mapping {
 	SHADER_COLOR_MAPPING_MATRIX,
 };
 
+enum gl_shader_attrib_loc {
+	SHADER_ATTRIB_LOC_POSITION = 0,
+	SHADER_ATTRIB_LOC_TEXCOORD,
+	SHADER_ATTRIB_LOC_COLOR,
+};
+
 /** GL shader requirements key
  *
  * This structure is used as a binary blob key for building and searching

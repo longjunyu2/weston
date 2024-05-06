@@ -330,11 +330,15 @@ gl_shader_create(struct gl_renderer *gr,
 	shader->program = glCreateProgram();
 	glAttachShader(shader->program, shader->vertex_shader);
 	glAttachShader(shader->program, shader->fragment_shader);
-	glBindAttribLocation(shader->program, 0, "position");
+
+	glBindAttribLocation(shader->program, SHADER_ATTRIB_LOC_POSITION,
+			     "position");
 	if (requirements->texcoord_input == SHADER_TEXCOORD_INPUT_ATTRIB)
-		glBindAttribLocation(shader->program, 1, "texcoord");
+		glBindAttribLocation(shader->program,
+				     SHADER_ATTRIB_LOC_TEXCOORD, "texcoord");
 	if (requirements->wireframe)
-		glBindAttribLocation(shader->program, 2, "color");
+		glBindAttribLocation(shader->program, SHADER_ATTRIB_LOC_COLOR,
+				     "color");
 
 	glLinkProgram(shader->program);
 	glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
