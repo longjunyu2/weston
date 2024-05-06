@@ -131,8 +131,11 @@ uniform sampler2D tex;
 
 varying HIGHPRECISION vec2 v_texcoord;
 varying HIGHPRECISION vec4 v_color;
+varying HIGHPRECISION vec3 v_barycentric;
+
 uniform sampler2D tex1;
 uniform sampler2D tex2;
+uniform sampler2D tex_wireframe;
 uniform float view_alpha;
 uniform vec4 unicolor;
 
@@ -428,6 +431,17 @@ color_pipeline(vec4 color)
 	return color;
 }
 
+vec4
+wireframe()
+{
+	float edge1 = texture2D(tex_wireframe, vec2(v_barycentric.x, 0.5)).r;
+	float edge2 = texture2D(tex_wireframe, vec2(v_barycentric.y, 0.5)).r;
+	float edge3 = texture2D(tex_wireframe, vec2(v_barycentric.z, 0.5)).r;
+	float edge = clamp(edge1 + edge2 + edge3, 0.0, 1.0);
+
+	return vec4(edge) * v_color;
+}
+
 void
 main()
 {
@@ -435,9 +449,6 @@ main()
 
 	/* Electrical (non-linear) RGBA values, may be premult or not */
 	color = sample_input_texture();
-
-	if (c_wireframe)
-		color *= v_color;
 
 	if (c_need_color_pipeline)
 		color = color_pipeline(color); /* Produces straight alpha */
@@ -450,6 +461,11 @@ main()
 
 	if (c_green_tint)
 		color = vec4(0.0, 0.3, 0.0, 0.2) + color * 0.8;
+
+	if (c_wireframe) {
+		vec4 src = wireframe();
+		color = color * vec4(1.0 - src.a) + src;
+	}
 
 	gl_FragColor = color;
 }

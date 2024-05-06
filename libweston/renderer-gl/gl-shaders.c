@@ -61,6 +61,7 @@ struct gl_shader {
 	GLint proj_uniform;
 	GLint surface_to_buffer_uniform;
 	GLint tex_uniforms[3];
+	GLint tex_uniform_wireframe;
 	GLint view_alpha_uniform;
 	GLint color_uniform;
 	union {
@@ -359,9 +360,13 @@ gl_shader_create(struct gl_renderer *gr,
 	if (requirements->texcoord_input == SHADER_TEXCOORD_INPUT_ATTRIB)
 		glBindAttribLocation(shader->program,
 				     SHADER_ATTRIB_LOC_TEXCOORD, "texcoord");
-	if (requirements->wireframe)
+	if (requirements->wireframe) {
 		glBindAttribLocation(shader->program, SHADER_ATTRIB_LOC_COLOR,
 				     "color");
+		glBindAttribLocation(shader->program,
+				     SHADER_ATTRIB_LOC_BARYCENTRIC,
+				     "barycentric");
+	}
 
 	glLinkProgram(shader->program);
 	glGetProgramiv(shader->program, GL_LINK_STATUS, &status);
@@ -380,6 +385,9 @@ gl_shader_create(struct gl_renderer *gr,
 	shader->tex_uniforms[0] = glGetUniformLocation(shader->program, "tex");
 	shader->tex_uniforms[1] = glGetUniformLocation(shader->program, "tex1");
 	shader->tex_uniforms[2] = glGetUniformLocation(shader->program, "tex2");
+	if (requirements->wireframe)
+		shader->tex_uniform_wireframe =
+			glGetUniformLocation(shader->program, "tex_wireframe");
 	shader->view_alpha_uniform = glGetUniformLocation(shader->program, "view_alpha");
 	if (requirements->variant == SHADER_VARIANT_SOLID) {
 		shader->color_uniform = glGetUniformLocation(shader->program,
@@ -752,6 +760,13 @@ gl_shader_load_config(struct gl_shader *shader,
 		glUniform1i(shader->color_post_curve.parametric.clamped_input_uniform,
 			    sconf->color_post_curve.parametric.clamped_input);
 		break;
+	}
+
+	if (sconf->req.wireframe) {
+		assert(sconf->wireframe_tex != 0);
+		glUniform1i(shader->tex_uniform_wireframe, GL_SHADER_WIREFRAME_TEX_UNIT);
+		glActiveTexture(GL_TEXTURE0 + GL_SHADER_WIREFRAME_TEX_UNIT);
+		glBindTexture(GL_TEXTURE_2D, sconf->wireframe_tex);
 	}
 }
 

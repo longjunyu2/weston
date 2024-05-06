@@ -47,10 +47,12 @@ uniform mat4 surface_to_buffer;
 attribute vec2 position;
 attribute vec2 texcoord;
 attribute vec4 color;
+attribute vec4 barycentric;
 
 /* Match the varying precision to the fragment shader */
 varying FRAG_PRECISION vec2 v_texcoord;
 varying FRAG_PRECISION vec4 v_color;
+varying FRAG_PRECISION vec3 v_barycentric;
 
 compile_const int c_texcoord_input = DEF_TEXCOORD_INPUT;
 compile_const bool c_wireframe = DEF_WIREFRAME;
@@ -64,6 +66,8 @@ void main()
 	else if (c_texcoord_input == SHADER_TEXCOORD_INPUT_SURFACE)
 		v_texcoord = vec2(surface_to_buffer * vec4(position, 0.0, 1.0));
 
-	if (c_wireframe)
+	if (c_wireframe) {
 		v_color = color;
+		v_barycentric = barycentric.xyz;
+	}
 }

@@ -76,6 +76,7 @@ enum gl_shader_attrib_loc {
 	SHADER_ATTRIB_LOC_POSITION = 0,
 	SHADER_ATTRIB_LOC_TEXCOORD,
 	SHADER_ATTRIB_LOC_COLOR,
+	SHADER_ATTRIB_LOC_BARYCENTRIC,
 };
 
 /** GL shader requirements key
@@ -115,6 +116,8 @@ struct gl_shader;
 struct weston_color_transform;
 
 #define GL_SHADER_INPUT_TEX_MAX 3
+#define GL_SHADER_WIREFRAME_TEX_UNIT GL_SHADER_INPUT_TEX_MAX
+
 struct gl_shader_config {
 	struct gl_shader_requirements req;
 
@@ -124,6 +127,7 @@ struct gl_shader_config {
 	GLfloat unicolor[4];
 	GLint input_tex_filter; /* GL_NEAREST or GL_LINEAR */
 	GLuint input_tex[GL_SHADER_INPUT_TEX_MAX];
+	GLuint wireframe_tex;
 
 	union {
 		struct {
@@ -161,10 +165,14 @@ struct gl_renderer {
 	struct weston_compositor *compositor;
 	struct weston_log_scope *renderer_scope;
 
-	bool fragment_shader_debug;
-	bool wireframe_debug;
 	struct weston_binding *fragment_binding;
+	bool fragment_shader_debug;
+
 	struct weston_binding *wireframe_binding;
+	bool wireframe_debug;
+	bool wireframe_dirty;
+	GLuint wireframe_tex;
+	int wireframe_size;
 
 	EGLenum platform;
 	EGLDisplay egl_display;
@@ -176,7 +184,8 @@ struct gl_renderer {
 	/* Vertex streams. */
 	struct wl_array position_stream;
 	struct wl_array color_stream;
-	struct wl_array indices[2];
+	struct wl_array barycentric_stream;
+	struct wl_array indices;
 
 	EGLDeviceEXT egl_device;
 	const char *drm_device;
