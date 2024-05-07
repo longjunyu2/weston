@@ -73,6 +73,7 @@ struct weston_point2d_device_normalized {
 	double y;
 };
 
+struct weston_compositor;
 struct weston_surface;
 struct weston_buffer;
 struct shell_surface;
@@ -84,6 +85,7 @@ struct linux_dmabuf_buffer;
 struct weston_recorder;
 struct weston_pointer_constraint;
 struct ro_anonymous_file;
+struct weston_color_profile_param_builder;
 struct weston_color_profile;
 struct weston_color_transform;
 struct pixel_format_info;
@@ -349,6 +351,69 @@ enum weston_transfer_function {
 	WESTON_TF_HLG,
 	WESTON_TF_POWER,
 };
+
+/** Error codes that the color profile parameters functions may return. */
+enum weston_color_profile_param_builder_error {
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_INVALID_TF = 0,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_INVALID_PRIMARIES,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_INVALID_TARGET_PRIMARIES,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_CIE_XY_OUT_OF_RANGE,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_INVALID_LUMINANCE,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_INCONSISTENT_LUMINANCES,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_INCONSISTENT_SET,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_INCOMPLETE_SET,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_ALREADY_SET,
+	WESTON_COLOR_PROFILE_PARAM_BUILDER_ERROR_UNSUPPORTED,
+};
+
+struct weston_color_profile_param_builder *
+weston_color_profile_param_builder_create(struct weston_compositor *compositor);
+
+void
+weston_color_profile_param_builder_destroy(struct weston_color_profile_param_builder *builder);
+
+bool
+weston_color_profile_param_builder_get_error(struct weston_color_profile_param_builder *builder,
+                                             enum weston_color_profile_param_builder_error *err,
+                                             char **err_msg);
+
+bool
+weston_color_profile_param_builder_set_primaries(struct weston_color_profile_param_builder *builder,
+						 const struct weston_color_gamut *primaries);
+
+bool
+weston_color_profile_param_builder_set_primaries_named(struct weston_color_profile_param_builder *builder,
+						       enum weston_color_primaries primaries);
+
+bool
+weston_color_profile_param_builder_set_tf_named(struct weston_color_profile_param_builder *builder,
+						enum weston_transfer_function tf);
+
+bool
+weston_color_profile_param_builder_set_tf_power_exponent(struct weston_color_profile_param_builder *builder,
+							 float power_exponent);
+
+bool
+weston_color_profile_param_builder_set_target_primaries(struct weston_color_profile_param_builder *builder,
+							const struct weston_color_gamut *target_primaries);
+
+bool
+weston_color_profile_param_builder_set_target_luminance(struct weston_color_profile_param_builder *builder,
+							float min_luminance, float max_luminance);
+
+bool
+weston_color_profile_param_builder_set_maxFALL(struct weston_color_profile_param_builder *builder,
+					       float maxFALL);
+
+bool
+weston_color_profile_param_builder_set_maxCLL(struct weston_color_profile_param_builder *builder,
+					      float maxCLL);
+
+struct weston_color_profile *
+weston_color_profile_param_builder_create_color_profile(struct weston_color_profile_param_builder *builder,
+							const char *name_part,
+							enum weston_color_profile_param_builder_error *err,
+							char **err_msg);
 
 enum weston_color_characteristics_groups {
 	/** weston_color_characteristics::primary is set */

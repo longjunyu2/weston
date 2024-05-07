@@ -18,6 +18,7 @@ srcs_libweston = [
 	'color-properties.c',
 	'color-management.c',
 	'color-noop.c',
+	'color-profile-param-builder.c',
 	'compositor.c',
 	'content-protection.c',
 	'data-device.c',
