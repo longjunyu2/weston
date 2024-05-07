@@ -147,7 +147,7 @@ Start VAAPI recorder.
 .RE
 - KEY_M :
 .RS 4
-Cycle through gl-renderer debug modes: none, shaders, wireframe.
+Cycle through gl-renderer debug modes: none, shaders, wireframe, batches.
 .RE
 - KEY_R :
 .RS 4

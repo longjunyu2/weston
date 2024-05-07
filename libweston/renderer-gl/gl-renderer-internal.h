@@ -172,6 +172,7 @@ struct gl_renderer {
 	bool wireframe_dirty;
 	GLuint wireframe_tex;
 	int wireframe_size;
+	int nbatches;
 
 	EGLenum platform;
 	EGLDisplay egl_display;

@@ -70,6 +70,7 @@ enum gl_debug_mode {
 	DEBUG_MODE_NONE = 0,
 	DEBUG_MODE_SHADERS,
 	DEBUG_MODE_WIREFRAME,
+	DEBUG_MODE_BATCHES,
 	DEBUG_MODE_LAST,
 };
 
@@ -1390,13 +1391,23 @@ draw_mesh(struct gl_renderer *gr,
 			{},                         /* DEBUG_MODE_NONE */
 			{ 0.0f, 0.3f, 0.0f, 0.2f }, /* DEBUG_MODE_SHADERS */
 			{ 0.0f, 0.0f, 0.0f, 0.3f }, /* DEBUG_MODE_WIREFRAME */
+			{},                         /* DEBUG_MODE_BATCHES */
 		};
+		static const float batch_tints[][4] = {
+			{ 0.9f, 0.0f, 0.0f, 0.9f },
+			{ 0.0f, 0.9f, 0.0f, 0.9f },
+			{ 0.0f, 0.0f, 0.9f, 0.9f },
+			{ 0.9f, 0.9f, 0.0f, 0.9f },
+			{ 0.9f, 0.0f, 0.9f, 0.9f },
+			{ 0.0f, 0.9f, 0.9f, 0.9f },
+			{ 0.9f, 0.9f, 0.9f, 0.9f },
+		};
+		int i;
 
-		assert(gr->debug_mode < DEBUG_MODE_LAST);
-		copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
 		sconf->req.tint = true;
 
-		if (gr->debug_mode == DEBUG_MODE_WIREFRAME) {
+		switch (gr->debug_mode) {
+		case DEBUG_MODE_WIREFRAME:
 			/* Wireframe rendering is based on Celes & Abraham's
 			 * "Fast and versatile texture-based wireframe
 			 * rendering", 2011. */
@@ -1406,6 +1417,19 @@ draw_mesh(struct gl_renderer *gr,
 			glVertexAttribPointer(SHADER_ATTRIB_LOC_BARYCENTRIC, 4,
 					      GL_UNSIGNED_BYTE, GL_TRUE, 0,
 					      barycentrics);
+			FALLTHROUGH;
+
+		case DEBUG_MODE_SHADERS:
+			copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
+			break;
+
+		case DEBUG_MODE_BATCHES:
+			i = gr->nbatches++ % ARRAY_LENGTH(batch_tints);
+			copy_uniform4f(sconf->tint, batch_tints[i]);
+			break;
+
+		default:
+			unreachable("Invalid debug mode");
 		}
 	}
 
@@ -1612,7 +1636,10 @@ out:
 static void
 repaint_views(struct weston_output *output, pixman_region32_t *damage)
 {
+	struct gl_renderer *gr = get_renderer(output->compositor);
 	struct weston_paint_node *pnode;
+
+	gr->nbatches = 0;
 
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
@@ -4366,7 +4393,8 @@ debug_mode_binding(struct weston_keyboard *keyboard,
 
 	mode = (gr->debug_mode + 1) % DEBUG_MODE_LAST;
 	gr->debug_mode = mode;
-	gr->debug_clear = mode == DEBUG_MODE_WIREFRAME;
+	gr->debug_clear = mode == DEBUG_MODE_WIREFRAME ||
+		mode == DEBUG_MODE_BATCHES;
 	gr->wireframe_dirty = mode == DEBUG_MODE_WIREFRAME;
 
 	weston_compositor_damage_all(compositor);
