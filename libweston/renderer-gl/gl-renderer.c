@@ -69,6 +69,7 @@
 enum gl_debug_mode {
 	DEBUG_MODE_NONE = 0,
 	DEBUG_MODE_SHADERS,
+	DEBUG_MODE_WIREFRAME,
 	DEBUG_MODE_LAST,
 };
 
@@ -1377,32 +1378,35 @@ draw_mesh(struct gl_renderer *gr,
 	  const struct clipper_vertex *positions,
 	  const uint32_t *barycentrics,
 	  const uint16_t *indices,
-	  int nidx,
-	  bool wireframe)
+	  int nidx)
 {
 	assert(nidx > 0);
 
-	if (wireframe) {
-		/* Wireframe rendering is based on Celes & Abraham's "Fast and
-		 * versatile texture-based wireframe rendering", 2011. */
-		glEnableVertexAttribArray(SHADER_ATTRIB_LOC_BARYCENTRIC);
-		glVertexAttribPointer(SHADER_ATTRIB_LOC_BARYCENTRIC, 4,
-				      GL_UNSIGNED_BYTE, GL_TRUE, 0,
-				      barycentrics);
+	if (gr->debug_mode) {
+		/* Debug mode tints indexed by gl_debug_mode enumeration. While
+		 * tints are meant to be premultiplied, debug modes can have
+		 * invalid colors in order to create visual effects. */
+		static const float tints[DEBUG_MODE_LAST][4] = {
+			{},                         /* DEBUG_MODE_NONE */
+			{ 0.0f, 0.3f, 0.0f, 0.2f }, /* DEBUG_MODE_SHADERS */
+			{ 0.0f, 0.0f, 0.0f, 0.3f }, /* DEBUG_MODE_WIREFRAME */
+		};
 
-		sconf->req.wireframe = wireframe;
-		sconf->wireframe_tex = gr->wireframe_tex;
-	}
-
-	if (gr->debug_mode == DEBUG_MODE_SHADERS) {
-		/* While tints are meant to be premultiplied, the shaders tint
-		 * has its green component greater than alpha for saturation
-		 * purpose. */
-		static const float debug_mode_shaders[] =
-			{ 0.0f, 0.3f, 0.0f, 0.2f };
-
-		copy_uniform4f(sconf->tint, debug_mode_shaders);
+		assert(gr->debug_mode < DEBUG_MODE_LAST);
+		copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
 		sconf->req.tint = true;
+
+		if (gr->debug_mode == DEBUG_MODE_WIREFRAME) {
+			/* Wireframe rendering is based on Celes & Abraham's
+			 * "Fast and versatile texture-based wireframe
+			 * rendering", 2011. */
+			sconf->req.wireframe = true;
+			sconf->wireframe_tex = gr->wireframe_tex;
+			glEnableVertexAttribArray(SHADER_ATTRIB_LOC_BARYCENTRIC);
+			glVertexAttribPointer(SHADER_ATTRIB_LOC_BARYCENTRIC, 4,
+					      GL_UNSIGNED_BYTE, GL_TRUE, 0,
+					      barycentrics);
+		}
 	}
 
 	if (!gl_renderer_use_program(gr, sconf))
@@ -1412,7 +1416,7 @@ draw_mesh(struct gl_renderer *gr,
 			      0, positions);
 	glDrawElements(GL_TRIANGLE_STRIP, nidx, GL_UNSIGNED_SHORT, indices);
 
-	if (wireframe)
+	if (gr->debug_mode == DEBUG_MODE_WIREFRAME)
 		glDisableVertexAttribArray(SHADER_ATTRIB_LOC_BARYCENTRIC);
 }
 
@@ -1430,7 +1434,7 @@ repaint_region(struct gl_renderer *gr,
 	uint16_t *indices;
 	int i, j, n, nrects, positions_size, barycentrics_size, indices_size;
 	int nvtx = 0, nidx = 0;
-	bool wireframe = gr->wireframe_debug;
+	bool wireframe = gr->debug_mode == DEBUG_MODE_WIREFRAME;
 
 	/* Build-time sub-mesh constants. Clipping emits 8 vertices max.
 	 * store_indices() store at most 10 indices. */
@@ -1483,8 +1487,7 @@ repaint_region(struct gl_renderer *gr,
 			 * Subtracting 2 removes the last chaining indices. */
 			if ((nvtx + nvtx_max) > UINT16_MAX) {
 				draw_mesh(gr, pnode, sconf, positions,
-					  barycentrics, indices, nidx - 2,
-					  wireframe);
+					  barycentrics, indices, nidx - 2);
 				nvtx = nidx = 0;
 			}
 		}
@@ -1492,7 +1495,7 @@ repaint_region(struct gl_renderer *gr,
 
 	if (nvtx)
 		draw_mesh(gr, pnode, sconf, positions, barycentrics, indices,
-			  nidx - 2, wireframe);
+			  nidx - 2);
 
 	gr->position_stream.size = 0;
 	gr->indices.size = 0;
@@ -1704,7 +1707,7 @@ update_wireframe_tex(struct gl_renderer *gr,
 	int new_size, i;
 	uint8_t *buffer;
 
-	if (!gr->wireframe_debug) {
+	if (gr->debug_mode != DEBUG_MODE_WIREFRAME) {
 		if (gr->wireframe_size) {
 			glDeleteTextures(1, &gr->wireframe_tex);
 			gr->wireframe_size = 0;
@@ -2228,18 +2231,19 @@ gl_renderer_repaint_output(struct weston_output *output,
 	 * any wireframes left over from previous draws on this buffer. This
 	 * precludes the use of EGL_EXT_swap_buffers_with_damage and
 	 * EGL_KHR_partial_update, since we damage the whole area. */
-	if (gr->wireframe_debug) {
+	if (gr->debug_mode == DEBUG_MODE_WIREFRAME) {
 		pixman_region32_t undamaged;
 		pixman_region32_init(&undamaged);
 		pixman_region32_subtract(&undamaged, &output->region,
 					 output_damage);
-		gr->wireframe_debug = false;
+		gr->debug_mode = DEBUG_MODE_NONE;
 		repaint_views(output, &undamaged);
-		gr->wireframe_debug = true;
+		gr->debug_mode = DEBUG_MODE_WIREFRAME;
 		pixman_region32_fini(&undamaged);
 	}
 
-	if (gr->has_egl_partial_update && !gr->wireframe_debug) {
+	if (gr->has_egl_partial_update &&
+	    gr->debug_mode != DEBUG_MODE_WIREFRAME) {
 		int n_egl_rects;
 		EGLint *egl_rects;
 
@@ -2285,7 +2289,8 @@ gl_renderer_repaint_output(struct weston_output *output,
 	if (go->egl_surface != EGL_NO_SURFACE) {
 		EGLBoolean ret;
 
-		if (gr->swap_buffers_with_damage && !gr->wireframe_debug) {
+		if (gr->swap_buffers_with_damage &&
+		    gr->debug_mode != DEBUG_MODE_WIREFRAME) {
 			int n_egl_rects;
 			EGLint *egl_rects;
 
@@ -2335,7 +2340,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 		extents = weston_matrix_transform_rect(&output->matrix,
 						       rb->base.damage.extents);
 
-		if (gr->wireframe_debug) {
+		if (gr->debug_mode == DEBUG_MODE_WIREFRAME) {
 			rect.y = go->fb_size.height - go->area.y - go->area.height;
 			rect.height = go->area.height;
 		} else {
@@ -2345,7 +2350,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 		}
 
 		if (gr->gl_version >= gr_gl_version(3, 0) &&
-		    ! gr->wireframe_debug) {
+		    gr->debug_mode != DEBUG_MODE_WIREFRAME) {
 			glPixelStorei(GL_PACK_ROW_LENGTH, width);
 			rect.width = extents.x2 - extents.x1;
 			rect.x += extents.x1;
@@ -4152,8 +4157,6 @@ gl_renderer_destroy(struct weston_compositor *ec)
 
 	if (gr->debug_mode_binding)
 		weston_binding_destroy(gr->debug_mode_binding);
-	if (gr->wireframe_binding)
-		weston_binding_destroy(gr->wireframe_binding);
 
 	weston_log_scope_destroy(gr->shader_scope);
 	weston_log_scope_destroy(gr->renderer_scope);
@@ -4362,19 +4365,8 @@ debug_mode_binding(struct weston_keyboard *keyboard,
 	struct gl_renderer *gr = get_renderer(compositor);
 
 	gr->debug_mode = (gr->debug_mode + 1) % DEBUG_MODE_LAST;
-	weston_compositor_damage_all(compositor);
-}
+	gr->wireframe_dirty = gr->debug_mode == DEBUG_MODE_WIREFRAME;
 
-static void
-wireframe_debug_repaint_binding(struct weston_keyboard *keyboard,
-				const struct timespec *time,
-				uint32_t key, void *data)
-{
-	struct weston_compositor *compositor = data;
-	struct gl_renderer *gr = get_renderer(compositor);
-
-	gr->wireframe_debug = !gr->wireframe_debug;
-	gr->wireframe_dirty = true;
 	weston_compositor_damage_all(compositor);
 }
 
@@ -4609,10 +4601,6 @@ gl_renderer_setup(struct weston_compositor *ec)
 	gr->debug_mode_binding =
 		weston_compositor_add_debug_binding(ec, KEY_M,
 						    debug_mode_binding, ec);
-	gr->wireframe_binding =
-		weston_compositor_add_debug_binding(ec, KEY_F,
-						    wireframe_debug_repaint_binding,
-						    ec);
 
 	weston_log("GL ES %d.%d - renderer features:\n",
 		   gr_gl_version_major(gr->gl_version),

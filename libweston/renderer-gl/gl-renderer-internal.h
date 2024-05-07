@@ -165,11 +165,9 @@ struct gl_renderer {
 	struct weston_compositor *compositor;
 	struct weston_log_scope *renderer_scope;
 
+	/* Debug modes. */
 	struct weston_binding *debug_mode_binding;
 	int debug_mode;
-
-	struct weston_binding *wireframe_binding;
-	bool wireframe_debug;
 	bool wireframe_dirty;
 	GLuint wireframe_tex;
 	int wireframe_size;
