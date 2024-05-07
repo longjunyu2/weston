@@ -71,6 +71,7 @@ enum gl_debug_mode {
 	DEBUG_MODE_SHADERS,
 	DEBUG_MODE_WIREFRAME,
 	DEBUG_MODE_BATCHES,
+	DEBUG_MODE_DAMAGE,
 	DEBUG_MODE_LAST,
 };
 
@@ -1388,10 +1389,11 @@ draw_mesh(struct gl_renderer *gr,
 		 * tints are meant to be premultiplied, debug modes can have
 		 * invalid colors in order to create visual effects. */
 		static const float tints[DEBUG_MODE_LAST][4] = {
-			{},                         /* DEBUG_MODE_NONE */
-			{ 0.0f, 0.3f, 0.0f, 0.2f }, /* DEBUG_MODE_SHADERS */
-			{ 0.0f, 0.0f, 0.0f, 0.3f }, /* DEBUG_MODE_WIREFRAME */
-			{},                         /* DEBUG_MODE_BATCHES */
+			{},                           /* DEBUG_MODE_NONE */
+			{ 0.0f, 0.3f, 0.0f, 0.2f },   /* DEBUG_MODE_SHADERS */
+			{ 0.0f, 0.0f, 0.0f, 0.3f },   /* DEBUG_MODE_WIREFRAME */
+			{},                           /* DEBUG_MODE_BATCHES */
+			{ 0.4f, -0.4f, -0.4f, 0.0f }, /* DEBUG_MODE_DAMAGE */
 		};
 		static const float batch_tints[][4] = {
 			{ 0.9f, 0.0f, 0.0f, 0.9f },
@@ -1420,6 +1422,7 @@ draw_mesh(struct gl_renderer *gr,
 			FALLTHROUGH;
 
 		case DEBUG_MODE_SHADERS:
+		case DEBUG_MODE_DAMAGE:
 			copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
 			break;
 
@@ -4394,7 +4397,8 @@ debug_mode_binding(struct weston_keyboard *keyboard,
 	mode = (gr->debug_mode + 1) % DEBUG_MODE_LAST;
 	gr->debug_mode = mode;
 	gr->debug_clear = mode == DEBUG_MODE_WIREFRAME ||
-		mode == DEBUG_MODE_BATCHES;
+		mode == DEBUG_MODE_BATCHES ||
+		mode == DEBUG_MODE_DAMAGE;
 	gr->wireframe_dirty = mode == DEBUG_MODE_WIREFRAME;
 
 	weston_compositor_damage_all(compositor);
