@@ -64,6 +64,7 @@ struct gl_shader {
 	GLint tex_uniform_wireframe;
 	GLint view_alpha_uniform;
 	GLint color_uniform;
+	GLint tint_uniform;
 	union {
 		struct {
 			GLint tex_2d_uniform;
@@ -235,7 +236,7 @@ create_shader_description_string(const struct gl_shader_requirements *req)
 	int size;
 	char *str;
 
-	size = asprintf(&str, "%s %s %s %s %s %s %cinput_is_premult %cgreen",
+	size = asprintf(&str, "%s %s %s %s %s %s %cinput_is_premult %ctint",
 			gl_shader_texcoord_input_to_string(req->texcoord_input),
 			gl_shader_texture_variant_to_string(req->variant),
 			gl_shader_color_curve_to_string(req->color_pre_curve),
@@ -243,7 +244,7 @@ create_shader_description_string(const struct gl_shader_requirements *req)
 			gl_shader_color_curve_to_string(req->color_post_curve),
 			gl_shader_color_order_to_string(req->color_channel_order),
 			req->input_is_premult ? '+' : '-',
-			req->green_tint ? '+' : '-');
+			req->tint ? '+' : '-');
 	if (size < 0)
 		return NULL;
 	return str;
@@ -277,7 +278,7 @@ create_fragment_shader_config_string(const struct gl_shader_requirements *req)
 	       req->color_channel_order == SHADER_CHANNEL_ORDER_RGBA);
 
 	size = asprintf(&str,
-			"#define DEF_GREEN_TINT %s\n"
+			"#define DEF_TINT %s\n"
 			"#define DEF_INPUT_IS_PREMULT %s\n"
 			"#define DEF_WIREFRAME %s\n"
 			"#define DEF_COLOR_PRE_CURVE %s\n"
@@ -285,7 +286,7 @@ create_fragment_shader_config_string(const struct gl_shader_requirements *req)
 			"#define DEF_COLOR_POST_CURVE %s\n"
 			"#define DEF_COLOR_CHANNEL_ORDER %s\n"
 			"#define DEF_VARIANT %s\n",
-			req->green_tint ? "true" : "false",
+			req->tint ? "true" : "false",
 			req->input_is_premult ? "true" : "false",
 			req->wireframe ? "true" : "false",
 			gl_shader_color_curve_to_string(req->color_pre_curve),
@@ -395,6 +396,13 @@ gl_shader_create(struct gl_renderer *gr,
 		assert(shader->color_uniform != -1);
 	} else {
 		shader->color_uniform = -1;
+	}
+	if (requirements->tint) {
+		shader->tint_uniform = glGetUniformLocation(shader->program,
+							    "tint");
+		assert(shader->tint_uniform != -1);
+	} else {
+		shader->tint_uniform = -1;
 	}
 
 	switch(requirements->color_pre_curve) {
@@ -670,6 +678,8 @@ gl_shader_load_config(struct gl_shader *shader,
 
 	if (shader->color_uniform != -1)
 		glUniform4fv(shader->color_uniform, 1, sconf->unicolor);
+	if (shader->tint_uniform != -1)
+		glUniform4fv(shader->tint_uniform, 1, sconf->tint);
 
 	glUniform1f(shader->view_alpha_uniform, sconf->view_alpha);
 

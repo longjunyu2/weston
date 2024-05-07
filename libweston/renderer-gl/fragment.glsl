@@ -87,7 +87,7 @@ compile_const int c_color_post_curve = DEF_COLOR_POST_CURVE;
 compile_const int c_color_channel_order = DEF_COLOR_CHANNEL_ORDER;
 
 compile_const bool c_input_is_premult = DEF_INPUT_IS_PREMULT;
-compile_const bool c_green_tint = DEF_GREEN_TINT;
+compile_const bool c_tint = DEF_TINT;
 compile_const bool c_wireframe = DEF_WIREFRAME;
 compile_const bool c_need_color_pipeline =
 	c_color_pre_curve != SHADER_COLOR_CURVE_IDENTITY ||
@@ -138,6 +138,7 @@ uniform sampler2D tex2;
 uniform sampler2D tex_wireframe;
 uniform float view_alpha;
 uniform vec4 unicolor;
+uniform vec4 tint;
 
 #define MAX_CURVE_PARAMS 10
 #define MAX_CURVESET_PARAMS (MAX_CURVE_PARAMS * 3)
@@ -459,8 +460,8 @@ main()
 
 	color *= view_alpha;
 
-	if (c_green_tint)
-		color = vec4(0.0, 0.3, 0.0, 0.2) + color * 0.8;
+	if (c_tint)
+		color = color * vec4(1.0 - tint.a) + tint;
 
 	if (c_wireframe) {
 		vec4 src = wireframe();

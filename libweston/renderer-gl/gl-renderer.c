@@ -254,6 +254,12 @@ dump_format(uint32_t format, char out[4])
 	return out;
 }
 
+static inline void
+copy_uniform4f(float dst[4], const float src[4])
+{
+	memcpy(dst, src, 4 * sizeof(float));
+}
+
 static inline struct gl_output_state *
 get_output_state(struct weston_output *output)
 {
@@ -1145,8 +1151,7 @@ gl_shader_config_set_input_textures(struct gl_shader_config *sconf,
 	sconf->req.input_is_premult =
 		gl_shader_texture_variant_can_be_premult(gb->shader_variant);
 
-	for (i = 0; i < 4; i++)
-		sconf->unicolor[i] = gb->color[i];
+	copy_uniform4f(sconf->unicolor, gb->color);
 
 	assert(gb->num_textures <= GL_SHADER_INPUT_TEX_MAX);
 	for (i = 0; i < gb->num_textures; i++)
@@ -1400,7 +1405,17 @@ draw_mesh(struct gl_renderer *gr,
 		sconf->req.wireframe = wireframe;
 		sconf->wireframe_tex = gr->wireframe_tex;
 	}
-	sconf->req.green_tint = gr->debug_mode == DEBUG_MODE_SHADERS;
+
+	if (gr->debug_mode == DEBUG_MODE_SHADERS) {
+		/* While tints are meant to be premultiplied, the shaders tint
+		 * has its green component greater than alpha for saturation
+		 * purpose. */
+		static const float debug_mode_shaders[] =
+			{ 0.0f, 0.3f, 0.0f, 0.2f };
+
+		copy_uniform4f(sconf->tint, debug_mode_shaders);
+		sconf->req.tint = true;
+	}
 
 	if (!gl_renderer_use_program(gr, sconf))
 		gl_renderer_send_shader_error(pnode); /* Use fallback shader. */

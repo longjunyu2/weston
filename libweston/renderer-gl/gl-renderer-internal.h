@@ -94,7 +94,7 @@ struct gl_shader_requirements
 
 	unsigned variant:4; /* enum gl_shader_texture_variant */
 	bool input_is_premult:1;
-	bool green_tint:1;
+	bool tint:1;
 	bool wireframe:1;
 
 	unsigned color_pre_curve:2; /* enum gl_shader_color_curve */
@@ -125,6 +125,7 @@ struct gl_shader_config {
 	struct weston_matrix surface_to_buffer;
 	float view_alpha;
 	GLfloat unicolor[4];
+	GLfloat tint[4];
 	GLint input_tex_filter; /* GL_NEAREST or GL_LINEAR */
 	GLuint input_tex[GL_SHADER_INPUT_TEX_MAX];
 	GLuint wireframe_tex;
