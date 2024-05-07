@@ -2231,19 +2231,20 @@ gl_renderer_repaint_output(struct weston_output *output,
 	 * any wireframes left over from previous draws on this buffer. This
 	 * precludes the use of EGL_EXT_swap_buffers_with_damage and
 	 * EGL_KHR_partial_update, since we damage the whole area. */
-	if (gr->debug_mode == DEBUG_MODE_WIREFRAME) {
+	if (gr->debug_clear) {
 		pixman_region32_t undamaged;
+		int debug_mode = gr->debug_mode;
+
 		pixman_region32_init(&undamaged);
 		pixman_region32_subtract(&undamaged, &output->region,
 					 output_damage);
 		gr->debug_mode = DEBUG_MODE_NONE;
 		repaint_views(output, &undamaged);
-		gr->debug_mode = DEBUG_MODE_WIREFRAME;
+		gr->debug_mode = debug_mode;
 		pixman_region32_fini(&undamaged);
 	}
 
-	if (gr->has_egl_partial_update &&
-	    gr->debug_mode != DEBUG_MODE_WIREFRAME) {
+	if (gr->has_egl_partial_update && !gr->debug_clear) {
 		int n_egl_rects;
 		EGLint *egl_rects;
 
@@ -2289,8 +2290,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 	if (go->egl_surface != EGL_NO_SURFACE) {
 		EGLBoolean ret;
 
-		if (gr->swap_buffers_with_damage &&
-		    gr->debug_mode != DEBUG_MODE_WIREFRAME) {
+		if (gr->swap_buffers_with_damage && !gr->debug_clear) {
 			int n_egl_rects;
 			EGLint *egl_rects;
 
@@ -2340,7 +2340,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 		extents = weston_matrix_transform_rect(&output->matrix,
 						       rb->base.damage.extents);
 
-		if (gr->debug_mode == DEBUG_MODE_WIREFRAME) {
+		if (gr->debug_clear) {
 			rect.y = go->fb_size.height - go->area.y - go->area.height;
 			rect.height = go->area.height;
 		} else {
@@ -2349,8 +2349,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 			pixels += rect.width * extents.y1;
 		}
 
-		if (gr->gl_version >= gr_gl_version(3, 0) &&
-		    gr->debug_mode != DEBUG_MODE_WIREFRAME) {
+		if (gr->gl_version >= gr_gl_version(3, 0) && !gr->debug_clear) {
 			glPixelStorei(GL_PACK_ROW_LENGTH, width);
 			rect.width = extents.x2 - extents.x1;
 			rect.x += extents.x1;
@@ -4363,9 +4362,12 @@ debug_mode_binding(struct weston_keyboard *keyboard,
 {
 	struct weston_compositor *compositor = data;
 	struct gl_renderer *gr = get_renderer(compositor);
+	int mode;
 
-	gr->debug_mode = (gr->debug_mode + 1) % DEBUG_MODE_LAST;
-	gr->wireframe_dirty = gr->debug_mode == DEBUG_MODE_WIREFRAME;
+	mode = (gr->debug_mode + 1) % DEBUG_MODE_LAST;
+	gr->debug_mode = mode;
+	gr->debug_clear = mode == DEBUG_MODE_WIREFRAME;
+	gr->wireframe_dirty = mode == DEBUG_MODE_WIREFRAME;
 
 	weston_compositor_damage_all(compositor);
 }

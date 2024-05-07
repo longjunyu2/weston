@@ -168,6 +168,7 @@ struct gl_renderer {
 	/* Debug modes. */
 	struct weston_binding *debug_mode_binding;
 	int debug_mode;
+	bool debug_clear;
 	bool wireframe_dirty;
 	GLuint wireframe_tex;
 	int wireframe_size;
