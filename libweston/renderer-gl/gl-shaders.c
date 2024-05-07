@@ -361,13 +361,10 @@ gl_shader_create(struct gl_renderer *gr,
 	if (requirements->texcoord_input == SHADER_TEXCOORD_INPUT_ATTRIB)
 		glBindAttribLocation(shader->program,
 				     SHADER_ATTRIB_LOC_TEXCOORD, "texcoord");
-	if (requirements->wireframe) {
-		glBindAttribLocation(shader->program, SHADER_ATTRIB_LOC_COLOR,
-				     "color");
+	if (requirements->wireframe)
 		glBindAttribLocation(shader->program,
 				     SHADER_ATTRIB_LOC_BARYCENTRIC,
 				     "barycentric");
-	}
 
 	glLinkProgram(shader->program);
 	glGetProgramiv(shader->program, GL_LINK_STATUS, &status);

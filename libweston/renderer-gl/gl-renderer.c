@@ -1311,17 +1311,14 @@ transform_damage(const struct weston_paint_node *pnode,
 		free(rects);
 }
 
-/* Colorise and set barycentric coordinates of a sub-mesh of 'count' vertices. 8
- * colors (32 bytes) and 8 barycentric coordinates (32 bytes too) are stored
- * unconditionally into 'color_stream' and 'barycentric_stream'.
+/* Set barycentric coordinates of a sub-mesh of 'count' vertices. 8 barycentric
+ * coordinates (32 bytes too) are stored unconditionally into
+ * 'barycentric_stream'.
  */
 static void
 store_wireframes(size_t count,
-		 uint32_t *restrict color_stream,
-		 uint32_t *restrict barycentric_stream)
+		 uint32_t *barycentric_stream)
 {
-	static const uint32_t colors[] =
-		{ 0xff0000ff, 0xff00ff00, 0xffff0000, 0xfffffff };
 	const uint32_t x = 0xff0000, y = 0x00ff00, z = 0x0000ff;
 	static const uint32_t barycentrics[][8] = {
 		{}, {}, {},
@@ -1332,17 +1329,12 @@ store_wireframes(size_t count,
 		{ x, z, y, x, z, x, y, 0 },
 		{ x, z, y, x, y, z, x, y },
 	};
-	static size_t idx = 0;
 	int i;
 
 	assert(count < ARRAY_LENGTH(barycentrics));
 
-	for (i = 0; i < 8; i++) {
+	for (i = 0; i < 8; i++)
 		barycentric_stream[i] = barycentrics[count][i];
-		color_stream[i] = colors[idx % ARRAY_LENGTH(colors)];
-	}
-
-	idx++;
 }
 
 /* Triangulate a sub-mesh of 'count' vertices as an indexed triangle strip.
@@ -1383,21 +1375,17 @@ draw_mesh(struct gl_renderer *gr,
 	  struct weston_paint_node *pnode,
 	  struct gl_shader_config *sconf,
 	  const struct clipper_vertex *positions,
-	  const uint32_t *colors,
 	  const uint32_t *barycentrics,
-	  const uint16_t *strip,
-	  int nstrip,
+	  const uint16_t *indices,
+	  int nidx,
 	  bool wireframe)
 {
-	assert(nstrip > 0);
+	assert(nidx > 0);
 
 	if (wireframe) {
 		/* Wireframe rendering is based on Celes & Abraham's "Fast and
 		 * versatile texture-based wireframe rendering", 2011. */
-		glEnableVertexAttribArray(SHADER_ATTRIB_LOC_COLOR);
 		glEnableVertexAttribArray(SHADER_ATTRIB_LOC_BARYCENTRIC);
-		glVertexAttribPointer(SHADER_ATTRIB_LOC_COLOR, 4,
-				      GL_UNSIGNED_BYTE, GL_TRUE, 0, colors);
 		glVertexAttribPointer(SHADER_ATTRIB_LOC_BARYCENTRIC, 4,
 				      GL_UNSIGNED_BYTE, GL_TRUE, 0,
 				      barycentrics);
@@ -1422,12 +1410,10 @@ draw_mesh(struct gl_renderer *gr,
 
 	glVertexAttribPointer(SHADER_ATTRIB_LOC_POSITION, 2, GL_FLOAT, GL_FALSE,
 			      0, positions);
-	glDrawElements(GL_TRIANGLE_STRIP, nstrip, GL_UNSIGNED_SHORT, strip);
+	glDrawElements(GL_TRIANGLE_STRIP, nidx, GL_UNSIGNED_SHORT, indices);
 
-	if (wireframe) {
+	if (wireframe)
 		glDisableVertexAttribArray(SHADER_ATTRIB_LOC_BARYCENTRIC);
-		glDisableVertexAttribArray(SHADER_ATTRIB_LOC_COLOR);
-	}
 }
 
 static void
@@ -1440,10 +1426,10 @@ repaint_region(struct gl_renderer *gr,
 {
 	pixman_box32_t *rects;
 	struct clipper_vertex *positions;
-	uint32_t *colors = NULL, *barycentrics = NULL;
+	uint32_t *barycentrics = NULL;
 	uint16_t *indices;
-	int i, j, n, nrects, positions_size, colors_size, barycentrics_size;
-	int indices_size, nvtx = 0, nidx = 0;
+	int i, j, n, nrects, positions_size, barycentrics_size, indices_size;
+	int nvtx = 0, nidx = 0;
 	bool wireframe = gr->wireframe_debug;
 
 	/* Build-time sub-mesh constants. Clipping emits 8 vertices max.
@@ -1457,17 +1443,14 @@ repaint_region(struct gl_renderer *gr,
 	/* Worst case allocation sizes per sub-mesh. */
 	n = nquads * nrects;
 	positions_size = n * nvtx_max * sizeof *positions;
-	colors_size = ROUND_UP_N(n * nvtx_max * sizeof *colors, 32);
 	barycentrics_size = ROUND_UP_N(n * nvtx_max * sizeof *barycentrics, 32);
 	indices_size = ROUND_UP_N(n * nidx_max * sizeof *indices, 32);
 
 	positions = wl_array_add(&gr->position_stream, positions_size);
 	indices = wl_array_add(&gr->indices, indices_size);
-	if (wireframe) {
-		colors = wl_array_add(&gr->color_stream, colors_size);
+	if (wireframe)
 		barycentrics = wl_array_add(&gr->barycentric_stream,
 					    barycentrics_size);
-	}
 
 	/* A node's damage mesh is created by clipping damage quads to surface
 	 * rects and by chaining the resulting sub-meshes into an indexed
@@ -1493,14 +1476,13 @@ repaint_region(struct gl_renderer *gr,
 						    &positions[nvtx]);
 			nidx += store_indices(n, nvtx, &indices[nidx]);
 			if (wireframe)
-				store_wireframes(n, &colors[nvtx],
-						 &barycentrics[nvtx]);
+				store_wireframes(n, &barycentrics[nvtx]);
 			nvtx += n;
 
 			/* Highly unlikely flush to prevent index wraparound.
 			 * Subtracting 2 removes the last chaining indices. */
 			if ((nvtx + nvtx_max) > UINT16_MAX) {
-				draw_mesh(gr, pnode, sconf, positions, colors,
+				draw_mesh(gr, pnode, sconf, positions,
 					  barycentrics, indices, nidx - 2,
 					  wireframe);
 				nvtx = nidx = 0;
@@ -1509,15 +1491,13 @@ repaint_region(struct gl_renderer *gr,
 	}
 
 	if (nvtx)
-		draw_mesh(gr, pnode, sconf, positions, colors, barycentrics,
-			  indices, nidx - 2, wireframe);
+		draw_mesh(gr, pnode, sconf, positions, barycentrics, indices,
+			  nidx - 2, wireframe);
 
 	gr->position_stream.size = 0;
 	gr->indices.size = 0;
-	if (wireframe) {
-		gr->color_stream.size = 0;
+	if (wireframe)
 		gr->barycentric_stream.size = 0;
-	}
 }
 
 static void
@@ -4167,7 +4147,6 @@ gl_renderer_destroy(struct weston_compositor *ec)
 	eglReleaseThread();
 
 	wl_array_release(&gr->position_stream);
-	wl_array_release(&gr->color_stream);
 	wl_array_release(&gr->barycentric_stream);
 	wl_array_release(&gr->indices);
 

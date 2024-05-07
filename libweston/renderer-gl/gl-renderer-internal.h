@@ -75,7 +75,6 @@ enum gl_shader_color_mapping {
 enum gl_shader_attrib_loc {
 	SHADER_ATTRIB_LOC_POSITION = 0,
 	SHADER_ATTRIB_LOC_TEXCOORD,
-	SHADER_ATTRIB_LOC_COLOR,
 	SHADER_ATTRIB_LOC_BARYCENTRIC,
 };
 
@@ -184,7 +183,6 @@ struct gl_renderer {
 
 	/* Vertex streams. */
 	struct wl_array position_stream;
-	struct wl_array color_stream;
 	struct wl_array barycentric_stream;
 	struct wl_array indices;
 

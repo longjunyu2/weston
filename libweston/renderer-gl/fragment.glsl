@@ -438,9 +438,8 @@ wireframe()
 	float edge1 = texture2D(tex_wireframe, vec2(v_barycentric.x, 0.5)).r;
 	float edge2 = texture2D(tex_wireframe, vec2(v_barycentric.y, 0.5)).r;
 	float edge3 = texture2D(tex_wireframe, vec2(v_barycentric.z, 0.5)).r;
-	float edge = clamp(edge1 + edge2 + edge3, 0.0, 1.0);
 
-	return vec4(edge) * v_color;
+	return vec4(clamp(edge1 + edge2 + edge3, 0.0, 1.0));
 }
 
 void
