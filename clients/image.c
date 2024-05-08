@@ -72,6 +72,39 @@ struct image {
 	cairo_matrix_t matrix;
 };
 
+struct cli_render_intent_option {
+	int render_intent;
+	const char *cli_option;
+};
+
+static const struct cli_render_intent_option
+cli_ri_table[] = {
+	{
+		.render_intent = -1,
+		.cli_option = "off",
+	},
+	{
+		.render_intent = RENDER_INTENT_PERCEPTUAL,
+		.cli_option = "per",
+	},
+	{
+		.render_intent = RENDER_INTENT_RELATIVE,
+		.cli_option = "rel",
+	},
+	{
+		.render_intent = RENDER_INTENT_RELATIVE_BPC,
+		.cli_option = "rel-bpc",
+	},
+	{
+		.render_intent = RENDER_INTENT_SATURATION,
+		.cli_option = "sat",
+	},
+	{
+		.render_intent = RENDER_INTENT_ABSOLUTE,
+		.cli_option = "abs",
+	},
+};
+
 static double
 get_scale(struct image *image)
 {
@@ -481,13 +514,12 @@ image_create(struct display *display, const char *filename,
 	/* TODO: investigate if/how to get colorimetry info from the
 	 * PNG/JPEG/etc image. Then use that to create a parametric image
 	 * description and set it as the widget image description. Also, if
-	 * clients do not enforce us to avoid setting an image description
-	 * (TODO: we still didn't add the CLI option for clients to choose that)
-	 * but no colorimetry data is present, we can create a sRGB image
-	 * description (through parameters) and set it as the image description
-	 * to use. For now Weston do not support creating image description from
-	 * parameters, that's why we've added only the code above that depends
-	 * on ICC profiles. */
+	 * clients do not enforce us to avoid setting an image description (i.e.
+	 * render_intent != -1) but no colorimetry data is present, we can
+	 * create a sRGB image description (through parameters) and set it as
+	 * the image description to use. For now Weston do not support creating
+	 * image description from parameters, that's why we've added only the
+	 * code above that depends on ICC profiles. */
 
 	widget_schedule_resize(image->frame_widget, 500, 400);
 
@@ -497,10 +529,56 @@ image_create(struct display *display, const char *filename,
 static void
 print_usage(const char *program_name)
 {
+	const struct render_intent_info *intent_info;
+	const char *desc;
+	unsigned int i;
+
 	fprintf(stderr, "Usage:\n  %s [OPTIONS] [FILENAME0] [FILENAME1] ...\n\n" \
 			"Options:\n", program_name);
 
-	fprintf(stderr, "-h or --help to open this HELP dialogue.\n");
+	fprintf(stderr, "-h or --help to open this HELP dialogue.\n\n");
+
+	fprintf(stderr, "-r or --rendering-intent to choose the color-management rendering intent.\n\n    " \
+			"The rendering intent is used when an image file has colorimetry data embedded,\n    " \
+			"and the compositor should present this image taking this into account. We use\n    " \
+			"the Wayland color-management protocol extension to set the image description\n    " \
+			"and a rendering intent, which is up to the client to decide. This is optional,\n    " \
+			"and if nothing set we'll use 'perceptual'. Supported values:\n\n");
+
+	for (i = 0; i < ARRAY_LENGTH(cli_ri_table); i++) {
+		/* "off" option does not have a corresponding render_intent_info
+		 * object from which we would be able to get the description. */
+		intent_info = render_intent_info_from(cli_ri_table[i].render_intent);
+		if (intent_info)
+			desc = intent_info->desc;
+		else
+			desc = "No render intent (do not set image description)";
+
+		fprintf(stderr, "        %s: %s.\n", cli_ri_table[i].cli_option, desc);
+	}
+}
+
+static int
+get_render_intent(int *render_intent, const char *opt_rendering_intent)
+{
+	unsigned int i;
+
+	/* The default, if client does not set anything. */
+	if (!opt_rendering_intent) {
+		*render_intent = RENDER_INTENT_PERCEPTUAL;
+		return 0;
+	}
+
+	for (i = 0; i < ARRAY_LENGTH(cli_ri_table); i++) {
+		if (strcmp(opt_rendering_intent, cli_ri_table[i].cli_option) == 0) {
+			*render_intent = cli_ri_table[i].render_intent;
+			return 0;
+		}
+	}
+
+	fprintf(stderr, "Error: unknown rendering intent: %s.\n\n",
+			opt_rendering_intent);
+	return -1;
 }
 
 int
@@ -511,16 +589,22 @@ main(int argc, char *argv[])
 	int image_counter = 0;
 	int render_intent;
 	bool opt_help = false;
+	char *opt_rendering_intent = NULL;
 	struct weston_option cli_options[] = {
 		{ WESTON_OPTION_BOOLEAN, "help", 'h', &opt_help },
+		{ WESTON_OPTION_STRING, "rendering-intent", 'r', &opt_rendering_intent },
 	};
 
 	parse_options(cli_options, ARRAY_LENGTH(cli_options), &argc, argv);
 
-	if (argc <= 1 || opt_help) {
+	if (argc <= 1 || opt_help ||
+	    get_render_intent(&render_intent, opt_rendering_intent) < 0) {
+		free(opt_rendering_intent);
 		print_usage(argv[0]);
 		return 1;
 	}
+
+	free(opt_rendering_intent);
 
 	d = display_create(&argc, argv);
 	if (d == NULL) {
@@ -528,10 +612,6 @@ main(int argc, char *argv[])
 			strerror(errno));
 		return -1;
 	}
-
-	/* TODO: get render intent from command line. If not given, fallback to
-	 * perceptual, which is the default for the CM&HDR protocol extension. */
-	render_intent = RENDER_INTENT_PERCEPTUAL;
 
 	for (i = 1; i < argc; i++)
 		image_create(d, argv[i], &image_counter, render_intent);
