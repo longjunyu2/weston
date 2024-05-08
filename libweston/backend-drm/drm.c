@@ -4084,9 +4084,6 @@ drm_backend_create(struct weston_compositor *compositor,
 					    recorder_binding, b);
 
 	if (compositor->renderer->import_dmabuf) {
-		if (linux_dmabuf_setup(compositor) < 0)
-			weston_log("Error: initializing dmabuf "
-				   "support failed.\n");
 		if (compositor->default_dmabuf_feedback) {
 			/* We were able to create the compositor's default
 			 * dma-buf feedback in the renderer, that means that the

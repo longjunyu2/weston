@@ -1974,12 +1974,6 @@ x11_backend_create(struct weston_compositor *compositor,
 				     x11_backend_handle_event, b);
 	wl_event_source_check(b->xcb_source);
 
-	if (compositor->renderer->import_dmabuf) {
-		if (linux_dmabuf_setup(compositor) < 0)
-			weston_log("Error: initializing dmabuf "
-				   "support failed.\n");
-	}
-
 	if (compositor->capabilities & WESTON_CAP_EXPLICIT_SYNC) {
 		if (linux_explicit_synchronization_setup(compositor) < 0)
 			weston_log("Error: initializing explicit "

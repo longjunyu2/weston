@@ -627,13 +627,6 @@ headless_backend_create(struct weston_compositor *compositor,
 		if (ret < 0)
 			goto err_input;
 
-		if (compositor->renderer->import_dmabuf) {
-			if (linux_dmabuf_setup(compositor) < 0) {
-				weston_log("Error: dmabuf protocol setup failed.\n");
-				goto err_input;
-			}
-		}
-
 		/* Support zwp_linux_explicit_synchronization_unstable_v1 to enable
 		 * testing. */
 		if (linux_explicit_synchronization_setup(compositor) < 0)

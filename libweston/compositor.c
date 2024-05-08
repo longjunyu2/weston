@@ -10027,6 +10027,10 @@ weston_compositor_init_renderer(struct weston_compositor *compositor,
 		ret = -1;
 	}
 
+	if (compositor->renderer->import_dmabuf)
+		if (linux_dmabuf_setup(compositor) < 0)
+			weston_log("Error: dmabuf protocol setup failed.\n");
+
 	return ret;
 }
 

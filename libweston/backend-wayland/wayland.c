@@ -2989,12 +2989,6 @@ wayland_backend_create(struct weston_compositor *compositor,
 
 	wl_event_source_check(b->parent.wl_source);
 
-	if (compositor->renderer->import_dmabuf) {
-		if (linux_dmabuf_setup(compositor) < 0)
-			weston_log("Error: initializing dmabuf "
-			           "support failed.\n");
-	}
-
 	return b;
 err_renderer:
 	compositor->renderer->destroy(compositor);
