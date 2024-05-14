@@ -116,6 +116,7 @@ struct window {
 	struct xdg_toplevel *xdg_toplevel;
 	EGLSurface egl_surface;
 	int fullscreen, maximized, opaque, buffer_bpp, interval, delay;
+	int present_opaque;
 	struct wp_tearing_control_v1 *tear_control;
 	struct wp_viewport *viewport;
 	struct wp_fractional_scale_v1 *fractional_scale_obj;
@@ -268,6 +269,13 @@ init_egl(struct display *display, struct window *window)
 				break;
 			}
 		}
+	}
+
+	if (window->present_opaque &&
+	    (!extensions ||
+	     !weston_check_egl_extension(extensions, "EGL_EXT_present_opaque"))) {
+		fprintf(stderr, "missing required EGL_EXT_present_opaque extension\n");
+		exit(1);
 	}
 
 	if (display->swap_buffers_with_damage)
@@ -438,6 +446,7 @@ init_gl(struct window *window)
 	GLuint program;
 	GLint status;
 	EGLBoolean ret;
+	EGLint attribs[] = { EGL_PRESENT_OPAQUE_EXT, EGL_TRUE, EGL_NONE };
 
 	if (window->needs_buffer_geometry_update)
 		update_buffer_geometry(window);
@@ -448,7 +457,15 @@ init_gl(struct window *window)
 	window->egl_surface =
 		weston_platform_create_egl_surface(window->display->egl.dpy,
 						   window->display->egl.conf,
-						   window->native, NULL);
+						   window->native,
+						   window->present_opaque ?
+							attribs : NULL);
+
+	if (!window->egl_surface) {
+		fprintf(stderr, "Failed to create EGLSurface, error 0x%x\n",
+			eglGetError());
+		exit(1);
+	}
 
 	ret = eglMakeCurrent(window->display->egl.dpy, window->egl_surface,
 			     window->egl_surface, window->display->egl.ctx);
@@ -1299,13 +1316,14 @@ usage(int error_code)
 		"  -f\tRun in fullscreen mode\n"
 		"  -r\tUse fixed width/height ratio when run in fullscreen mode\n"
 		"  -m\tRun in maximized mode\n"
-		"  -o\tCreate an opaque surface\n"
+		"  -o\tCreate an opaque surface (without alpha)\n"
 		"  -s\tUse a 16 bpp EGL config\n"
 		"  -b\tDon't sync to compositor redraw (eglSwapInterval 0)\n"
 		"  -t\tEnable tearing via the tearing_control protocol\n"
 		"  -T\tEnable and disable tearing every 5 seconds\n"
 		"  -v\tDraw a moving vertical bar instead of a triangle\n"
 		"  -i <interval> \tSet eglSwapInterval to interval\n"
+		"  -p\tPresent surface opaquely, regardless of alpha\n"
 		"  -h\tThis help text\n\n");
 
 	exit(error_code);
@@ -1359,6 +1377,8 @@ main(int argc, char **argv)
 			window.vertical_bar = true;
 		else if (strcmp("-i", argv[i]) == 0)
 			window.interval = atoi(argv[++i]);
+		else if (strcmp("-p", argv[i]) == 0)
+			window.present_opaque = 1;
 		else if (strcmp("-h", argv[i]) == 0)
 			usage(EXIT_SUCCESS);
 		else
