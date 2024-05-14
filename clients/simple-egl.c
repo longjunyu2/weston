@@ -198,7 +198,7 @@ init_egl(struct display *display, struct window *window)
 	EGLBoolean ret;
 	int r, g, b, a;
 
-	if (window->opaque || window->buffer_bpp == 16)
+	if (window->opaque)
 		config_attribs[9] = 0;
 
 	display->egl.dpy =
