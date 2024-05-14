@@ -195,6 +195,7 @@ init_egl(struct display *display, struct window *window)
 	EGLint major, minor, n, count, i;
 	EGLConfig *configs;
 	EGLBoolean ret;
+	int r, g, b, a;
 
 	if (window->opaque || window->buffer_bpp == 16)
 		config_attribs[9] = 0;
@@ -237,6 +238,16 @@ init_egl(struct display *display, struct window *window)
 			window->buffer_bpp);
 		exit(EXIT_FAILURE);
 	}
+
+	eglGetConfigAttrib(display->egl.dpy,
+			   display->egl.conf, EGL_RED_SIZE, &r);
+	eglGetConfigAttrib(display->egl.dpy,
+			   display->egl.conf, EGL_GREEN_SIZE, &g);
+	eglGetConfigAttrib(display->egl.dpy,
+			   display->egl.conf, EGL_BLUE_SIZE, &b);
+	eglGetConfigAttrib(display->egl.dpy,
+			   display->egl.conf, EGL_ALPHA_SIZE, &a);
+	printf("Using config: r%dg%db%da%d\n", r, g, b, a);
 
 	display->egl.ctx = eglCreateContext(display->egl.dpy,
 					    display->egl.conf,
