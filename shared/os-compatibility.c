@@ -40,6 +40,11 @@
 
 #define READONLY_SEALS (F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE)
 
+/* Fallback to no flag when missing the definition */
+#ifndef MFD_NOEXEC_SEAL
+#define MFD_NOEXEC_SEAL 0
+#endif
+
 int
 os_fd_clear_cloexec(int fd)
 {
@@ -184,7 +189,21 @@ os_create_anonymous_file(off_t size)
 	int ret;
 
 #ifdef HAVE_MEMFD_CREATE
-	fd = memfd_create("weston-shared", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+	/*
+	* Linux kernels older than 6.3 reject MFD_NOEXEC_SEAL with EINVAL.
+	* Try first *with* it, and if that fails, try again *without* it.
+	*/
+	errno = 0;
+	fd = memfd_create(
+		"weston-shared",
+		MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_NOEXEC_SEAL);
+
+	if (fd < 0 && errno == EINVAL && MFD_NOEXEC_SEAL != 0) {
+		fd = memfd_create(
+			"weston-shared",
+			MFD_CLOEXEC | MFD_ALLOW_SEALING);
+	}
+
 	if (fd >= 0) {
 		/* We can add this seal before calling posix_fallocate(), as
 		 * the file is currently zero-sized anyway.
