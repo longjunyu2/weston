@@ -96,6 +96,7 @@ struct display {
 	uint32_t serial;
 
 	int display_fd;
+	bool display_fd_was_read;
 	uint32_t display_fd_events;
 	struct task display_task;
 
@@ -6620,7 +6621,8 @@ handle_display_data(struct task *task, uint32_t events)
 	}
 
 	if (events & EPOLLIN) {
-		ret = wl_display_dispatch(display->display);
+		ret = wl_display_read_events(display->display);
+		display->display_fd_was_read = true;
 		if (ret == -1) {
 			display_exit(display);
 			return;
@@ -6872,6 +6874,19 @@ display_unwatch_fd(struct display *display, int fd)
 	epoll_ctl(display->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 }
 
+static void
+run_deferred_tasks(struct display *display)
+{
+	struct task *task;
+
+	while (!wl_list_empty(&display->deferred_list)) {
+		task = container_of(display->deferred_list.prev,
+				    struct task, link);
+		wl_list_remove(&task->link);
+		task->run(task, 0);
+	}
+}
+
 void
 display_run(struct display *display)
 {
@@ -6881,17 +6896,39 @@ display_run(struct display *display)
 
 	display->running = 1;
 	while (1) {
-		while (!wl_list_empty(&display->deferred_list)) {
-			task = container_of(display->deferred_list.prev,
-					    struct task, link);
-			wl_list_remove(&task->link);
-			task->run(task, 0);
+		/*
+		 * Run the deferred tasks at least once. The loop below also run
+		 * deferred tasks, but it will handle the deferred tasks created
+		 * by the Wayland event handlers. With this call we make sure
+		 * that deferred tasks will run even if there are no Wayland
+		 * events to dispatch.
+		 */
+		run_deferred_tasks(display);
+
+		/*
+		 * wl_display_prepare_read() fails until the default queue is
+		 * empty. So we loop dispatching Wayland events and also running
+		 * the deferred tasks that the Wayland event handlers may
+		 * create. We do that until wl_display_prepare_read() succeeds.
+		 * It is important to handle both the Wayland events and the
+		 * deferred tasks before wl_display_prepare_read() succeeds, as
+		 * the Wayland event handlers or the deferred tasks may lead to
+		 * functions that try reading from the display fd (with
+		 * wl_display_prepare_read() as well). That would cause a
+		 * deadlock, because we only cancel/read at the end of this main
+		 * event loop.
+		 */
+		while (wl_display_prepare_read(display->display) == -1) {
+			ret = wl_display_dispatch_pending(display->display);
+			run_deferred_tasks(display);
+			if (ret == -1)
+				break;
 		}
 
-		wl_display_dispatch_pending(display->display);
-
-		if (!display->running)
+		if (!display->running) {
+			wl_display_cancel_read(display->display);
 			break;
+		}
 
 		ret = wl_display_flush(display->display);
 		if (ret < 0 && errno == EAGAIN) {
@@ -6902,15 +6939,19 @@ display_run(struct display *display)
 			epoll_ctl(display->epoll_fd, EPOLL_CTL_MOD,
 				  display->display_fd, &ep[0]);
 		} else if (ret < 0) {
+			wl_display_cancel_read(display->display);
 			break;
 		}
 
 		count = epoll_wait(display->epoll_fd,
 				   ep, ARRAY_LENGTH(ep), -1);
+		display->display_fd_was_read = false;
 		for (i = 0; i < count; i++) {
 			task = ep[i].data.ptr;
 			task->run(task, ep[i].events);
 		}
+		if (!display->display_fd_was_read)
+			wl_display_cancel_read(display->display);
 	}
 }
 
