@@ -68,7 +68,6 @@
 
 enum gl_debug_mode {
 	DEBUG_MODE_NONE = 0,
-	DEBUG_MODE_SHADERS,
 	DEBUG_MODE_WIREFRAME,
 	DEBUG_MODE_BATCHES,
 	DEBUG_MODE_DAMAGE,
@@ -1392,7 +1391,6 @@ draw_mesh(struct gl_renderer *gr,
 		 * invalid colors in order to create visual effects. */
 		static const float tints[DEBUG_MODE_LAST][4] = {
 			{},                           /* DEBUG_MODE_NONE */
-			{ 0.0f, 0.3f, 0.0f, 0.2f },   /* DEBUG_MODE_SHADERS */
 			{ 0.0f, 0.0f, 0.0f, 0.3f },   /* DEBUG_MODE_WIREFRAME */
 			{},                           /* DEBUG_MODE_BATCHES */
 			{ 0.4f, -0.4f, -0.4f, 0.0f }, /* DEBUG_MODE_DAMAGE */
@@ -1422,7 +1420,6 @@ draw_mesh(struct gl_renderer *gr,
 					      barycentrics);
 			FALLTHROUGH;
 
-		case DEBUG_MODE_SHADERS:
 		case DEBUG_MODE_DAMAGE:
 			sconf->req.tint = true;
 			copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
