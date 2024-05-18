@@ -72,6 +72,7 @@ enum gl_debug_mode {
 	DEBUG_MODE_WIREFRAME,
 	DEBUG_MODE_BATCHES,
 	DEBUG_MODE_DAMAGE,
+	DEBUG_MODE_OPAQUE,
 	DEBUG_MODE_LAST,
 };
 
@@ -1380,7 +1381,8 @@ draw_mesh(struct gl_renderer *gr,
 	  const struct clipper_vertex *positions,
 	  const uint32_t *barycentrics,
 	  const uint16_t *indices,
-	  int nidx)
+	  int nidx,
+	  bool opaque)
 {
 	assert(nidx > 0);
 
@@ -1394,6 +1396,7 @@ draw_mesh(struct gl_renderer *gr,
 			{ 0.0f, 0.0f, 0.0f, 0.3f },   /* DEBUG_MODE_WIREFRAME */
 			{},                           /* DEBUG_MODE_BATCHES */
 			{ 0.4f, -0.4f, -0.4f, 0.0f }, /* DEBUG_MODE_DAMAGE */
+			{ -0.4f, -0.4f, 0.7f, 0.0f }, /* DEBUG_MODE_OPAQUE */
 		};
 		static const float batch_tints[][4] = {
 			{ 0.9f, 0.0f, 0.0f, 0.9f },
@@ -1405,8 +1408,6 @@ draw_mesh(struct gl_renderer *gr,
 			{ 0.9f, 0.9f, 0.9f, 0.9f },
 		};
 		int i;
-
-		sconf->req.tint = true;
 
 		switch (gr->debug_mode) {
 		case DEBUG_MODE_WIREFRAME:
@@ -1423,10 +1424,17 @@ draw_mesh(struct gl_renderer *gr,
 
 		case DEBUG_MODE_SHADERS:
 		case DEBUG_MODE_DAMAGE:
+			sconf->req.tint = true;
+			copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
+			break;
+
+		case DEBUG_MODE_OPAQUE:
+			sconf->req.tint = opaque;
 			copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
 			break;
 
 		case DEBUG_MODE_BATCHES:
+			sconf->req.tint = true;
 			i = gr->nbatches++ % ARRAY_LENGTH(batch_tints);
 			copy_uniform4f(sconf->tint, batch_tints[i]);
 			break;
@@ -1453,7 +1461,8 @@ repaint_region(struct gl_renderer *gr,
 	       struct clipper_quad *quads,
 	       int nquads,
 	       pixman_region32_t *region,
-	       struct gl_shader_config *sconf)
+	       struct gl_shader_config *sconf,
+	       bool opaque)
 {
 	pixman_box32_t *rects;
 	struct clipper_vertex *positions;
@@ -1514,7 +1523,8 @@ repaint_region(struct gl_renderer *gr,
 			 * Subtracting 2 removes the last chaining indices. */
 			if ((nvtx + nvtx_max) > UINT16_MAX) {
 				draw_mesh(gr, pnode, sconf, positions,
-					  barycentrics, indices, nidx - 2);
+					  barycentrics, indices, nidx - 2,
+					  opaque);
 				nvtx = nidx = 0;
 			}
 		}
@@ -1522,7 +1532,7 @@ repaint_region(struct gl_renderer *gr,
 
 	if (nvtx)
 		draw_mesh(gr, pnode, sconf, positions, barycentrics, indices,
-			  nidx - 2);
+			  nidx - 2, opaque);
 
 	gr->position_stream.size = 0;
 	gr->indices.size = 0;
@@ -1615,14 +1625,16 @@ draw_paint_node(struct weston_paint_node *pnode,
 			glDisable(GL_BLEND);
 
 		transform_damage(pnode, &repaint, &quads, &nquads);
-		repaint_region(gr, pnode, quads, nquads, &surface_opaque, &alt);
+		repaint_region(gr, pnode, quads, nquads, &surface_opaque, &alt,
+			       true);
 		gs->used_in_output_repaint = true;
 	}
 
 	if (pixman_region32_not_empty(&surface_blend)) {
 		glEnable(GL_BLEND);
 		transform_damage(pnode, &repaint, &quads, &nquads);
-		repaint_region(gr, pnode, quads, nquads, &surface_blend, &sconf);
+		repaint_region(gr, pnode, quads, nquads, &surface_blend, &sconf,
+			       false);
 		gs->used_in_output_repaint = true;
 	}
 
@@ -4398,7 +4410,8 @@ debug_mode_binding(struct weston_keyboard *keyboard,
 	gr->debug_mode = mode;
 	gr->debug_clear = mode == DEBUG_MODE_WIREFRAME ||
 		mode == DEBUG_MODE_BATCHES ||
-		mode == DEBUG_MODE_DAMAGE;
+		mode == DEBUG_MODE_DAMAGE ||
+		mode == DEBUG_MODE_OPAQUE;
 	gr->wireframe_dirty = mode == DEBUG_MODE_WIREFRAME;
 
 	weston_compositor_damage_all(compositor);
