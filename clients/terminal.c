@@ -1711,7 +1711,7 @@ handle_non_csi_escape(struct terminal *terminal, char code)
 		break;
 	case 'E':    /* NEL - Newline */
 		terminal->column = 0;
-		// fallthrough
+		FALLTHROUGH;
 	case 'D':    /* IND - Linefeed */
 		terminal->row += 1;
 		if (terminal->row > terminal->margin_bottom) {
@@ -1893,7 +1893,7 @@ handle_special_char(struct terminal *terminal, char c)
 		if (terminal->mode & MODE_LF_NEWLINE) {
 			terminal->column = 0;
 		}
-		/* fallthrough */
+		FALLTHROUGH;
 	case '\v':
 	case '\f':
 		terminal->row++;

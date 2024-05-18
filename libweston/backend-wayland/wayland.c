@@ -2941,8 +2941,8 @@ wayland_backend_create(struct weston_compositor *compositor,
 		if (renderer != WESTON_RENDERER_PIXMAN)
 			break;
 		weston_log_continue("; falling back to Pixman.\n");
+		FALLTHROUGH;
 	}
-		/* fallthrough */
 	case WESTON_RENDERER_PIXMAN:
 		if (weston_compositor_init_renderer(compositor,
 						    WESTON_RENDERER_PIXMAN,

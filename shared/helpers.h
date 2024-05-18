@@ -235,6 +235,13 @@ do {                        \
 #define unreachable(str) assert(!str)
 #endif
 
+#if __has_attribute(fallthrough)
+/* Supported at least by gcc and clang. */
+#define FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FALLTHROUGH do {} while(0)
+#endif
+
 /**
  * Returns number of bits set in 32-bit value x.
  *

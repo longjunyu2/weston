@@ -728,31 +728,31 @@ create_subsurface_tree(struct client *client, struct wl_surface **surfs,
 
 	case 11:
 		SUB_LINK(10, 2);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 10:
 		SUB_LINK(9, 2);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 9:
 		SUB_LINK(8, 6);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 8:
 		SUB_LINK(7, 6);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 7:
 		SUB_LINK(6, 2);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 6:
 		SUB_LINK(5, 1);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 5:
 		SUB_LINK(4, 3);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 4:
 		SUB_LINK(3, 1);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 3:
 		SUB_LINK(2, 0);
-		/* fallthrough */
+		FALLTHROUGH;
 	case 2:
 		SUB_LINK(1, 0);
 
