@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <signal.h>
 
 #include <linux/input.h>
 
@@ -104,6 +105,8 @@ static const uint32_t ignore_keys_on_compose[] = {
 	XKB_KEY_Shift_L,
 	XKB_KEY_Shift_R
 };
+
+static int running = 1;
 
 static void
 handle_surrounding_text(void *data,
@@ -481,10 +484,17 @@ simple_im_key_handler(struct simple_im *keyboard,
 						  text);
 }
 
+static void
+signal_int(int signum)
+{
+	running = 0;
+}
+
 int
 main(int argc, char *argv[])
 {
 	struct simple_im simple_im;
+	struct sigaction sigint;
 	int ret = 0;
 
 	memset(&simple_im, 0, sizeof(simple_im));
@@ -514,8 +524,30 @@ main(int argc, char *argv[])
 	simple_im.context = NULL;
 	simple_im.key_handler =  simple_im_key_handler;
 
-	while (ret != -1)
+	sigint.sa_handler = signal_int;
+	sigemptyset(&sigint.sa_mask);
+	sigint.sa_flags = SA_RESETHAND;
+	sigaction(SIGINT, &sigint, NULL);
+
+	while (running && ret != -1)
 		ret = wl_display_dispatch(simple_im.display);
+
+	if (simple_im.input_method)
+		zwp_input_method_v1_destroy(simple_im.input_method);
+
+	if (simple_im.context)
+		zwp_input_method_context_v1_destroy(simple_im.context);
+
+	if (simple_im.keyboard)
+		wl_keyboard_destroy(simple_im.keyboard);
+
+	xkb_context_unref(simple_im.xkb_context);
+	xkb_state_unref(simple_im.state);
+	xkb_keymap_unref(simple_im.keymap);
+
+	wl_registry_destroy(simple_im.registry);
+	wl_display_flush(simple_im.display);
+	wl_display_disconnect(simple_im.display);
 
 	if (ret == -1) {
 		fprintf(stderr, "Dispatch error: %s\n", strerror(errno));
