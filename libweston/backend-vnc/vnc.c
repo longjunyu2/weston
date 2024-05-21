@@ -1226,40 +1226,50 @@ vnc_backend_create(struct weston_compositor *compositor,
 	nvnc_set_userdata(backend->server, backend, NULL);
 	nvnc_set_name(backend->server, "Weston VNC backend");
 
-	if (!nvnc_has_auth()) {
-		weston_log("Neat VNC built without TLS support\n");
-		goto err_output;
-	}
-	if (!config->server_cert && !config->server_key) {
-		weston_log("The VNC backend requires a key and a certificate for TLS security"
-			   " (--vnc-tls-cert/--vnc-tls-key)\n");
-		goto err_output;
-	}
-	if (!config->server_cert) {
-		weston_log("Missing TLS certificate (--vnc-tls-cert)\n");
-		goto err_output;
-	}
-	if (!config->server_key) {
-		weston_log("Missing TLS key (--vnc-tls-key)\n");
-		goto err_output;
-	}
+	if (!config->disable_tls) {
+		if (!nvnc_has_auth()) {
+			weston_log("Neat VNC built without TLS support\n");
+			goto err_output;
+		}
+		if (!config->server_cert && !config->server_key) {
+			weston_log(
+				"The VNC backend requires a key and a "
+				"certificate for TLS security"
+				" (--vnc-tls-cert/--vnc-tls-key)\n");
+			goto err_output;
+		}
+		if (!config->server_cert) {
+			weston_log(
+				"Missing TLS certificate (--vnc-tls-cert)\n");
+			goto err_output;
+		}
+		if (!config->server_key) {
+			weston_log("Missing TLS key (--vnc-tls-key)\n");
+			goto err_output;
+		}
 
-	ret = nvnc_set_tls_creds(backend->server, config->server_key,
-				 config->server_cert);
-	if (ret) {
-		weston_log("Failed set TLS credentials\n");
-		goto err_output;
-	}
+		ret = nvnc_set_tls_creds(backend->server, config->server_key,
+					 config->server_cert);
+		if (ret) {
+			weston_log("Failed set TLS credentials\n");
+			goto err_output;
+		}
 
-	ret = nvnc_enable_auth(backend->server, NVNC_AUTH_REQUIRE_AUTH |
-			       NVNC_AUTH_REQUIRE_ENCRYPTION, vnc_handle_auth,
-			       NULL);
-	if (ret) {
-		weston_log("Failed to enable TLS support\n");
-		goto err_output;
-	}
+		ret = nvnc_enable_auth(
+			backend->server,
+			NVNC_AUTH_REQUIRE_AUTH | NVNC_AUTH_REQUIRE_ENCRYPTION,
+			vnc_handle_auth, NULL);
+		if (ret) {
+			weston_log("Failed to enable TLS support\n");
+			goto err_output;
+		}
 
-	weston_log("TLS support activated\n");
+		weston_log("TLS support activated\n");
+	} else {
+		weston_log(
+			"warning: VNC enabled without Transport Layer "
+			"Security!\n");
+	}
 
 	ret = weston_plugin_api_register(compositor, WESTON_VNC_OUTPUT_API_NAME,
 					 &api, sizeof(api));

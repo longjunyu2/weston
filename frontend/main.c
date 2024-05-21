@@ -792,6 +792,7 @@ usage(int error_code)
 		"  --port=PORT\t\tThe port to listen on\n"
 		"  --vnc-tls-cert=FILE\tThe file containing the certificate for TLS encryption\n"
 		"  --vnc-tls-key=FILE\tThe file containing the private key for TLS encryption\n"
+		"  --disable-transport-layer-security\t\tDisable Transport Layer Security (not recommended)\n"
 		"\n");
 #endif
 
@@ -3873,6 +3874,7 @@ load_vnc_backend(struct weston_compositor *c,
 		{ WESTON_OPTION_INTEGER, "port", 0, &config.port },
 		{ WESTON_OPTION_STRING,  "vnc-tls-cert", 0, &config.server_cert },
 		{ WESTON_OPTION_STRING,  "vnc-tls-key", 0, &config.server_key },
+		{ WESTON_OPTION_BOOLEAN, "disable-transport-layer-security", 0, &config.disable_tls },
 	};
 
 	parse_options(vnc_options, ARRAY_LENGTH(vnc_options), argc, argv);
