@@ -4778,6 +4778,7 @@ shell_destroy(struct wl_listener *listener, void *data)
 	wl_list_remove(&shell->output_create_listener.link);
 	wl_list_remove(&shell->output_move_listener.link);
 	wl_list_remove(&shell->resized_listener.link);
+	wl_list_remove(&shell->session_listener.link);
 
 	wl_list_for_each_safe(shseat, shseat_next, &shell->seat_list, link)
 		desktop_shell_destroy_seat(shseat);
@@ -4870,6 +4871,37 @@ shell_add_bindings(struct weston_compositor *ec, struct desktop_shell *shell)
 				          force_kill_binding, shell);
 
 	weston_install_debug_key_binding(ec, mod);
+}
+
+static void
+desktop_shell_notify_session(struct wl_listener *listener, void *data)
+{
+	struct desktop_shell *shell =
+		container_of(listener, struct desktop_shell, session_listener);
+	struct weston_compositor *compositor = data;
+	struct weston_seat *seat;
+
+	if (!compositor->session_active)
+		return;
+
+	wl_list_for_each(seat, &shell->seat_list, link) {
+		struct shell_seat *shseat = get_shell_seat(seat);
+
+		if (!shseat)
+			 continue;
+
+		if (shseat->focused_surface) {
+			struct shell_surface *current_focus =
+				get_shell_surface(shseat->focused_surface);
+
+			if (!current_focus)
+				continue;
+
+			weston_view_activate_input(current_focus->view,
+						   shseat->seat,
+						   WESTON_ACTIVATE_FLAG_NONE);
+		}
+	}
 }
 
 static void
@@ -4972,6 +5004,8 @@ wet_shell_init(struct weston_compositor *ec,
 	shell->resized_listener.notify = handle_output_resized;
 	wl_signal_add(&ec->output_resized_signal, &shell->resized_listener);
 
+	shell->session_listener.notify = desktop_shell_notify_session;
+	wl_signal_add(&ec->session_signal, &shell->session_listener);
 	screenshooter_create(ec);
 
 	shell_add_bindings(ec, shell);
