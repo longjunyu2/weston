@@ -1423,6 +1423,7 @@ kiosk_shell_destroy(struct wl_listener *listener, void *data)
 	wl_list_remove(&shell->output_moved_listener.link);
 	wl_list_remove(&shell->seat_created_listener.link);
 	wl_list_remove(&shell->transform_listener.link);
+	wl_list_remove(&shell->session_listener.link);
 
 	wl_list_for_each_safe(shoutput, tmp, &shell->output_list, link) {
 		kiosk_shell_output_destroy(shoutput);
@@ -1442,6 +1443,31 @@ kiosk_shell_destroy(struct wl_listener *listener, void *data)
 	weston_desktop_destroy(shell->desktop);
 
 	free(shell);
+}
+
+static void
+kiosk_shell_notify_session(struct wl_listener *listener, void *data)
+{
+	struct kiosk_shell *shell =
+		container_of(listener, struct kiosk_shell, session_listener);
+	struct kiosk_shell_seat *k_seat;
+	struct weston_compositor *compositor = data;
+	struct weston_seat *seat = get_kiosk_shell_first_seat(shell);
+
+
+	if (!compositor->session_active || !seat)
+		return;
+
+	k_seat = get_kiosk_shell_seat(seat);
+	if (k_seat->focused_surface) {
+		struct kiosk_shell_surface *current_focus =
+			get_kiosk_shell_surface(k_seat->focused_surface);
+
+		weston_view_activate_input(current_focus->view,
+					   k_seat->seat,
+					   WESTON_ACTIVATE_FLAG_NONE);
+	}
+
 }
 
 WL_EXPORT int
@@ -1509,6 +1535,8 @@ wet_shell_init(struct weston_compositor *ec,
 	shell->output_moved_listener.notify = kiosk_shell_handle_output_moved;
 	wl_signal_add(&ec->output_moved_signal, &shell->output_moved_listener);
 
+	shell->session_listener.notify = kiosk_shell_notify_session;
+	wl_signal_add(&ec->session_signal, &shell->session_listener);
 	screenshooter_create(ec);
 
 	kiosk_shell_add_bindings(shell);
