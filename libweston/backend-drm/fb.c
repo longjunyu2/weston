@@ -613,7 +613,8 @@ drm_can_scanout_dmabuf(struct weston_backend *backend,
 }
 
 static bool
-drm_fb_compatible_with_plane(struct drm_fb *fb, struct drm_plane *plane)
+drm_fb_compatible_with_plane(struct drm_fb *fb, struct drm_plane *plane,
+			     struct weston_view *view)
 {
 	struct drm_device *device = plane->device;
 	struct drm_backend *b = device->backend;
@@ -637,13 +638,11 @@ drm_fb_compatible_with_plane(struct drm_fb *fb, struct drm_plane *plane)
 			return true;
 	}
 
-	drm_debug(b, "\t\t\t\t[%s] not placing view on %s: "
-		  "no free %s planes matching format %s (0x%lx) "
-		  "modifier 0x%llx\n",
+	drm_debug(b, "\t\t\t\t[%s] not assigning view %p on %s, "
+		  "plane %d (format %s (0x%lx) with modifier 0x%llx) not supported\n",
 		  drm_output_get_plane_type_name(plane),
-		  drm_output_get_plane_type_name(plane),
-		  drm_output_get_plane_type_name(plane),
-		  fb->format->drm_format_name,
+		  view, drm_output_get_plane_type_name(plane),
+		  plane->plane_id, fb->format->drm_format_name,
 		  (unsigned long) fb->format->format,
 		  (unsigned long long) fb->modifier);
 
@@ -759,7 +758,7 @@ drm_fb_get_from_paint_node(struct drm_output_state *state,
 		if (plane->type == WDRM_PLANE_TYPE_CURSOR)
 			continue;
 
-		if (drm_fb_compatible_with_plane(fb, plane))
+		if (drm_fb_compatible_with_plane(fb, plane, pnode->view))
 			fb->plane_mask |= 1 << (plane->plane_idx);
 	}
 	if (fb->plane_mask == 0) {
