@@ -3583,21 +3583,6 @@ weston_output_repaint(struct weston_output *output)
 		}
 	}
 
-	wl_list_init(&frame_callback_list);
-	wl_list_for_each(pnode, &output->paint_node_z_order_list,
-			 z_order_link) {
-		/* Note: This operation is safe to do multiple times on the
-		 * same surface.
-		 */
-		if (pnode->surface->output == output) {
-			wl_list_insert_list(&frame_callback_list,
-					    &pnode->surface->frame_callback_list);
-			wl_list_init(&pnode->surface->frame_callback_list);
-
-			weston_output_take_feedback_list(output, pnode->surface);
-		}
-	}
-
 	output_update_visibility(output);
 
 	wl_list_for_each(pnode, &output->paint_node_z_order_list,
@@ -3615,6 +3600,31 @@ weston_output_repaint(struct weston_output *output)
 	weston_compositor_repick(ec);
 
 	frame_time_msec = timespec_to_msec(&output->frame_time);
+
+	wl_list_init(&frame_callback_list);
+	wl_list_for_each(pnode, &output->paint_node_z_order_list,
+			 z_order_link) {
+		/* Note: This operation is safe to do multiple times on the
+		 * same surface.
+		 */
+		if (pnode->surface->output == output) {
+
+			/*
+			 * avoid adding pnode's frame callbacks/presented
+			 * feedback to the respective lists if pnode/surface is
+			 * occluded
+			 */
+			if (!pixman_region32_not_empty(&pnode->visible))
+				continue;
+
+			wl_list_insert_list(&frame_callback_list,
+					    &pnode->surface->frame_callback_list);
+			wl_list_init(&pnode->surface->frame_callback_list);
+
+			weston_output_take_feedback_list(output, pnode->surface);
+		}
+	}
+
 
 	wl_resource_for_each_safe(cb, cnext, &frame_callback_list) {
 		wl_callback_send_done(cb, frame_time_msec);
