@@ -1319,8 +1319,7 @@ wet_output_set_scale(struct weston_output *output,
 {
 	int32_t scale = default_scale;
 
-	if (section)
-		weston_config_section_get_int(section, "scale", &scale, default_scale);
+	weston_config_section_get_int(section, "scale", &scale, default_scale);
 
 	if (parsed_scale)
 		scale = parsed_scale;
@@ -1340,11 +1339,7 @@ wet_output_set_transform(struct weston_output *output,
 	char *t = NULL;
 	uint32_t transform = default_transform;
 
-	if (section) {
-		weston_config_section_get_string(section,
-						 "transform", &t, NULL);
-	}
-
+	weston_config_section_get_string(section, "transform", &t, NULL);
 	if (t) {
 		if (weston_parse_transform(t, &transform) < 0) {
 			weston_log("Invalid transform \"%s\" for output %s\n",
@@ -1375,11 +1370,7 @@ wet_output_set_color_profile(struct weston_output *output,
 	if (!compositor->use_color_manager)
 		return 0;
 
-	if (section) {
-		weston_config_section_get_string(section, "icc_profile",
-						 &icc_file, NULL);
-	}
-
+	weston_config_section_get_string(section, "icc_profile", &icc_file, NULL);
 	if (icc_file) {
 		cprof = weston_compositor_load_icc_file(output->compositor,
 							icc_file);
@@ -1422,11 +1413,7 @@ wet_output_set_eotf_mode(struct weston_output *output,
 	char *str = NULL;
 	unsigned i;
 
-	if (section) {
-		weston_config_section_get_string(section, "eotf-mode",
-						 &str, NULL);
-	}
-
+	weston_config_section_get_string(section, "eotf-mode", &str, NULL);
 	if (!str) {
 		/* The default SDR mode is always supported. */
 		assert(weston_output_get_supported_eotf_modes(output) & eotf_mode);
@@ -1494,11 +1481,7 @@ wet_output_set_colorimetry_mode(struct weston_output *output,
 	char *str = NULL;
 	unsigned i;
 
-	if (section) {
-		weston_config_section_get_string(section, "colorimetry-mode",
-						 &str, NULL);
-	}
-
+	weston_config_section_get_string(section, "colorimetry-mode", &str, NULL);
 	if (!str) {
 		/* The default RGB mode is always supported. */
 		assert(weston_output_get_supported_colorimetry_modes(output) & cmode);
@@ -1702,10 +1685,7 @@ allow_content_protection(struct weston_output *output,
 {
 	bool allow_hdcp = true;
 
-	if (section)
-		weston_config_section_get_bool(section, "allow_hdcp",
-					       &allow_hdcp, true);
-
+	weston_config_section_get_bool(section, "allow_hdcp", &allow_hdcp, true);
 	weston_output_allow_protection(output, allow_hdcp);
 }
 
@@ -3327,9 +3307,7 @@ pipewire_backend_output_configure(struct weston_output *output)
 	parse_simple_mode(output, section, &width, &height, &defaults,
 			  parsed_options);
 
-	if (section)
-		weston_config_section_get_string(section, "gbm-format",
-						 &gbm_format, NULL);
+	weston_config_section_get_string(section, "gbm-format", &gbm_format, NULL);
 
 	weston_output_set_scale(output, 1);
 	weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL);
