@@ -1245,8 +1245,8 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 
 	switch (xform->search_key.category) {
 	case CMLCMS_CATEGORY_INPUT_TO_BLEND:
-		chain[chain_len++] = xform->search_key.input_profile->profile;
-		chain[chain_len++] = output_profile->profile;
+		chain[chain_len++] = xform->search_key.input_profile->icc.profile;
+		chain[chain_len++] = output_profile->icc.profile;
 		chain[chain_len++] = output_profile->extract.eotf;
 		break;
 	case CMLCMS_CATEGORY_BLEND_TO_OUTPUT:
@@ -1260,8 +1260,8 @@ xform_realize_chain(struct cmlcms_color_transform *xform)
 							       WESTON_RENDER_INTENT_ABSOLUTE);
 		break;
 	case CMLCMS_CATEGORY_INPUT_TO_OUTPUT:
-		chain[chain_len++] = xform->search_key.input_profile->profile;
-		chain[chain_len++] = output_profile->profile;
+		chain[chain_len++] = xform->search_key.input_profile->icc.profile;
+		chain[chain_len++] = output_profile->icc.profile;
 		if (output_profile->extract.vcgt.p)
 			chain[chain_len++] = output_profile->extract.vcgt;
 		break;

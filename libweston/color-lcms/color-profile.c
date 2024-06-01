@@ -295,7 +295,7 @@ ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 	switch (cprof->type) {
 	case CMLCMS_PROFILE_TYPE_ICC:
 		ret = ensure_output_profile_extract_icc(&cprof->extract, lcms_ctx,
-							cprof->profile, num_points,
+							cprof->icc.profile, num_points,
 							err_msg);
 		if (ret)
 			weston_assert_ptr(compositor, cprof->extract.eotf.p);
@@ -351,7 +351,7 @@ cmlcms_find_color_profile_by_md5(const struct weston_color_manager_lcms *cm,
 		if (cprof->type != CMLCMS_PROFILE_TYPE_ICC)
 			continue;
 
-		if (memcmp(cprof->md5sum.bytes,
+		if (memcmp(cprof->icc.md5sum.bytes,
 			   md5sum->bytes, sizeof(md5sum->bytes)) == 0)
 			return cprof;
 	}
@@ -416,8 +416,8 @@ cmlcms_color_profile_create(struct weston_color_manager_lcms *cm,
 
 	weston_color_profile_init(&cprof->base, &cm->base);
 	cprof->base.description = desc;
-	cprof->profile = profile;
-	cmsGetHeaderProfileID(profile.p, cprof->md5sum.bytes);
+	cprof->icc.profile = profile;
+	cmsGetHeaderProfileID(profile.p, cprof->icc.md5sum.bytes);
 	wl_list_insert(&cm->color_profile_list, &cprof->link);
 
 	weston_log_scope_printf(cm->profiles_scope,
@@ -442,14 +442,14 @@ cmlcms_color_profile_destroy(struct cmlcms_color_profile *cprof)
 
 	switch (cprof->type) {
 	case CMLCMS_PROFILE_TYPE_ICC:
-		cmsCloseProfile(cprof->profile.p);
+		cmsCloseProfile(cprof->icc.profile.p);
 		/**
 		 * TODO: drop this if when we convert the stock sRGB profile to
 		 * a parametric one. When we do that, all ICC profiles will have
 		 * their ro_anonymous_file, so we won't have to check.
 		 */
-		if (cprof->prof_rofile)
-			os_ro_anonymous_file_destroy(cprof->prof_rofile);
+		if (cprof->icc.prof_rofile)
+			os_ro_anonymous_file_destroy(cprof->icc.prof_rofile);
 		break;
 	case CMLCMS_PROFILE_TYPE_PARAMS:
 		free(cprof->params);
@@ -623,7 +623,7 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 		goto err_close;
 
 	cprof->type = CMLCMS_PROFILE_TYPE_ICC;
-	cprof->prof_rofile = prof_rofile;
+	cprof->icc.prof_rofile = prof_rofile;
 
 	*cprof_out = &cprof->base;
 	return true;
@@ -716,14 +716,14 @@ cmlcms_send_image_desc_info(struct cm_image_desc_info *cm_image_desc_info,
 		/* ICC-based color profile, so just send the ICC file fd. If we
 		 * get an error (negative fd), the helper will send the proper
 		 * error to the client. */
-		fd = os_ro_anonymous_file_get_fd(cprof->prof_rofile,
+		fd = os_ro_anonymous_file_get_fd(cprof->icc.prof_rofile,
 						 RO_ANONYMOUS_FILE_MAPMODE_PRIVATE);
 		if (fd < 0) {
 			weston_cm_send_icc_file(cm_image_desc_info, -1, 0);
 			return false;
 		}
 
-		len = os_ro_anonymous_file_size(cprof->prof_rofile);
+		len = os_ro_anonymous_file_size(cprof->icc.prof_rofile);
 		weston_assert_uint32_gt(compositor, len, 0);
 
 		weston_cm_send_icc_file(cm_image_desc_info, fd, len);

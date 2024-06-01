@@ -108,11 +108,12 @@ struct cmlcms_color_profile {
 	/* struct weston_color_manager_lcms::color_profile_list */
 	struct wl_list link;
 
-	struct lcmsProfilePtr profile;
-	struct cmlcms_md5_sum md5sum;
-
 	/* Only for CMLCMS_PROFILE_TYPE_ICC */
-	struct ro_anonymous_file *prof_rofile;
+	struct {
+		struct lcmsProfilePtr profile;
+		struct cmlcms_md5_sum md5sum;
+		struct ro_anonymous_file *prof_rofile;
+	} icc;
 
 	/* Only for CMLCMS_PROFILE_TYPE_PARAMS */
 	struct weston_color_profile_params *params;
