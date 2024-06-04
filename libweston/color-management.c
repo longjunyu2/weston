@@ -36,8 +36,8 @@
 #include "color-management-v1-server-protocol.h"
 
 enum supports_get_info {
-        NO_GET_INFO = false,
-        YES_GET_INFO = true,
+	NO_GET_INFO = false,
+	YES_GET_INFO = true,
 };
 
 /**
@@ -48,18 +48,18 @@ enum supports_get_info {
  * Image description that we failed to create do not have such backing object.
  */
 struct cm_image_desc {
-        struct wl_resource *owner;
-        struct weston_color_manager *cm;
+	struct wl_resource *owner;
+	struct weston_color_manager *cm;
 
-        /* Reference to the color profile that it is backing up. An image
-         * description without a cprof is valid, and that simply means that it
-         * isn't ready (i.e. we didn't send the 'ready' event because we are
-         * still in the process of creating the color profile). */
-        struct weston_color_profile *cprof;
+	/* Reference to the color profile that it is backing up. An image
+	 * description without a cprof is valid, and that simply means that it
+	 * isn't ready (i.e. we didn't send the 'ready' event because we are
+	 * still in the process of creating the color profile). */
+	struct weston_color_profile *cprof;
 
-        /* Depending how the image description is created, the protocol states
-         * that get_information() request should be invalid. */
-        bool supports_get_info;
+	/* Depending how the image description is created, the protocol states
+	 * that get_information() request should be invalid. */
+	bool supports_get_info;
 };
 
 /**
@@ -67,8 +67,8 @@ struct cm_image_desc {
  * gets destroyed when all the info is sent, i.e. with the done() event.
  */
 struct cm_image_desc_info {
-        struct wl_resource *owner;
-        struct weston_compositor *compositor;
+	struct wl_resource *owner;
+	struct weston_compositor *compositor;
 };
 
 /**
@@ -76,14 +76,14 @@ struct cm_image_desc_info {
  * use this struct to help.
  */
 struct cm_creator_icc {
-        struct wl_resource *owner;
+	struct wl_resource *owner;
 
-        struct weston_compositor *compositor;
+	struct weston_compositor *compositor;
 
-        /* ICC profile data given by the client. */
-        int32_t icc_profile_fd;
-        size_t icc_data_length;
-        size_t icc_data_offset;
+	/* ICC profile data given by the client. */
+	int32_t icc_profile_fd;
+	size_t icc_data_length;
+	size_t icc_data_offset;
 };
 
 /**
@@ -102,17 +102,17 @@ struct cm_creator_icc {
  */
 WL_EXPORT void
 weston_cm_send_icc_file(struct cm_image_desc_info *cm_image_desc_info,
-                        int32_t fd, uint32_t len)
+			int32_t fd, uint32_t len)
 {
-        /* Caller failed to create fd. At this point we already know that the
-         * ICC is valid, so let's disconnect the client with OOM. */
-        if (fd < 0) {
-                wl_resource_post_no_memory(cm_image_desc_info->owner);
-                return;
-        }
+	/* Caller failed to create fd. At this point we already know that the
+	 * ICC is valid, so let's disconnect the client with OOM. */
+	if (fd < 0) {
+		wl_resource_post_no_memory(cm_image_desc_info->owner);
+		return;
+	}
 
-        xx_image_description_info_v2_send_icc_file(cm_image_desc_info->owner,
-                                                   fd, len);
+	xx_image_description_info_v2_send_icc_file(cm_image_desc_info->owner,
+						   fd, len);
 }
 
 /**
@@ -129,8 +129,8 @@ WL_EXPORT void
 weston_cm_send_primaries_named(struct cm_image_desc_info *cm_image_desc_info,
 			       const struct weston_color_primaries_info *primaries_info)
 {
-        xx_image_description_info_v2_send_primaries_named(cm_image_desc_info->owner,
-                                                          primaries_info->protocol_primaries);
+	xx_image_description_info_v2_send_primaries_named(cm_image_desc_info->owner,
+							  primaries_info->protocol_primaries);
 }
 
 /**
@@ -145,21 +145,21 @@ weston_cm_send_primaries_named(struct cm_image_desc_info *cm_image_desc_info,
  */
 WL_EXPORT void
 weston_cm_send_primaries(struct cm_image_desc_info *cm_image_desc_info,
-                         const struct weston_color_gamut *color_gamut)
+			 const struct weston_color_gamut *color_gamut)
 {
-        xx_image_description_info_v2_send_primaries(cm_image_desc_info->owner,
-                                                    /* red */
-                                                    round(color_gamut->primary[0].x * 10000),
-                                                    round(color_gamut->primary[0].y * 10000),
-                                                    /* green */
-                                                    round(color_gamut->primary[1].x * 10000),
-                                                    round(color_gamut->primary[1].y * 10000),
-                                                    /* blue */
-                                                    round(color_gamut->primary[2].x * 10000),
-                                                    round(color_gamut->primary[2].y * 10000),
-                                                    /* white point */
-                                                    round(color_gamut->white_point.x * 10000),
-                                                    round(color_gamut->white_point.y * 10000));
+	xx_image_description_info_v2_send_primaries(cm_image_desc_info->owner,
+						    /* red */
+						    round(color_gamut->primary[0].x * 10000),
+						    round(color_gamut->primary[0].y * 10000),
+						    /* green */
+						    round(color_gamut->primary[1].x * 10000),
+						    round(color_gamut->primary[1].y * 10000),
+						    /* blue */
+						    round(color_gamut->primary[2].x * 10000),
+						    round(color_gamut->primary[2].y * 10000),
+						    /* white point */
+						    round(color_gamut->white_point.x * 10000),
+						    round(color_gamut->white_point.y * 10000));
 }
 
 /**
@@ -174,10 +174,10 @@ weston_cm_send_primaries(struct cm_image_desc_info *cm_image_desc_info,
  */
 WL_EXPORT void
 weston_cm_send_tf_named(struct cm_image_desc_info *cm_image_desc_info,
-                        const struct weston_color_tf_info *tf_info)
+			const struct weston_color_tf_info *tf_info)
 {
-        xx_image_description_info_v2_send_tf_named(cm_image_desc_info->owner,
-                                                   tf_info->protocol_tf);
+	xx_image_description_info_v2_send_tf_named(cm_image_desc_info->owner,
+						   tf_info->protocol_tf);
 }
 
 /**
@@ -186,7 +186,7 @@ weston_cm_send_tf_named(struct cm_image_desc_info *cm_image_desc_info,
 static void
 cm_image_desc_info_destroy(struct cm_image_desc_info *cm_image_desc_info)
 {
-        free(cm_image_desc_info);
+	free(cm_image_desc_info);
 }
 
 /**
@@ -196,10 +196,10 @@ cm_image_desc_info_destroy(struct cm_image_desc_info *cm_image_desc_info)
 static void
 image_description_info_resource_destroy(struct wl_resource *cm_image_desc_info_res)
 {
-        struct cm_image_desc_info *cm_image_desc_info =
-                wl_resource_get_user_data(cm_image_desc_info_res);
+	struct cm_image_desc_info *cm_image_desc_info =
+		wl_resource_get_user_data(cm_image_desc_info_res);
 
-        cm_image_desc_info_destroy(cm_image_desc_info);
+	cm_image_desc_info_destroy(cm_image_desc_info);
 }
 
 /**
@@ -207,28 +207,28 @@ image_description_info_resource_destroy(struct wl_resource *cm_image_desc_info_r
  */
 static struct cm_image_desc_info *
 image_description_info_create(struct wl_client *client, uint32_t version,
-                              struct weston_compositor *compositor,
-                              uint32_t cm_image_desc_info_id)
+			      struct weston_compositor *compositor,
+			      uint32_t cm_image_desc_info_id)
 {
-        struct cm_image_desc_info *cm_image_desc_info;
+	struct cm_image_desc_info *cm_image_desc_info;
 
-        cm_image_desc_info = xzalloc(sizeof(*cm_image_desc_info));
+	cm_image_desc_info = xzalloc(sizeof(*cm_image_desc_info));
 
-        cm_image_desc_info->compositor = compositor;
+	cm_image_desc_info->compositor = compositor;
 
-        cm_image_desc_info->owner =
-                wl_resource_create(client, &xx_image_description_info_v2_interface,
-                                   version, cm_image_desc_info_id);
-        if (!cm_image_desc_info->owner) {
-                free(cm_image_desc_info);
-                return NULL;
-        }
+	cm_image_desc_info->owner =
+		wl_resource_create(client, &xx_image_description_info_v2_interface,
+				   version, cm_image_desc_info_id);
+	if (!cm_image_desc_info->owner) {
+		free(cm_image_desc_info);
+		return NULL;
+	}
 
-        wl_resource_set_implementation(cm_image_desc_info->owner,
-                                       NULL, cm_image_desc_info,
-                                       image_description_info_resource_destroy);
+	wl_resource_set_implementation(cm_image_desc_info->owner,
+				       NULL, cm_image_desc_info,
+				       image_description_info_resource_destroy);
 
-        return cm_image_desc_info;
+	return cm_image_desc_info;
 }
 
 /**
@@ -236,63 +236,63 @@ image_description_info_create(struct wl_client *client, uint32_t version,
  */
 static void
 image_description_get_information(struct wl_client *client,
-                                  struct wl_resource *cm_image_desc_res,
-                                  uint32_t cm_image_desc_info_id)
+				  struct wl_resource *cm_image_desc_res,
+				  uint32_t cm_image_desc_info_id)
 {
-        struct cm_image_desc *cm_image_desc =
-                wl_resource_get_user_data(cm_image_desc_res);
-        uint32_t version = wl_resource_get_version(cm_image_desc_res);
-        struct cm_image_desc_info *cm_image_desc_info;
-        bool success;
+	struct cm_image_desc *cm_image_desc =
+		wl_resource_get_user_data(cm_image_desc_res);
+	uint32_t version = wl_resource_get_version(cm_image_desc_res);
+	struct cm_image_desc_info *cm_image_desc_info;
+	bool success;
 
-        /* Invalid image description for this request, as we gracefully failed
-         * to create it. */
-        if (!cm_image_desc) {
-                wl_resource_post_error(cm_image_desc_res,
-                                       XX_IMAGE_DESCRIPTION_V2_ERROR_NOT_READY,
-                                       "we gracefully failed to create this image " \
-                                       "description");
-                return;
-        }
+	/* Invalid image description for this request, as we gracefully failed
+	 * to create it. */
+	if (!cm_image_desc) {
+		wl_resource_post_error(cm_image_desc_res,
+				       XX_IMAGE_DESCRIPTION_V2_ERROR_NOT_READY,
+				       "we gracefully failed to create this image " \
+				       "description");
+		return;
+	}
 
-        /* Invalid image description for this request, as it isn't ready yet. */
-        if (!cm_image_desc->cprof) {
-                wl_resource_post_error(cm_image_desc_res,
-                                       XX_IMAGE_DESCRIPTION_V2_ERROR_NOT_READY,
-                                       "image description not ready yet");
-                return;
-        }
+	/* Invalid image description for this request, as it isn't ready yet. */
+	if (!cm_image_desc->cprof) {
+		wl_resource_post_error(cm_image_desc_res,
+				       XX_IMAGE_DESCRIPTION_V2_ERROR_NOT_READY,
+				       "image description not ready yet");
+		return;
+	}
 
-        /* Depending how the image description is created, the protocol states
-         * that get_information() request should be invalid. */
-        if (!cm_image_desc->supports_get_info) {
-                wl_resource_post_error(cm_image_desc_res,
-                                       XX_IMAGE_DESCRIPTION_V2_ERROR_NO_INFORMATION,
-                                       "get_information is not allowed for this "
-                                       "image description");
-                return;
-        }
+	/* Depending how the image description is created, the protocol states
+	 * that get_information() request should be invalid. */
+	if (!cm_image_desc->supports_get_info) {
+		wl_resource_post_error(cm_image_desc_res,
+				       XX_IMAGE_DESCRIPTION_V2_ERROR_NO_INFORMATION,
+				       "get_information is not allowed for this "
+				       "image description");
+		return;
+	}
 
-        /* Create object responsible for sending the image description info. */
-        cm_image_desc_info =
-                image_description_info_create(client, version,
-                                              cm_image_desc->cm->compositor,
-                                              cm_image_desc_info_id);
-        if (!cm_image_desc_info) {
-                wl_resource_post_no_memory(cm_image_desc_res);
-                return;
-        }
+	/* Create object responsible for sending the image description info. */
+	cm_image_desc_info =
+		image_description_info_create(client, version,
+					      cm_image_desc->cm->compositor,
+					      cm_image_desc_info_id);
+	if (!cm_image_desc_info) {
+		wl_resource_post_no_memory(cm_image_desc_res);
+		return;
+	}
 
-        /* The color plugin is the one that has information about the color
-         * profile, so we go through it to send the info to clients. It uses
-         * our helpers (weston_cm_send_primaries(), etc) to do that. */
-        success = cm_image_desc->cm->send_image_desc_info(cm_image_desc_info,
-                                                          cm_image_desc->cprof);
-        if (success)
-                xx_image_description_info_v2_send_done(cm_image_desc_info->owner);
+	/* The color plugin is the one that has information about the color
+	 * profile, so we go through it to send the info to clients. It uses
+	 * our helpers (weston_cm_send_primaries(), etc) to do that. */
+	success = cm_image_desc->cm->send_image_desc_info(cm_image_desc_info,
+							  cm_image_desc->cprof);
+	if (success)
+		xx_image_description_info_v2_send_done(cm_image_desc_info->owner);
 
-        /* All info sent, so destroy the object. */
-        wl_resource_destroy(cm_image_desc_info->owner);
+	/* All info sent, so destroy the object. */
+	wl_resource_destroy(cm_image_desc_info->owner);
 }
 
 /**
@@ -301,9 +301,9 @@ image_description_get_information(struct wl_client *client,
  */
 static void
 image_description_destroy(struct wl_client *client,
-                          struct wl_resource *cm_image_desc_res)
+			  struct wl_resource *cm_image_desc_res)
 {
-        wl_resource_destroy(cm_image_desc_res);
+	wl_resource_destroy(cm_image_desc_res);
 }
 
 static void
@@ -316,21 +316,21 @@ cm_image_desc_destroy(struct cm_image_desc *cm_image_desc);
 static void
 image_description_resource_destroy(struct wl_resource *cm_image_desc_res)
 {
-        struct cm_image_desc *cm_image_desc =
-                wl_resource_get_user_data(cm_image_desc_res);
+	struct cm_image_desc *cm_image_desc =
+		wl_resource_get_user_data(cm_image_desc_res);
 
-        /* Image description that we failed to create do not have a backing
-         * struct cm_image_desc object. */
-        if (!cm_image_desc)
-                return;
+	/* Image description that we failed to create do not have a backing
+	 * struct cm_image_desc object. */
+	if (!cm_image_desc)
+		return;
 
-        cm_image_desc_destroy(cm_image_desc);
+	cm_image_desc_destroy(cm_image_desc);
 }
 
 static const struct xx_image_description_v2_interface
 image_description_implementation = {
-        .destroy = image_description_destroy,
-        .get_information = image_description_get_information,
+	.destroy = image_description_destroy,
+	.get_information = image_description_get_information,
 };
 
 /**
@@ -338,33 +338,33 @@ image_description_implementation = {
  */
 static struct cm_image_desc *
 cm_image_desc_create(struct weston_color_manager *cm,
-                     struct weston_color_profile *cprof,
-                     struct wl_client *client, uint32_t version,
-                     uint32_t image_description_id,
-                     enum supports_get_info supports_get_info)
+		     struct weston_color_profile *cprof,
+		     struct wl_client *client, uint32_t version,
+		     uint32_t image_description_id,
+		     enum supports_get_info supports_get_info)
 {
-        struct cm_image_desc *cm_image_desc;
+	struct cm_image_desc *cm_image_desc;
 
-        cm_image_desc = xzalloc(sizeof(*cm_image_desc));
+	cm_image_desc = xzalloc(sizeof(*cm_image_desc));
 
-        cm_image_desc->owner =
-                wl_resource_create(client, &xx_image_description_v2_interface,
-                                   version, image_description_id);
-        if (!cm_image_desc->owner) {
-                free(cm_image_desc);
-                return NULL;
-        }
+	cm_image_desc->owner =
+		wl_resource_create(client, &xx_image_description_v2_interface,
+				   version, image_description_id);
+	if (!cm_image_desc->owner) {
+		free(cm_image_desc);
+		return NULL;
+	}
 
-        wl_resource_set_implementation(cm_image_desc->owner,
-                                       &image_description_implementation,
-                                       cm_image_desc,
-                                       image_description_resource_destroy);
+	wl_resource_set_implementation(cm_image_desc->owner,
+				       &image_description_implementation,
+				       cm_image_desc,
+				       image_description_resource_destroy);
 
-        cm_image_desc->cm = cm;
-        cm_image_desc->cprof = weston_color_profile_ref(cprof);
-        cm_image_desc->supports_get_info = supports_get_info;
+	cm_image_desc->cm = cm;
+	cm_image_desc->cprof = weston_color_profile_ref(cprof);
+	cm_image_desc->supports_get_info = supports_get_info;
 
-        return cm_image_desc;
+	return cm_image_desc;
 }
 
 /**
@@ -373,8 +373,8 @@ cm_image_desc_create(struct weston_color_manager *cm,
 static void
 cm_image_desc_destroy(struct cm_image_desc *cm_image_desc)
 {
-        weston_color_profile_unref(cm_image_desc->cprof);
-        free(cm_image_desc);
+	weston_color_profile_unref(cm_image_desc->cprof);
+	free(cm_image_desc);
 }
 
 /**
@@ -382,62 +382,62 @@ cm_image_desc_destroy(struct cm_image_desc *cm_image_desc)
  */
 static void
 cm_output_get_image_description(struct wl_client *client,
-                                struct wl_resource *cm_output_res,
-                                uint32_t image_description_id)
+				struct wl_resource *cm_output_res,
+				uint32_t image_description_id)
 {
-        struct weston_head *head = wl_resource_get_user_data(cm_output_res);
-        struct weston_compositor *compositor;
-        struct weston_output *output;
-        uint32_t version = wl_resource_get_version(cm_output_res);
-        struct cm_image_desc *cm_image_desc;
-        struct wl_resource *cm_image_desc_res;
+	struct weston_head *head = wl_resource_get_user_data(cm_output_res);
+	struct weston_compositor *compositor;
+	struct weston_output *output;
+	uint32_t version = wl_resource_get_version(cm_output_res);
+	struct cm_image_desc *cm_image_desc;
+	struct wl_resource *cm_image_desc_res;
 
-        /* The protocol states that if the wl_output global (which is backed by
-         * the weston_head object) no longer exists, we should immediately send
-         * a "failed" event for the image desc. After receiving that, clients
-         * are not allowed to make requests other than "destroy" for the image
-         * description. So let's avoid creating a cm_image_desc object, let's
-         * create only the resource and send the failed event. */
-        if (!head) {
-                cm_image_desc_res =
-                        wl_resource_create(client, &xx_image_description_v2_interface,
-                                           version, image_description_id);
-                if (!cm_image_desc_res) {
-                        wl_resource_post_no_memory(cm_output_res);
-                        return;
-                }
+	/* The protocol states that if the wl_output global (which is backed by
+	 * the weston_head object) no longer exists, we should immediately send
+	 * a "failed" event for the image desc. After receiving that, clients
+	 * are not allowed to make requests other than "destroy" for the image
+	 * description. So let's avoid creating a cm_image_desc object, let's
+	 * create only the resource and send the failed event. */
+	if (!head) {
+		cm_image_desc_res =
+			wl_resource_create(client, &xx_image_description_v2_interface,
+					   version, image_description_id);
+		if (!cm_image_desc_res) {
+			wl_resource_post_no_memory(cm_output_res);
+			return;
+		}
 
-                wl_resource_set_implementation(cm_image_desc_res,
-                                               &image_description_implementation,
-                                               NULL, image_description_resource_destroy);
+		wl_resource_set_implementation(cm_image_desc_res,
+					       &image_description_implementation,
+					       NULL, image_description_resource_destroy);
 
-                xx_image_description_v2_send_failed(cm_image_desc_res,
-                                                    XX_IMAGE_DESCRIPTION_V2_CAUSE_NO_OUTPUT,
-                                                    "the wl_output global no longer exists");
-                return;
-        }
+		xx_image_description_v2_send_failed(cm_image_desc_res,
+						    XX_IMAGE_DESCRIPTION_V2_CAUSE_NO_OUTPUT,
+						    "the wl_output global no longer exists");
+		return;
+	}
 
-        compositor = head->compositor;
-        output = head->output;
+	compositor = head->compositor;
+	output = head->output;
 
-        /* If the head becomes inactive (head->output == NULL), the respective
-         * wl_output global gets destroyed. In such case we make the cm_output
-         * object inert. We do that in weston_head_remove_global(), and the
-         * cm_output_res user data (which was the head itself) is set to NULL.
-         * So if we reached here, head is active and head->output != NULL. */
-        weston_assert_ptr(compositor, output);
+	/* If the head becomes inactive (head->output == NULL), the respective
+	 * wl_output global gets destroyed. In such case we make the cm_output
+	 * object inert. We do that in weston_head_remove_global(), and the
+	 * cm_output_res user data (which was the head itself) is set to NULL.
+	 * So if we reached here, head is active and head->output != NULL. */
+	weston_assert_ptr(compositor, output);
 
-        cm_image_desc = cm_image_desc_create(compositor->color_manager,
-                                             output->color_profile, client,
-                                             version, image_description_id,
-                                             YES_GET_INFO);
-        if (!cm_image_desc) {
-                wl_resource_post_no_memory(cm_output_res);
-                return;
-        }
+	cm_image_desc = cm_image_desc_create(compositor->color_manager,
+					     output->color_profile, client,
+					     version, image_description_id,
+					     YES_GET_INFO);
+	if (!cm_image_desc) {
+		wl_resource_post_no_memory(cm_output_res);
+		return;
+	}
 
-        xx_image_description_v2_send_ready(cm_image_desc->owner,
-                                           cm_image_desc->cprof->id);
+	xx_image_description_v2_send_ready(cm_image_desc->owner,
+					   cm_image_desc->cprof->id);
 }
 
 /**
@@ -446,7 +446,7 @@ cm_output_get_image_description(struct wl_client *client,
 static void
 cm_output_destroy(struct wl_client *client, struct wl_resource *cm_output_res)
 {
-        wl_resource_destroy(cm_output_res);
+	wl_resource_destroy(cm_output_res);
 }
 
 /**
@@ -455,29 +455,29 @@ cm_output_destroy(struct wl_client *client, struct wl_resource *cm_output_res)
 static void
 cm_output_resource_destroy(struct wl_resource *cm_output_res)
 {
-        struct weston_head *head = wl_resource_get_user_data(cm_output_res);
+	struct weston_head *head = wl_resource_get_user_data(cm_output_res);
 
-        /* For inert cm_output, we don't have to do anything.
-         *
-         * If the cm_get_output() was called after we made the head inactive, we
-         * created the cm_output with no resource user data and didn't add the
-         * resource link to weston_head::cm_output_resource_list.
-         *
-         * If the cm_output was created with an active head but it became
-         * inactive later, we have already done what is necessary when cm_output
-         * became inert, in weston_head_remove_global(). */
-        if (!head)
-                return;
+	/* For inert cm_output, we don't have to do anything.
+	 *
+	 * If the cm_get_output() was called after we made the head inactive, we
+	 * created the cm_output with no resource user data and didn't add the
+	 * resource link to weston_head::cm_output_resource_list.
+	 *
+	 * If the cm_output was created with an active head but it became
+	 * inactive later, we have already done what is necessary when cm_output
+	 * became inert, in weston_head_remove_global(). */
+	if (!head)
+		return;
 
-        /* We are destroying the cm_output_res, so simply remove it from
-         * weston_head::cm_output_resource_list. */
-        wl_list_remove(wl_resource_get_link(cm_output_res));
+	/* We are destroying the cm_output_res, so simply remove it from
+	 * weston_head::cm_output_resource_list. */
+	wl_list_remove(wl_resource_get_link(cm_output_res));
 }
 
 static const struct xx_color_management_output_v2_interface
 cm_output_implementation = {
-        .destroy = cm_output_destroy,
-        .get_image_description = cm_output_get_image_description,
+	.destroy = cm_output_destroy,
+	.get_image_description = cm_output_get_image_description,
 };
 
 /**
@@ -498,30 +498,30 @@ cm_output_implementation = {
 void
 weston_output_send_image_description_changed(struct weston_output *output)
 {
-        struct weston_head *head;
-        struct wl_resource *res;
-        int ver;
+	struct weston_head *head;
+	struct wl_resource *res;
+	int ver;
 
-        /* For each head attached to this weston_output, send the events that
-         * notifies that the output image description changed. */
-        wl_list_for_each(head, &output->head_list, output_link) {
-                wl_resource_for_each(res, &head->cm_output_resource_list)
-                        xx_color_management_output_v2_send_image_description_changed(res);
+	/* For each head attached to this weston_output, send the events that
+	 * notifies that the output image description changed. */
+	wl_list_for_each(head, &output->head_list, output_link) {
+		wl_resource_for_each(res, &head->cm_output_resource_list)
+			xx_color_management_output_v2_send_image_description_changed(res);
 
-                /* wl_output.done should be sent after collecting all the
-                 * changes related to the output. But in Weston we are lacking
-                 * an atomic output configuration API, so we have no facilities
-                 * to do that.
-                 *
-                 * TODO: enhance this behavior after we add the atomic output
-                 * configuration API.
-                 */
-                wl_resource_for_each(res, &head->resource_list) {
-                        ver = wl_resource_get_version(res);
-		        if (ver >= WL_OUTPUT_DONE_SINCE_VERSION)
-			        wl_output_send_done(res);
-                }
-        }
+		/* wl_output.done should be sent after collecting all the
+		 * changes related to the output. But in Weston we are lacking
+		 * an atomic output configuration API, so we have no facilities
+		 * to do that.
+		 *
+		 * TODO: enhance this behavior after we add the atomic output
+		 * configuration API.
+		 */
+		wl_resource_for_each(res, &head->resource_list) {
+			ver = wl_resource_get_version(res);
+			if (ver >= WL_OUTPUT_DONE_SINCE_VERSION)
+				wl_output_send_done(res);
+		}
+	}
 }
 
 /**
@@ -530,32 +530,32 @@ weston_output_send_image_description_changed(struct weston_output *output)
  */
 static void
 cm_get_output(struct wl_client *client, struct wl_resource *cm_res,
-              uint32_t cm_output_id, struct wl_resource *output_res)
+	      uint32_t cm_output_id, struct wl_resource *output_res)
 {
-        struct weston_head *head = weston_head_from_resource(output_res);
-        uint32_t version = wl_resource_get_version(cm_res);
-        struct wl_resource *res;
+	struct weston_head *head = weston_head_from_resource(output_res);
+	uint32_t version = wl_resource_get_version(cm_res);
+	struct wl_resource *res;
 
-        res = wl_resource_create(client, &xx_color_management_output_v2_interface,
-                                 version, cm_output_id);
-        if (!res) {
-                wl_resource_post_no_memory(cm_res);
-                return;
-        }
+	res = wl_resource_create(client, &xx_color_management_output_v2_interface,
+				 version, cm_output_id);
+	if (!res) {
+		wl_resource_post_no_memory(cm_res);
+		return;
+	}
 
-        /* Client wants the cm_output but we've already made the head inactive,
-         * so let's set the implementation data as NULL. */
-        if (!head) {
-                wl_resource_set_implementation(res, &cm_output_implementation,
-                                               NULL, cm_output_resource_destroy);
-                return;
-        }
+	/* Client wants the cm_output but we've already made the head inactive,
+	 * so let's set the implementation data as NULL. */
+	if (!head) {
+		wl_resource_set_implementation(res, &cm_output_implementation,
+					       NULL, cm_output_resource_destroy);
+		return;
+	}
 
-        wl_resource_set_implementation(res, &cm_output_implementation,
-                                       head, cm_output_resource_destroy);
+	wl_resource_set_implementation(res, &cm_output_implementation,
+				       head, cm_output_resource_destroy);
 
-        wl_list_insert(&head->cm_output_resource_list,
-                       wl_resource_get_link(res));
+	wl_list_insert(&head->cm_output_resource_list,
+		       wl_resource_get_link(res));
 }
 
 /**
@@ -566,66 +566,66 @@ cm_get_output(struct wl_client *client, struct wl_resource *cm_res,
  */
 static void
 cm_surface_set_image_description(struct wl_client *client,
-                                 struct wl_resource *cm_surface_res,
+				 struct wl_resource *cm_surface_res,
 				 struct wl_resource *cm_image_desc_res,
 				 uint32_t protocol_render_intent)
 {
-        struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
-        struct cm_image_desc *cm_image_desc =
-                wl_resource_get_user_data(cm_image_desc_res);
-        struct weston_color_manager *cm;
-        const struct weston_render_intent_info *render_intent;
+	struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
+	struct cm_image_desc *cm_image_desc =
+		wl_resource_get_user_data(cm_image_desc_res);
+	struct weston_color_manager *cm;
+	const struct weston_render_intent_info *render_intent;
 
-        /* The surface might have been already gone, in such case cm_surface is
-         * inert. */
-        if (!surface) {
-                wl_resource_post_error(cm_surface_res,
-                                       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_INERT,
-                                       "the wl_surface has already been destroyed");
-                return;
-        }
+	/* The surface might have been already gone, in such case cm_surface is
+	 * inert. */
+	if (!surface) {
+		wl_resource_post_error(cm_surface_res,
+				       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_INERT,
+				       "the wl_surface has already been destroyed");
+		return;
+	}
 
-        /* Invalid image description for this request, as we gracefully failed
-         * to create it. */
-        if (!cm_image_desc) {
-                /* TODO: the version of the xx protocol that we are using still
-                 * does not have an error for this. Fix when we update to the
-                 * next version. */
-                wl_resource_post_no_memory(cm_surface_res);
-                return;
-        }
+	/* Invalid image description for this request, as we gracefully failed
+	 * to create it. */
+	if (!cm_image_desc) {
+		/* TODO: the version of the xx protocol that we are using still
+		 * does not have an error for this. Fix when we update to the
+		 * next version. */
+		wl_resource_post_no_memory(cm_surface_res);
+		return;
+	}
 
-        /* Invalid image description for this request, as it isn't ready yet. */
-        if (!cm_image_desc->cprof) {
-                /* TODO: the version of the xx protocol that we are using still
-                 * does not have an error for this. Fix when we update to the
-                 * next version. */
-                wl_resource_post_no_memory(cm_surface_res);
-                return;
-        }
+	/* Invalid image description for this request, as it isn't ready yet. */
+	if (!cm_image_desc->cprof) {
+		/* TODO: the version of the xx protocol that we are using still
+		 * does not have an error for this. Fix when we update to the
+		 * next version. */
+		wl_resource_post_no_memory(cm_surface_res);
+		return;
+	}
 
-        cm = cm_image_desc->cm;
+	cm = cm_image_desc->cm;
 
-        render_intent = weston_render_intent_info_from_protocol(surface->compositor,
-                                                                protocol_render_intent);
-        if (!render_intent) {
-                wl_resource_post_error(cm_surface_res,
-                                       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_RENDER_INTENT,
-                                       "unknown render intent");
-                return;
-        }
+	render_intent = weston_render_intent_info_from_protocol(surface->compositor,
+								protocol_render_intent);
+	if (!render_intent) {
+		wl_resource_post_error(cm_surface_res,
+				       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_RENDER_INTENT,
+				       "unknown render intent");
+		return;
+	}
 
-        if (!((cm->supported_rendering_intents >> render_intent->intent) & 1)) {
-                wl_resource_post_error(cm_surface_res,
-                                       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_RENDER_INTENT,
-                                       "unsupported render intent");
-                return;
-        }
+	if (!((cm->supported_rendering_intents >> render_intent->intent) & 1)) {
+		wl_resource_post_error(cm_surface_res,
+				       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_RENDER_INTENT,
+				       "unsupported render intent");
+		return;
+	}
 
-        weston_color_profile_unref(surface->pending.color_profile);
-        surface->pending.color_profile =
-                weston_color_profile_ref(cm_image_desc->cprof);
-        surface->pending.render_intent = render_intent;
+	weston_color_profile_unref(surface->pending.color_profile);
+	surface->pending.color_profile =
+		weston_color_profile_ref(cm_image_desc->cprof);
+	surface->pending.render_intent = render_intent;
 }
 
 /**
@@ -636,22 +636,22 @@ cm_surface_set_image_description(struct wl_client *client,
  */
 static void
 cm_surface_unset_image_description(struct wl_client *client,
-                                   struct wl_resource *cm_surface_res)
+				   struct wl_resource *cm_surface_res)
 {
-        struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
+	struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
 
-        /* The surface might have been already gone, in such case cm_surface is
-         * inert. */
-        if (!surface) {
-                wl_resource_post_error(cm_surface_res,
-                                       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_INERT,
-                                       "the wl_surface has already been destroyed");
-                return;
-        }
+	/* The surface might have been already gone, in such case cm_surface is
+	 * inert. */
+	if (!surface) {
+		wl_resource_post_error(cm_surface_res,
+				       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_INERT,
+				       "the wl_surface has already been destroyed");
+		return;
+	}
 
-        weston_color_profile_unref(surface->pending.color_profile);
-        surface->pending.color_profile = NULL;
-        surface->pending.render_intent = NULL;
+	weston_color_profile_unref(surface->pending.color_profile);
+	surface->pending.color_profile = NULL;
+	surface->pending.render_intent = NULL;
 }
 
 /**
@@ -662,32 +662,32 @@ static void
 cm_surface_get_preferred(struct wl_client *client, struct wl_resource *cm_surface_res,
 			 uint32_t image_description_id)
 {
-        struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
-        uint32_t version = wl_resource_get_version(cm_surface_res);
-        struct weston_color_manager *cm;
-        struct cm_image_desc *cm_image_desc;
+	struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
+	uint32_t version = wl_resource_get_version(cm_surface_res);
+	struct weston_color_manager *cm;
+	struct cm_image_desc *cm_image_desc;
 
-        /* The surface might have been already gone, in such case cm_surface is
-         * inert. */
-        if (!surface) {
-                wl_resource_post_error(cm_surface_res,
-                                       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_INERT,
-                                       "the wl_surface has already been destroyed");
-                return;
-        }
+	/* The surface might have been already gone, in such case cm_surface is
+	 * inert. */
+	if (!surface) {
+		wl_resource_post_error(cm_surface_res,
+				       XX_COLOR_MANAGEMENT_SURFACE_V2_ERROR_INERT,
+				       "the wl_surface has already been destroyed");
+		return;
+	}
 
-        cm = surface->compositor->color_manager;
+	cm = surface->compositor->color_manager;
 
-        cm_image_desc = cm_image_desc_create(cm, surface->preferred_color_profile,
-                                             client, version, image_description_id,
-                                             YES_GET_INFO);
-        if (!cm_image_desc) {
-                wl_resource_post_no_memory(cm_surface_res);
-                return;
-        }
+	cm_image_desc = cm_image_desc_create(cm, surface->preferred_color_profile,
+					     client, version, image_description_id,
+					     YES_GET_INFO);
+	if (!cm_image_desc) {
+		wl_resource_post_no_memory(cm_surface_res);
+		return;
+	}
 
-        xx_image_description_v2_send_ready(cm_image_desc->owner,
-                                           cm_image_desc->cprof->id);
+	xx_image_description_v2_send_ready(cm_image_desc->owner,
+					   cm_image_desc->cprof->id);
 }
 
 /**
@@ -696,7 +696,7 @@ cm_surface_get_preferred(struct wl_client *client, struct wl_resource *cm_surfac
 static void
 cm_surface_destroy(struct wl_client *client, struct wl_resource *cm_surface_res)
 {
-        wl_resource_destroy(cm_surface_res);
+	wl_resource_destroy(cm_surface_res);
 }
 
 /**
@@ -705,38 +705,38 @@ cm_surface_destroy(struct wl_client *client, struct wl_resource *cm_surface_res)
 static void
 cm_surface_resource_destroy(struct wl_resource *cm_surface_res)
 {
-        struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
+	struct weston_surface *surface = wl_resource_get_user_data(cm_surface_res);
 
-        /* For inert cm_surface, we don't have to do anything.
-         *
-         * We already did what was necessary when cm_surface became inert, in
-         * the surface destruction process (in weston_surface_unref(), which
-         * is the surface destruction function). */
-        if (!surface)
-                return;
+	/* For inert cm_surface, we don't have to do anything.
+	 *
+	 * We already did what was necessary when cm_surface became inert, in
+	 * the surface destruction process (in weston_surface_unref(), which
+	 * is the surface destruction function). */
+	if (!surface)
+		return;
 
-        /* We are destroying the cm_surface_res, so simply remove it from
-         * weston_surface::cm_surface_resource_list. */
-        wl_list_remove(wl_resource_get_link(cm_surface_res));
+	/* We are destroying the cm_surface_res, so simply remove it from
+	 * weston_surface::cm_surface_resource_list. */
+	wl_list_remove(wl_resource_get_link(cm_surface_res));
 
-        /* TODO: if wl_list_empty(&surface->cm_surface_resource_list), we need
-         * to unset_image_description for the surface. The protocol states that
-         * we need to do that after the last cm_surface object for a wl_surface
-         * is destroyed.
-         *
-         * We still didn't add the code for that because there are discussions
-         * on the protocol upstream to allow a single cm_surface per surface.
-         * Once that reaches a conclusion and the changes land on the xx version
-         * of the protocol, we need to update this.
-         */
+	/* TODO: if wl_list_empty(&surface->cm_surface_resource_list), we need
+	 * to unset_image_description for the surface. The protocol states that
+	 * we need to do that after the last cm_surface object for a wl_surface
+	 * is destroyed.
+	 *
+	 * We still didn't add the code for that because there are discussions
+	 * on the protocol upstream to allow a single cm_surface per surface.
+	 * Once that reaches a conclusion and the changes land on the xx version
+	 * of the protocol, we need to update this.
+	 */
 }
 
 static const struct xx_color_management_surface_v2_interface
 cm_surface_implementation = {
-        .destroy = cm_surface_destroy,
-        .set_image_description = cm_surface_set_image_description,
-        .unset_image_description = cm_surface_unset_image_description,
-        .get_preferred = cm_surface_get_preferred,
+	.destroy = cm_surface_destroy,
+	.set_image_description = cm_surface_set_image_description,
+	.unset_image_description = cm_surface_unset_image_description,
+	.get_preferred = cm_surface_get_preferred,
 };
 
 /**
@@ -747,12 +747,12 @@ cm_surface_implementation = {
 void
 weston_surface_send_preferred_image_description_changed(struct weston_surface *surface)
 {
-        struct wl_resource *res;
+	struct wl_resource *res;
 
-        /* For each resource, send the event that notifies that the surface
-         * preferred image description changed. */
-        wl_resource_for_each(res, &surface->cm_surface_resource_list)
-                xx_color_management_surface_v2_send_preferred_changed(res);
+	/* For each resource, send the event that notifies that the surface
+	 * preferred image description changed. */
+	wl_resource_for_each(res, &surface->cm_surface_resource_list)
+		xx_color_management_surface_v2_send_preferred_changed(res);
 }
 
 /**
@@ -761,22 +761,22 @@ weston_surface_send_preferred_image_description_changed(struct weston_surface *s
  */
 static void
 cm_get_surface(struct wl_client *client, struct wl_resource *cm_res,
-               uint32_t cm_surface_id, struct wl_resource *surface_res)
+	       uint32_t cm_surface_id, struct wl_resource *surface_res)
 {
-        struct weston_surface *surface = wl_resource_get_user_data(surface_res);
-        uint32_t version = wl_resource_get_version(cm_res);
-        struct wl_resource *res;
+	struct weston_surface *surface = wl_resource_get_user_data(surface_res);
+	uint32_t version = wl_resource_get_version(cm_res);
+	struct wl_resource *res;
 
-        res = wl_resource_create(client, &xx_color_management_surface_v2_interface,
-                                 version, cm_surface_id);
-        if (!res) {
-                wl_resource_post_no_memory(cm_res);
-                return;
-        }
+	res = wl_resource_create(client, &xx_color_management_surface_v2_interface,
+				 version, cm_surface_id);
+	if (!res) {
+		wl_resource_post_no_memory(cm_res);
+		return;
+	}
 
-        wl_resource_set_implementation(res, &cm_surface_implementation,
-                                       surface, cm_surface_resource_destroy);
-        wl_list_insert(&surface->cm_surface_resource_list, wl_resource_get_link(res));
+	wl_resource_set_implementation(res, &cm_surface_implementation,
+				       surface, cm_surface_resource_destroy);
+	wl_list_insert(&surface->cm_surface_resource_list, wl_resource_get_link(res));
 }
 
 /**
@@ -784,175 +784,175 @@ cm_get_surface(struct wl_client *client, struct wl_resource *cm_res,
  */
 static void
 cm_creator_icc_set_icc_file(struct wl_client *client,
-                            struct wl_resource *resource,
-                            int32_t icc_profile_fd,
-                            uint32_t offset, uint32_t length)
+			    struct wl_resource *resource,
+			    int32_t icc_profile_fd,
+			    uint32_t offset, uint32_t length)
 {
-        struct cm_creator_icc *cm_creator_icc = wl_resource_get_user_data(resource);
-        int flags;
-        uint32_t err_code;
-        const char *err_msg;
+	struct cm_creator_icc *cm_creator_icc = wl_resource_get_user_data(resource);
+	int flags;
+	uint32_t err_code;
+	const char *err_msg;
 
-        if (cm_creator_icc->icc_data_length > 0) {
-                err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_ALREADY_SET;
-                err_msg = "ICC file was already set";
-                goto err;
-        }
+	if (cm_creator_icc->icc_data_length > 0) {
+		err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_ALREADY_SET;
+		err_msg = "ICC file was already set";
+		goto err;
+	}
 
-        /* Length should be in the (0, 4MB] interval */
-        if (length == 0 || length > (4 * 1024 * 1024)) {
-                err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_SIZE;
-                err_msg = "invalid ICC file size";
-                goto err;
-        }
+	/* Length should be in the (0, 4MB] interval */
+	if (length == 0 || length > (4 * 1024 * 1024)) {
+		err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_SIZE;
+		err_msg = "invalid ICC file size";
+		goto err;
+	}
 
-        /* Fd should be readable. */
-        flags = fcntl(icc_profile_fd, F_GETFL);
-        if ((flags & O_ACCMODE) == O_WRONLY) {
-                err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_FD;
-                err_msg = "ICC fd is not readable";
-                goto err;
-        }
+	/* Fd should be readable. */
+	flags = fcntl(icc_profile_fd, F_GETFL);
+	if ((flags & O_ACCMODE) == O_WRONLY) {
+		err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_FD;
+		err_msg = "ICC fd is not readable";
+		goto err;
+	}
 
-        /* Fd should be seekable. */
-        if (lseek(icc_profile_fd, 0, SEEK_CUR) < 0) {
-                err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_FD;
-                err_msg = "ICC fd is not seekable";
-                goto err;
-        }
+	/* Fd should be seekable. */
+	if (lseek(icc_profile_fd, 0, SEEK_CUR) < 0) {
+		err_code = XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_FD;
+		err_msg = "ICC fd is not seekable";
+		goto err;
+	}
 
-        cm_creator_icc->icc_profile_fd = icc_profile_fd;
+	cm_creator_icc->icc_profile_fd = icc_profile_fd;
 
-        /* We save length and offset in size_t variables. This ensures that they
-         * fit. We received them as uint32_t from the protocol. */
-        static_assert(UINT32_MAX <= SIZE_MAX,
-                      "won't be able to save uint32_t var into size_t");
-        cm_creator_icc->icc_data_length = length;
-        cm_creator_icc->icc_data_offset = offset;
+	/* We save length and offset in size_t variables. This ensures that they
+	 * fit. We received them as uint32_t from the protocol. */
+	static_assert(UINT32_MAX <= SIZE_MAX,
+		      "won't be able to save uint32_t var into size_t");
+	cm_creator_icc->icc_data_length = length;
+	cm_creator_icc->icc_data_offset = offset;
 
-        return;
+	return;
 
 err:
-        close(icc_profile_fd);
-        wl_resource_post_error(resource, err_code, "%s", err_msg);
+	close(icc_profile_fd);
+	wl_resource_post_error(resource, err_code, "%s", err_msg);
 }
 
 static bool
 do_length_and_offset_fit(struct cm_creator_icc *cm_creator_icc)
 {
-        size_t end;
-        off_t end_off;
+	size_t end;
+	off_t end_off;
 
-        /* Ensure that length + offset doesn't overflow in size_t. If that isn't
-         * true, we won't be able to make it fit into off_t. And we may need
-         * that to read the ICC file. */
-        if (cm_creator_icc->icc_data_length > SIZE_MAX - cm_creator_icc->icc_data_offset)
-                return false;
+	/* Ensure that length + offset doesn't overflow in size_t. If that isn't
+	 * true, we won't be able to make it fit into off_t. And we may need
+	 * that to read the ICC file. */
+	if (cm_creator_icc->icc_data_length > SIZE_MAX - cm_creator_icc->icc_data_offset)
+		return false;
 
-        /* Ensure that length + offset doesn't overflow in off_t. */
-        end = cm_creator_icc->icc_data_offset + cm_creator_icc->icc_data_length;
-        end_off = end;
-        if (end_off < 0 || end != (size_t)end_off)
-                return false;
+	/* Ensure that length + offset doesn't overflow in off_t. */
+	end = cm_creator_icc->icc_data_offset + cm_creator_icc->icc_data_length;
+	end_off = end;
+	if (end_off < 0 || end != (size_t)end_off)
+		return false;
 
-        return true;
+	return true;
 }
 
 static int
 create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm_image_desc,
-                                                        struct cm_creator_icc *cm_creator_icc)
+							struct cm_creator_icc *cm_creator_icc)
 {
-        struct weston_compositor *compositor = cm_creator_icc->compositor;
-        struct weston_color_manager *cm = compositor->color_manager;
-        struct weston_color_profile *cprof;
-        char *err_msg;
-        void *icc_prof_data;
-        size_t bytes_read = 0;
-        ssize_t pread_ret;
-        bool ret;
+	struct weston_compositor *compositor = cm_creator_icc->compositor;
+	struct weston_color_manager *cm = compositor->color_manager;
+	struct weston_color_profile *cprof;
+	char *err_msg;
+	void *icc_prof_data;
+	size_t bytes_read = 0;
+	ssize_t pread_ret;
+	bool ret;
 
-        if (!do_length_and_offset_fit(cm_creator_icc)) {
-                xx_image_description_v2_send_failed(cm_image_desc->owner,
-                                                    XX_IMAGE_DESCRIPTION_V2_CAUSE_OPERATING_SYSTEM,
-                                                    "length + offset does not fit off_t");
-                return -1;
-        }
+	if (!do_length_and_offset_fit(cm_creator_icc)) {
+		xx_image_description_v2_send_failed(cm_image_desc->owner,
+						    XX_IMAGE_DESCRIPTION_V2_CAUSE_OPERATING_SYSTEM,
+						    "length + offset does not fit off_t");
+		return -1;
+	}
 
-        /* Create buffer to read ICC profile. As they may have up to 4Mb, we
-         * send OOM if something fails (instead of using xalloc). */
-        icc_prof_data = zalloc(cm_creator_icc->icc_data_length);
-        if (!icc_prof_data) {
-                wl_resource_post_no_memory(cm_creator_icc->owner);
-                return -1;
-        }
+	/* Create buffer to read ICC profile. As they may have up to 4Mb, we
+	 * send OOM if something fails (instead of using xalloc). */
+	icc_prof_data = zalloc(cm_creator_icc->icc_data_length);
+	if (!icc_prof_data) {
+		wl_resource_post_no_memory(cm_creator_icc->owner);
+		return -1;
+	}
 
-        /* Read ICC file.
-         *
-         * TODO: it is not that simple. Clients can abuse that to DoS the
-         * compositor. See the discussion in the link below.
-         *
-         * https://gitlab.freedesktop.org/wayland/weston/-/merge_requests/1356#note_2125102
-         */
-        while (bytes_read < cm_creator_icc->icc_data_length) {
-                pread_ret = pread(cm_creator_icc->icc_profile_fd,
-                                  icc_prof_data + bytes_read,
-                                  cm_creator_icc->icc_data_length - bytes_read,
-                                  (off_t)cm_creator_icc->icc_data_offset + bytes_read);
-                if (pread_ret < 0) {
-                        /* Failed to read but not an error (just interruption),
-                         * so continue trying to read. */
-                        if (errno == EINTR)
-                                continue;
+	/* Read ICC file.
+	 *
+	 * TODO: it is not that simple. Clients can abuse that to DoS the
+	 * compositor. See the discussion in the link below.
+	 *
+	 * https://gitlab.freedesktop.org/wayland/weston/-/merge_requests/1356#note_2125102
+	 */
+	while (bytes_read < cm_creator_icc->icc_data_length) {
+		pread_ret = pread(cm_creator_icc->icc_profile_fd,
+				  icc_prof_data + bytes_read,
+				  cm_creator_icc->icc_data_length - bytes_read,
+				  (off_t)cm_creator_icc->icc_data_offset + bytes_read);
+		if (pread_ret < 0) {
+			/* Failed to read but not an error (just interruption),
+			 * so continue trying to read. */
+			if (errno == EINTR)
+				continue;
 
-                        /* Reading the ICC failed */
-                        free(icc_prof_data);
-                        str_printf(&err_msg, "failed to read ICC file: %s", strerror(errno));
-                        xx_image_description_v2_send_failed(cm_image_desc->owner,
-                                                            XX_IMAGE_DESCRIPTION_V2_CAUSE_OPERATING_SYSTEM,
-                                                            err_msg);
-                        free(err_msg);
-                        return -1;
-                } else if (pread_ret == 0) {
-                        /* We were expecting to read more than 0 bytes, but we
-                         * didn't. That means that we've tried to read beyond
-                         * EOF. This is client's fault, it must make sure that
-                         * the given ICC file don't simply change. */
-                        free(icc_prof_data);
-                        wl_resource_post_error(cm_creator_icc->owner,
-                                               XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_OUT_OF_FILE,
-                                               "tried to read ICC beyond EOF");
-                        return -1;
-                }
-                bytes_read += (size_t)pread_ret;
-        }
-        weston_assert_true(compositor, bytes_read == cm_creator_icc->icc_data_length);
+			/* Reading the ICC failed */
+			free(icc_prof_data);
+			str_printf(&err_msg, "failed to read ICC file: %s", strerror(errno));
+			xx_image_description_v2_send_failed(cm_image_desc->owner,
+							    XX_IMAGE_DESCRIPTION_V2_CAUSE_OPERATING_SYSTEM,
+							    err_msg);
+			free(err_msg);
+			return -1;
+		} else if (pread_ret == 0) {
+			/* We were expecting to read more than 0 bytes, but we
+			 * didn't. That means that we've tried to read beyond
+			 * EOF. This is client's fault, it must make sure that
+			 * the given ICC file don't simply change. */
+			free(icc_prof_data);
+			wl_resource_post_error(cm_creator_icc->owner,
+					       XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_OUT_OF_FILE,
+					       "tried to read ICC beyond EOF");
+			return -1;
+		}
+		bytes_read += (size_t)pread_ret;
+	}
+	weston_assert_true(compositor, bytes_read == cm_creator_icc->icc_data_length);
 
-        /* We've read the ICC file so let's create the color profile. */
-        ret = cm->get_color_profile_from_icc(cm, icc_prof_data,
-                                             cm_creator_icc->icc_data_length,
-                                             "icc-from-client", &cprof, &err_msg);
-        free(icc_prof_data);
+	/* We've read the ICC file so let's create the color profile. */
+	ret = cm->get_color_profile_from_icc(cm, icc_prof_data,
+					     cm_creator_icc->icc_data_length,
+					     "icc-from-client", &cprof, &err_msg);
+	free(icc_prof_data);
 
-        if (!ret) {
-                /* We can't tell if it is client's fault that the ICC profile is
-                 * invalid, so let's gracefully fail without returning a
-                 * protocol error.
-                 *
-                 * TODO: we need to return proper error codes from the
-                 * color-manager plugins and decide if we should gracefully fail
-                 * or return a protocol error.
-                 */
-                xx_image_description_v2_send_failed(cm_image_desc->owner,
-                                                    XX_IMAGE_DESCRIPTION_V2_CAUSE_UNSUPPORTED,
-                                                    err_msg);
-                free(err_msg);
-                return -1;
-        }
+	if (!ret) {
+		/* We can't tell if it is client's fault that the ICC profile is
+		 * invalid, so let's gracefully fail without returning a
+		 * protocol error.
+		 *
+		 * TODO: we need to return proper error codes from the
+		 * color-manager plugins and decide if we should gracefully fail
+		 * or return a protocol error.
+		 */
+		xx_image_description_v2_send_failed(cm_image_desc->owner,
+						    XX_IMAGE_DESCRIPTION_V2_CAUSE_UNSUPPORTED,
+						    err_msg);
+		free(err_msg);
+		return -1;
+	}
 
-        cm_image_desc->cprof = cprof;
-        xx_image_description_v2_send_ready(cm_image_desc->owner,
-                                           cm_image_desc->cprof->id);
-        return 0;
+	cm_image_desc->cprof = cprof;
+	xx_image_description_v2_send_ready(cm_image_desc->owner,
+					   cm_image_desc->cprof->id);
+	return 0;
 }
 
 /**
@@ -962,46 +962,46 @@ create_image_description_color_profile_from_icc_creator(struct cm_image_desc *cm
  */
 static void
 cm_creator_icc_create(struct wl_client *client, struct wl_resource *resource,
-                      uint32_t image_description_id)
+		      uint32_t image_description_id)
 {
-        struct cm_creator_icc *cm_creator_icc =
-                wl_resource_get_user_data(resource);
-        struct weston_compositor *compositor = cm_creator_icc->compositor;
-        struct weston_color_manager *cm = compositor->color_manager;
-        uint32_t version = wl_resource_get_version(cm_creator_icc->owner);
-        struct cm_image_desc *cm_image_desc;
-        int ret;
+	struct cm_creator_icc *cm_creator_icc =
+		wl_resource_get_user_data(resource);
+	struct weston_compositor *compositor = cm_creator_icc->compositor;
+	struct weston_color_manager *cm = compositor->color_manager;
+	uint32_t version = wl_resource_get_version(cm_creator_icc->owner);
+	struct cm_image_desc *cm_image_desc;
+	int ret;
 
-        if (cm_creator_icc->icc_data_length == 0) {
-                wl_resource_post_error(resource,
-                                       XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_INCOMPLETE_SET,
-                                       "trying to create image description before " \
-                                       "setting the ICC file");
-                return;
-        }
+	if (cm_creator_icc->icc_data_length == 0) {
+		wl_resource_post_error(resource,
+				       XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_INCOMPLETE_SET,
+				       "trying to create image description before " \
+				       "setting the ICC file");
+		return;
+	}
 
-        /* Create the image description with cprof == NULL. */
-        cm_image_desc = cm_image_desc_create(cm, NULL, client, version,
-                                             image_description_id, NO_GET_INFO);
-        if (!cm_image_desc) {
-                wl_resource_post_no_memory(resource);
-                return;
-        }
+	/* Create the image description with cprof == NULL. */
+	cm_image_desc = cm_image_desc_create(cm, NULL, client, version,
+					     image_description_id, NO_GET_INFO);
+	if (!cm_image_desc) {
+		wl_resource_post_no_memory(resource);
+		return;
+	}
 
-        /* Create the cprof for the image description. */
-        ret = create_image_description_color_profile_from_icc_creator(cm_image_desc,
-                                                                      cm_creator_icc);
-        if (ret < 0) {
-                /* If something went wrong and we failed to create the image
-                 * description, let's set the resource userdata to NULL. We use
-                 * that to be able to tell if a client is trying to use an
-                 * (invalid) image description that we failed to create. */
-                wl_resource_set_user_data(cm_image_desc->owner, NULL);
-                cm_image_desc_destroy(cm_image_desc);
-        }
+	/* Create the cprof for the image description. */
+	ret = create_image_description_color_profile_from_icc_creator(cm_image_desc,
+								      cm_creator_icc);
+	if (ret < 0) {
+		/* If something went wrong and we failed to create the image
+		 * description, let's set the resource userdata to NULL. We use
+		 * that to be able to tell if a client is trying to use an
+		 * (invalid) image description that we failed to create. */
+		wl_resource_set_user_data(cm_image_desc->owner, NULL);
+		cm_image_desc_destroy(cm_image_desc);
+	}
 
-        /* Destroy the cm_creator_icc resource. This is a destructor request. */
-        wl_resource_destroy(cm_creator_icc->owner);
+	/* Destroy the cm_creator_icc resource. This is a destructor request. */
+	wl_resource_destroy(cm_creator_icc->owner);
 }
 
 /**
@@ -1011,19 +1011,19 @@ cm_creator_icc_create(struct wl_client *client, struct wl_resource *resource,
 static void
 cm_creator_icc_destructor(struct wl_resource *resource)
 {
-        struct cm_creator_icc *cm_creator_icc =
-                wl_resource_get_user_data(resource);
+	struct cm_creator_icc *cm_creator_icc =
+		wl_resource_get_user_data(resource);
 
-        if (cm_creator_icc->icc_profile_fd >= 0)
-                close(cm_creator_icc->icc_profile_fd);
+	if (cm_creator_icc->icc_profile_fd >= 0)
+		close(cm_creator_icc->icc_profile_fd);
 
-        free(cm_creator_icc);
+	free(cm_creator_icc);
 }
 
 static const struct xx_image_description_creator_icc_v2_interface
 cm_creator_icc_implementation = {
-        .create = cm_creator_icc_create,
-        .set_icc_file = cm_creator_icc_set_icc_file,
+	.create = cm_creator_icc_create,
+	.set_icc_file = cm_creator_icc_set_icc_file,
 };
 
 /**
@@ -1031,39 +1031,39 @@ cm_creator_icc_implementation = {
  */
 static void
 cm_new_image_description_creator_icc(struct wl_client *client, struct wl_resource *cm_res,
-                                     uint32_t cm_creator_icc_id)
+				     uint32_t cm_creator_icc_id)
 {
-        struct cm_creator_icc *cm_creator_icc;
-        struct weston_compositor *compositor = wl_resource_get_user_data(cm_res);
-        struct weston_color_manager *cm = compositor->color_manager;
-        uint32_t version = wl_resource_get_version(cm_res);
+	struct cm_creator_icc *cm_creator_icc;
+	struct weston_compositor *compositor = wl_resource_get_user_data(cm_res);
+	struct weston_color_manager *cm = compositor->color_manager;
+	uint32_t version = wl_resource_get_version(cm_res);
 
-        if (!((cm->supported_color_features >> WESTON_COLOR_FEATURE_ICC) & 1)) {
-                wl_resource_post_error(cm_res, XX_COLOR_MANAGER_V2_ERROR_UNSUPPORTED_FEATURE,
-                                       "creating ICC image description creator is " \
-                                       "still unsupported");
-                return;
-        }
+	if (!((cm->supported_color_features >> WESTON_COLOR_FEATURE_ICC) & 1)) {
+		wl_resource_post_error(cm_res, XX_COLOR_MANAGER_V2_ERROR_UNSUPPORTED_FEATURE,
+				       "creating ICC image description creator is " \
+				       "still unsupported");
+		return;
+	}
 
-        cm_creator_icc = xzalloc(sizeof(*cm_creator_icc));
+	cm_creator_icc = xzalloc(sizeof(*cm_creator_icc));
 
-        cm_creator_icc->compositor = compositor;
-        cm_creator_icc->icc_profile_fd = -1;
+	cm_creator_icc->compositor = compositor;
+	cm_creator_icc->icc_profile_fd = -1;
 
-        cm_creator_icc->owner =
-                wl_resource_create(client, &xx_image_description_creator_icc_v2_interface,
-                                   version, cm_creator_icc_id);
-        if (!cm_creator_icc->owner)
-                goto err;
+	cm_creator_icc->owner =
+		wl_resource_create(client, &xx_image_description_creator_icc_v2_interface,
+				   version, cm_creator_icc_id);
+	if (!cm_creator_icc->owner)
+		goto err;
 
-        wl_resource_set_implementation(cm_creator_icc->owner, &cm_creator_icc_implementation,
-                                       cm_creator_icc, cm_creator_icc_destructor);
+	wl_resource_set_implementation(cm_creator_icc->owner, &cm_creator_icc_implementation,
+				       cm_creator_icc, cm_creator_icc_destructor);
 
-        return;
+	return;
 
 err:
-        free(cm_creator_icc);
-        wl_resource_post_no_memory(cm_res);
+	free(cm_creator_icc);
+	wl_resource_post_no_memory(cm_res);
 }
 
 /**
@@ -1071,12 +1071,12 @@ err:
  */
 static void
 cm_new_image_description_creator_params(struct wl_client *client, struct wl_resource *cm_res,
-                                        uint32_t cm_creator_params_id)
+					uint32_t cm_creator_params_id)
 {
-        /* Still unsupported. */
-        wl_resource_post_error(cm_res, XX_COLOR_MANAGER_V2_ERROR_UNSUPPORTED_FEATURE,
-                               "creating parametric image description creator is " \
-                               "still unsupported");
+	/* Still unsupported. */
+	wl_resource_post_error(cm_res, XX_COLOR_MANAGER_V2_ERROR_UNSUPPORTED_FEATURE,
+			       "creating parametric image description creator is " \
+			       "still unsupported");
 }
 
 /**
@@ -1086,16 +1086,16 @@ cm_new_image_description_creator_params(struct wl_client *client, struct wl_reso
 static void
 cm_destroy(struct wl_client *client, struct wl_resource *cm_res)
 {
-        wl_resource_destroy(cm_res);
+	wl_resource_destroy(cm_res);
 }
 
 static const struct xx_color_manager_v2_interface
 color_manager_implementation = {
-        .destroy = cm_destroy,
-        .get_output = cm_get_output,
-        .get_surface = cm_get_surface,
-        .new_icc_creator = cm_new_image_description_creator_icc,
-        .new_parametric_creator = cm_new_image_description_creator_params,
+	.destroy = cm_destroy,
+	.get_output = cm_get_output,
+	.get_surface = cm_get_surface,
+	.new_icc_creator = cm_new_image_description_creator_icc,
+	.new_parametric_creator = cm_new_image_description_creator_params,
 };
 
 /**
@@ -1103,14 +1103,14 @@ color_manager_implementation = {
  */
 static void
 bind_color_management(struct wl_client *client, void *data, uint32_t version,
-                      uint32_t id)
+		      uint32_t id)
 {
-        struct wl_resource *resource;
-        struct weston_compositor *compositor = data;
-        struct weston_color_manager *cm = compositor->color_manager;
-        const struct weston_color_feature_info *feature_info;
-        const struct weston_render_intent_info *render_intent;
-        unsigned int i;
+	struct wl_resource *resource;
+	struct weston_compositor *compositor = data;
+	struct weston_color_manager *cm = compositor->color_manager;
+	const struct weston_color_feature_info *feature_info;
+	const struct weston_render_intent_info *render_intent;
+	unsigned int i;
 
 	resource = wl_resource_create(client, &xx_color_manager_v2_interface,
 				      version, id);
@@ -1122,23 +1122,23 @@ bind_color_management(struct wl_client *client, void *data, uint32_t version,
 	wl_resource_set_implementation(resource, &color_manager_implementation,
 				       compositor, NULL);
 
-        /* Expose the supported color features to the client. */
-        for (i = 0; i < 32; i++) {
-                if (!((cm->supported_color_features >> i) & 1))
-                        continue;
-                feature_info = weston_color_feature_info_from(compositor, i);
-                xx_color_manager_v2_send_supported_feature(resource,
-                                                           feature_info->protocol_feature);
-        }
+	/* Expose the supported color features to the client. */
+	for (i = 0; i < 32; i++) {
+		if (!((cm->supported_color_features >> i) & 1))
+			continue;
+		feature_info = weston_color_feature_info_from(compositor, i);
+		xx_color_manager_v2_send_supported_feature(resource,
+							   feature_info->protocol_feature);
+	}
 
-        /* Expose the supported rendering intents to the client. */
-        for (i = 0; i < 32; i++) {
-                if (!((cm->supported_rendering_intents >> i) & 1))
-                        continue;
-                render_intent = weston_render_intent_info_from(compositor, i);
-                xx_color_manager_v2_send_supported_intent(resource,
-                                                          render_intent->protocol_intent);
-        }
+	/* Expose the supported rendering intents to the client. */
+	for (i = 0; i < 32; i++) {
+		if (!((cm->supported_rendering_intents >> i) & 1))
+			continue;
+		render_intent = weston_render_intent_info_from(compositor, i);
+		xx_color_manager_v2_send_supported_intent(resource,
+							  render_intent->protocol_intent);
+	}
 }
 
 /** Advertise color-management support
@@ -1155,16 +1155,16 @@ bind_color_management(struct wl_client *client, void *data, uint32_t version,
 int
 weston_compositor_enable_color_management_protocol(struct weston_compositor *compositor)
 {
-        uint32_t version = 1;
+	uint32_t version = 1;
 
 	weston_assert_bit_is_set(compositor,
 				 compositor->color_manager->supported_rendering_intents,
 				 WESTON_RENDER_INTENT_PERCEPTUAL);
 
-        if (!wl_global_create(compositor->wl_display,
-                              &xx_color_manager_v2_interface,
-                              version, compositor, bind_color_management))
-                return -1;
+	if (!wl_global_create(compositor->wl_display,
+			      &xx_color_manager_v2_interface,
+			      version, compositor, bind_color_management))
+		return -1;
 
-        return 0;
+	return 0;
 }
