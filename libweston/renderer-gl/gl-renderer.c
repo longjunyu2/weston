@@ -1077,8 +1077,8 @@ ensure_surface_buffer_is_ready(struct gl_renderer *gr,
 }
 
 static void
-censor_override(struct gl_shader_config *sconf,
-		struct weston_output *output)
+prepare_placeholder(struct gl_shader_config *sconf,
+		    struct weston_output *output)
 {
 	struct weston_color_transform *ctransf;
 	struct gl_renderer *gr = get_renderer(output->compositor);
@@ -1101,17 +1101,18 @@ censor_override(struct gl_shader_config *sconf,
 	*sconf = alt;
 }
 
- /* Checks if a view needs to be censored on an output
+ /* Checks if a paint node should be replaced by a solid placeholder
   * Checks for 2 types of censor requirements
   * - recording_censor: Censor protected view when a
   *   protected view is captured.
   * - unprotected_censor: Censor regions of protected views
   *   when displayed on an output which has lower protection capability.
-  * If censoring is needed, smashes the GL shader config.
+  * Checks if direct_display is in use.
+  * If replacement is needed, smashes the GL shader config.
   */
 static void
-maybe_censor_override(struct gl_shader_config *sconf,
-		      struct weston_paint_node *pnode)
+maybe_replace_paint_node(struct gl_shader_config *sconf,
+			 struct weston_paint_node *pnode)
 {
 	struct weston_output *output = pnode->output;
 	struct weston_surface *surface = pnode->surface;
@@ -1125,7 +1126,7 @@ maybe_censor_override(struct gl_shader_config *sconf,
 		(surface->desired_protection > output->current_protection);
 
 	if (buffer->direct_display) {
-		censor_override(sconf, output);
+		prepare_placeholder(sconf, output);
 		return;
 	}
 
@@ -1136,7 +1137,7 @@ maybe_censor_override(struct gl_shader_config *sconf,
 		return;
 
 	if (recording_censor || unprotected_censor)
-		censor_override(sconf, output);
+		prepare_placeholder(sconf, output);
 }
 
 static void
@@ -1606,7 +1607,7 @@ draw_paint_node(struct weston_paint_node *pnode,
 	else
 		pixman_region32_copy(&surface_opaque, &pnode->surface->opaque);
 
-	maybe_censor_override(&sconf, pnode);
+	maybe_replace_paint_node(&sconf, pnode);
 
 	if (pixman_region32_not_empty(&surface_opaque)) {
 		struct gl_shader_config alt = sconf;
