@@ -575,6 +575,7 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 	struct weston_color_manager_lcms *cm = to_cmlcms(cm_base);
 	struct lcmsProfilePtr profile;
 	struct cmlcms_md5_sum md5sum;
+	struct ro_anonymous_file *prof_rofile = NULL;
 	struct cmlcms_color_profile *cprof = NULL;
 	char *desc = NULL;
 
@@ -613,20 +614,23 @@ cmlcms_get_color_profile_from_icc(struct weston_color_manager *cm_base,
 	if (!desc)
 		goto err_close;
 
+	prof_rofile = os_ro_anonymous_file_create(icc_len, icc_data);
+	if (!prof_rofile)
+		goto err_close;
+
 	cprof = cmlcms_color_profile_create(cm, profile, desc, errmsg);
 	if (!cprof)
 		goto err_close;
 
 	cprof->type = CMLCMS_PROFILE_TYPE_ICC;
-
-	cprof->prof_rofile = os_ro_anonymous_file_create(icc_len, icc_data);
-	if (!cprof->prof_rofile)
-		goto err_close;
+	cprof->prof_rofile = prof_rofile;
 
 	*cprof_out = &cprof->base;
 	return true;
 
 err_close:
+	if (prof_rofile)
+		os_ro_anonymous_file_destroy(prof_rofile);
 	if (cprof)
 		cmlcms_color_profile_destroy(cprof);
 	free(desc);
