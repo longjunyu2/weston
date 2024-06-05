@@ -2693,9 +2693,7 @@ gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer)
 		destroy_buffer_state(gs->buffer);
 	gs->buffer = NULL;
 
-	gb = zalloc(sizeof(*gb));
-	if (!gb)
-		return false;
+	gb = xzalloc(sizeof(*gb));
 	gb->gr = gr;
 
 	wl_list_init(&gb->destroy_listener.link);
