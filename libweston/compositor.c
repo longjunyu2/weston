@@ -3212,10 +3212,12 @@ paint_node_add_damage(struct weston_paint_node *node)
 }
 
 static void
-surface_flush_damage(struct weston_surface *surface, struct weston_output *output)
+paint_node_flush_surface_damage(struct weston_paint_node *pnode)
 {
+	struct weston_output *output = pnode->output;
+	struct weston_surface *surface = pnode->surface;
 	struct weston_buffer *buffer = surface->buffer_ref.buffer;
-	struct weston_paint_node *node;
+	struct weston_paint_node *walk_node;
 
 	if (buffer->type == WESTON_BUFFER_SHM)
 		surface->compositor->renderer->flush_damage(surface, buffer,
@@ -3227,10 +3229,10 @@ surface_flush_damage(struct weston_surface *surface, struct weston_output *outpu
 	TL_POINT(surface->compositor, "core_flush_damage",
 		 TLP_SURFACE(surface), TLP_OUTPUT(output), TLP_END);
 
-	wl_list_for_each(node, &surface->paint_node_list, surface_link) {
-		assert(node->surface == surface);
+	wl_list_for_each(walk_node, &surface->paint_node_list, surface_link) {
+		assert(walk_node->surface == surface);
 
-		paint_node_add_damage(node);
+		paint_node_add_damage(walk_node);
 	}
 	pixman_region32_clear(&surface->damage);
 }
@@ -3284,7 +3286,7 @@ output_accumulate_damage(struct weston_output *output)
 			continue;
 		pnode->surface->touched = true;
 
-		surface_flush_damage(pnode->surface, output);
+		paint_node_flush_surface_damage(pnode);
 
 		/* Both the renderer and the backend have seen the buffer
 		 * by now. If renderer needs the buffer, it has its own
