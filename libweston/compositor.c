@@ -266,7 +266,8 @@ paint_node_update_late(struct weston_paint_node *pnode)
 
 	pnode->status &= ~(PAINT_NODE_VISIBILITY_DIRTY |
 			   PAINT_NODE_PLANE_DIRTY |
-			   PAINT_NODE_CONTENT_DIRTY);
+			   PAINT_NODE_CONTENT_DIRTY |
+			   PAINT_NODE_BUFFER_DIRTY);
 
 	/* Nothing should be able to flip "early" bits between
 	 * the early and late updates.
@@ -3156,7 +3157,8 @@ weston_surface_attach(struct weston_surface *surface,
 	}
 
 	status |= WESTON_SURFACE_DIRTY_BUFFER;
-
+	weston_surface_dirty_paint_nodes(surface,
+					 PAINT_NODE_BUFFER_DIRTY);
 	old_buffer = NULL;
 	weston_buffer_reference(&surface->buffer_ref, buffer,
 				BUFFER_MAY_BE_ACCESSED);

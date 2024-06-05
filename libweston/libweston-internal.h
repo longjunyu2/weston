@@ -507,7 +507,8 @@ enum paint_node_status {
 	PAINT_NODE_VISIBILITY_DIRTY = 1 << 2,
 	PAINT_NODE_PLANE_DIRTY = 1 << 3,
 	PAINT_NODE_CONTENT_DIRTY = 1 << 4,
-	PAINT_NODE_ALL_DIRTY = (1 << 5) - 1,
+	PAINT_NODE_BUFFER_DIRTY = 1 << 5,
+	PAINT_NODE_ALL_DIRTY = (1 << 6) - 1,
 };
 
 /**
