@@ -3753,11 +3753,6 @@ gl_renderer_create_surface(struct weston_surface *surface)
 
 	if (surface->buffer_ref.buffer) {
 		gl_renderer_attach(surface, surface->buffer_ref.buffer);
-		if (surface->buffer_ref.buffer->type == WESTON_BUFFER_SHM) {
-			gl_renderer_flush_damage(surface,
-						 surface->buffer_ref.buffer,
-						 NULL);
-		}
 	}
 
 	return 0;
