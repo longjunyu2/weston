@@ -2558,7 +2558,7 @@ ensure_textures(struct gl_buffer_state *gb, GLenum target, int num_textures)
 	glBindTexture(target, 0);
 }
 
-static bool
+static void
 gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer)
 {
 	struct weston_compositor *ec = es->compositor;
@@ -2686,7 +2686,7 @@ gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer)
 	    buffer->pixel_format == old_buffer->pixel_format) {
 		gs->buffer->pitch = pitch;
 		memcpy(gs->buffer->offset, offset, sizeof(offset));
-		return true;
+		return;
 	}
 
 	if (gs->buffer)
@@ -2710,8 +2710,6 @@ gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer)
 	gs->surface = es;
 
 	ensure_textures(gb, GL_TEXTURE_2D, num_planes);
-
-	return true;
 }
 
 static bool
@@ -2832,7 +2830,7 @@ err_free:
 	return false;
 }
 
-static bool
+static void
 gl_renderer_attach_egl(struct weston_surface *es, struct weston_buffer *buffer)
 {
 	struct weston_compositor *ec = es->compositor;
@@ -2852,8 +2850,6 @@ gl_renderer_attach_egl(struct weston_surface *es, struct weston_buffer *buffer)
 		glBindTexture(target, gb->textures[i]);
 		gr->image_target_texture_2d(target, gb->images[i]);
 	}
-
-	return true;
 }
 
 static void
@@ -3472,7 +3468,7 @@ out:
 	return ret;
 }
 
-static bool
+static void
 gl_renderer_attach_solid(struct weston_surface *surface,
 			 struct weston_buffer *buffer)
 {
@@ -3486,15 +3482,12 @@ gl_renderer_attach_solid(struct weston_surface *surface,
 	gb->color[3] = buffer->solid.a;
 
 	gb->shader_variant = SHADER_VARIANT_SOLID;
-
-	return true;
 }
 
 static void
 gl_renderer_attach(struct weston_surface *es, struct weston_buffer *buffer)
 {
 	struct gl_surface_state *gs = get_surface_state(es);
-	bool ret = false;
 
 	/* If get_surface_state called gl_renderer_create_surface, it did
 	 * attach the buffer */
@@ -3522,22 +3515,18 @@ gl_renderer_attach(struct weston_surface *es, struct weston_buffer *buffer)
 
 	switch (buffer->type) {
 	case WESTON_BUFFER_SHM:
-		ret = gl_renderer_attach_shm(es, buffer);
+		gl_renderer_attach_shm(es, buffer);
 		break;
 	case WESTON_BUFFER_DMABUF:
-		ret = gl_renderer_attach_dmabuf(es, buffer);
+		gl_renderer_attach_dmabuf(es, buffer);
 		break;
 	case WESTON_BUFFER_RENDERER_OPAQUE:
-		ret = gl_renderer_attach_egl(es, buffer);
+		gl_renderer_attach_egl(es, buffer);
 		break;
 	case WESTON_BUFFER_SOLID:
-		ret = gl_renderer_attach_solid(es, buffer);
+		gl_renderer_attach_solid(es, buffer);
 		break;
 	default:
-		break;
-	}
-
-	if (!ret) {
 		weston_log("unhandled buffer type!\n");
 		weston_buffer_send_server_error(buffer,
 			"disconnecting due to unhandled buffer type");
