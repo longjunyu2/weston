@@ -79,9 +79,7 @@ struct weston_renderer {
 			      const struct weston_size *fb_size,
 			      const struct weston_geometry *area);
 
-	void (*flush_damage)(struct weston_surface *surface,
-			     struct weston_buffer *buffer,
-			     struct weston_output *output);
+	void (*flush_damage)(struct weston_paint_node *pnode);
 	void (*attach)(struct weston_surface *es, struct weston_buffer *buffer);
 	void (*destroy)(struct weston_compositor *ec);
 

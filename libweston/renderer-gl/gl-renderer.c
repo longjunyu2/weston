@@ -2394,16 +2394,14 @@ gl_format_from_internal(GLenum internal_format)
 }
 
 static void
-gl_renderer_flush_damage(struct weston_surface *surface,
-			 struct weston_buffer *buffer,
-			 struct weston_output *output)
+gl_renderer_flush_damage_internal(struct weston_surface *surface,
+				  bool just_accumulate)
 {
 	const struct weston_testsuite_quirks *quirks =
 		&surface->compositor->test_data.test_quirks;
+	struct weston_buffer *buffer = surface->buffer_ref.buffer;
 	struct gl_surface_state *gs = get_surface_state(surface);
 	struct gl_buffer_state *gb = gs->buffer;
-	struct weston_paint_node *pnode;
-	bool texture_used;
 	pixman_box32_t *rectangles;
 	uint8_t *data;
 	int i, j, n;
@@ -2413,29 +2411,13 @@ gl_renderer_flush_damage(struct weston_surface *surface,
 	pixman_region32_union(&gb->texture_damage,
 			      &gb->texture_damage, &surface->damage);
 
+	if (just_accumulate)
+		return;
+
 	/* This can happen if a SHM wl_buffer gets destroyed before we flush
 	 * damage, because wayland-server just nukes the wl_shm_buffer from
 	 * underneath us */
 	if (!buffer->shm_buffer)
-		return;
-
-	/* Avoid upload, if the texture won't be used this time.
-	 * We still accumulate the damage in texture_damage, and
-	 * hold the reference to the buffer, in case the surface
-	 * migrates back to the primary plane.
-	 *
-	 * When called from gl_renderer_surface_copy_content()
-	 * or gl_renderer_create_surface(), output is NULL.
-	 * In that case, always upload.
-	 */
-	texture_used = false;
-	wl_list_for_each(pnode, &surface->paint_node_list, surface_link) {
-		if (!output || pnode->plane == &output->primary_plane) {
-			texture_used = true;
-			break;
-		}
-	}
-	if (!texture_used)
 		return;
 
 	if (!pixman_region32_not_empty(&gb->texture_damage) &&
@@ -2507,6 +2489,23 @@ done:
 	weston_buffer_reference(&gs->buffer_ref, buffer,
 				BUFFER_WILL_NOT_BE_ACCESSED);
 	weston_buffer_release_reference(&gs->buffer_release_ref, NULL);
+}
+
+static void
+gl_renderer_flush_damage(struct weston_paint_node *pnode)
+{
+	bool just_accumulate = false;
+
+	/* Avoid upload, if the texture won't be used this time.
+	 * We still accumulate the damage in texture_damage, and
+	 * hold the reference to the buffer, in case the surface
+	 * migrates back to the primary plane.
+	 */
+	if (pnode->plane != &pnode->output->primary_plane)
+		just_accumulate = true;
+
+	gl_renderer_flush_damage_internal(pnode->surface,
+					  just_accumulate);
 }
 
 static void
@@ -3613,7 +3612,7 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 		*(uint32_t *)target = pack_color(format, gb->color);
 		return 0;
 	case WESTON_BUFFER_SHM:
-		gl_renderer_flush_damage(surface, buffer, NULL);
+		gl_renderer_flush_damage_internal(surface, false);
 		/* fall through */
 	case WESTON_BUFFER_DMABUF:
 	case WESTON_BUFFER_RENDERER_OPAQUE:
