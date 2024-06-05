@@ -3483,7 +3483,8 @@ gl_renderer_attach_solid(struct weston_surface *surface,
 }
 
 static void
-gl_renderer_attach(struct weston_surface *es, struct weston_buffer *buffer)
+gl_renderer_attach_internal(struct weston_surface *es,
+			    struct weston_buffer *buffer)
 {
 	struct gl_surface_state *gs = get_surface_state(es);
 
@@ -3540,6 +3541,15 @@ out:
 	weston_buffer_reference(&gs->buffer_ref, NULL,
 				BUFFER_WILL_NOT_BE_ACCESSED);
 	weston_buffer_release_reference(&gs->buffer_release_ref, NULL);
+}
+
+static void
+gl_renderer_attach(struct weston_paint_node *pnode)
+{
+	struct weston_surface *es = pnode->surface;
+	struct weston_buffer *buffer = es->buffer_ref.buffer;
+
+	gl_renderer_attach_internal(es, buffer);
 }
 
 static uint32_t
@@ -3600,7 +3610,7 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 	GLenum status;
 	int ret = -1;
 
-	gl_renderer_attach(surface, surface->buffer_ref.buffer);
+	gl_renderer_attach_internal(surface, surface->buffer_ref.buffer);
 	gs = get_surface_state(surface);
 	gb = gs->buffer;
 	buffer = gs->buffer_ref.buffer;

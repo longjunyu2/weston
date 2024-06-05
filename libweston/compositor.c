@@ -267,8 +267,7 @@ paint_node_update_late(struct weston_paint_node *pnode)
 	}
 
 	if (buffer_dirty)
-		surf->compositor->renderer->attach(surf,
-						   surf->buffer_ref.buffer);
+		surf->compositor->renderer->attach(pnode);
 
 	pnode->status &= ~(PAINT_NODE_VISIBILITY_DIRTY |
 			   PAINT_NODE_PLANE_DIRTY |
