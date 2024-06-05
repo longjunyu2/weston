@@ -143,14 +143,15 @@ weston_view_dirty_paint_nodes(struct weston_view *view)
 }
 
 static void
-weston_surface_dirty_paint_nodes(struct weston_surface *surface)
+weston_surface_dirty_paint_nodes(struct weston_surface *surface,
+				 enum paint_node_status status)
 {
 	struct weston_paint_node *node;
 
 	wl_list_for_each(node, &surface->paint_node_list, surface_link) {
 		assert(node->surface == surface);
 
-		node->status |= PAINT_NODE_VIEW_DIRTY;
+		node->status |= status;
 	}
 }
 
@@ -4594,7 +4595,8 @@ weston_surface_commit_state(struct weston_surface *surface,
 						   &surface->surface_to_buffer_matrix);
 		weston_matrix_invert(&surface->buffer_to_surface_matrix,
 			     	     &surface->surface_to_buffer_matrix);
-		weston_surface_dirty_paint_nodes(surface);
+		weston_surface_dirty_paint_nodes(surface,
+						 PAINT_NODE_VIEW_DIRTY);
 		weston_surface_update_size(surface);
 	}
 
