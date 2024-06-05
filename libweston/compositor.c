@@ -6431,6 +6431,7 @@ weston_output_compute_protection(struct weston_output *output)
 
 	if (output->current_protection != op_protection) {
 		output->current_protection = op_protection;
+		weston_output_dirty_paint_nodes(output);
 		weston_output_damage(output);
 		weston_schedule_surface_protection_update(wc);
 	}
