@@ -221,9 +221,11 @@ paint_node_update_early(struct weston_paint_node *pnode)
 static void
 paint_node_update_late(struct weston_paint_node *pnode)
 {
+	struct weston_surface *surf = pnode->surface;
 	bool vis_dirty = pnode->status & PAINT_NODE_VISIBILITY_DIRTY;
 	bool plane_dirty = pnode->status & PAINT_NODE_PLANE_DIRTY;
 	bool content_dirty = pnode->status & PAINT_NODE_CONTENT_DIRTY;
+	bool buffer_dirty = pnode->status & PAINT_NODE_BUFFER_DIRTY;
 
 	/* The geoemtry may be shrinking, so we shouldn't just
 	 * add the old visible region to our damage region, because
@@ -263,6 +265,10 @@ paint_node_update_late(struct weston_paint_node *pnode)
 		pnode->plane = pnode->plane_next;
 		pnode->plane_next = NULL;
 	}
+
+	if (buffer_dirty)
+		surf->compositor->renderer->attach(surf,
+						   surf->buffer_ref.buffer);
 
 	pnode->status &= ~(PAINT_NODE_VISIBILITY_DIRTY |
 			   PAINT_NODE_PLANE_DIRTY |
@@ -2981,7 +2987,6 @@ weston_surface_attach_solid(struct weston_surface *surface,
 	assert(buffer->type == WESTON_BUFFER_SOLID);
 	weston_buffer_reference(&surface->buffer_ref, buffer,
 				BUFFER_MAY_BE_ACCESSED);
-	surface->compositor->renderer->attach(surface, buffer);
 
 	weston_surface_set_size(surface, w, h);
 
@@ -3117,7 +3122,6 @@ weston_surface_attach(struct weston_surface *surface,
 
 		weston_buffer_reference(&surface->buffer_ref, NULL,
 					BUFFER_WILL_NOT_BE_ACCESSED);
-		surface->compositor->renderer->attach(surface, buffer);
 
 		surface->width_from_buffer = 0;
 		surface->height_from_buffer = 0;
@@ -3162,7 +3166,6 @@ weston_surface_attach(struct weston_surface *surface,
 	old_buffer = NULL;
 	weston_buffer_reference(&surface->buffer_ref, buffer,
 				BUFFER_MAY_BE_ACCESSED);
-	surface->compositor->renderer->attach(surface, buffer);
 
 	return status;
 }

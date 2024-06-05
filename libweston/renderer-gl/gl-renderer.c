@@ -3487,8 +3487,6 @@ gl_renderer_attach(struct weston_surface *es, struct weston_buffer *buffer)
 {
 	struct gl_surface_state *gs = get_surface_state(es);
 
-	/* If get_surface_state called gl_renderer_create_surface, it did
-	 * attach the buffer */
 	if (gs->buffer_ref.buffer == buffer)
 		return;
 
@@ -3593,15 +3591,19 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 	const size_t bytespp = 4; /* PIXMAN_a8b8g8r8 */
 	const GLenum gl_format = GL_RGBA; /* PIXMAN_a8b8g8r8 little-endian */
 	struct gl_renderer *gr = get_renderer(surface->compositor);
-	struct gl_surface_state *gs = get_surface_state(surface);
-	struct gl_buffer_state *gb = gs->buffer;
-	struct weston_buffer *buffer = gs->buffer_ref.buffer;
+	struct gl_surface_state *gs;
+	struct gl_buffer_state *gb;
+	struct weston_buffer *buffer;
 	int cw, ch;
 	GLuint fbo;
 	GLuint tex;
 	GLenum status;
 	int ret = -1;
 
+	gl_renderer_attach(surface, surface->buffer_ref.buffer);
+	gs = get_surface_state(surface);
+	gb = gs->buffer;
+	buffer = gs->buffer_ref.buffer;
 	assert(buffer);
 
 	cw = buffer->width;
@@ -3749,10 +3751,6 @@ gl_renderer_create_surface(struct weston_surface *surface)
 		surface_state_handle_renderer_destroy;
 	wl_signal_add(&gr->destroy_signal,
 		      &gs->renderer_destroy_listener);
-
-	if (surface->buffer_ref.buffer) {
-		gl_renderer_attach(surface, surface->buffer_ref.buffer);
-	}
 
 	return 0;
 }
