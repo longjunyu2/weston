@@ -46,6 +46,13 @@
 #include "shared/helpers.h"
 #include "shared/image-loader.h"
 
+bool verbose;
+
+#define verbose_print(...) do { \
+	if (verbose) \
+		fprintf(stderr, __VA_ARGS__); \
+} while (0)
+
 struct image {
 	struct window *window;
 
@@ -494,17 +501,17 @@ image_create(struct display *display, const char *filename,
 	wimage = load_cairo_surface_get_user_data(image->image);
 	assert(wimage);
 	if (wimage->icc_profile_data && render_intent != -1) {
-		fprintf(stderr, "Image contains ICC file embedded, let's try to use the Wayland\n" \
-				"color-management protocol to set the surface image description\n" \
-				"using this ICC file.\n");
+		verbose_print("Image contains ICC file embedded, let's try to use the Wayland\n" \
+			      "color-management protocol to set the surface image description\n" \
+			      "using this ICC file.\n");
 		ret = widget_set_image_description_icc(image->image_widget,
 						       wimage->icc_profile_data->fd,
 						       wimage->icc_profile_data->length,
 						       wimage->icc_profile_data->offset,
 						       render_intent, &err_msg);
 		if (ret) {
-			fprintf(stderr, "Successfully set surface image description " \
-					"using ICC file.\n");
+			verbose_print("Successfully set surface image description " \
+				      "using ICC file.\n");
 		} else {
 			fprintf(stderr, "Failed to set surface image description:\n%s\n",
 					err_msg);
@@ -535,6 +542,8 @@ print_usage(const char *program_name)
 
 	fprintf(stderr, "Usage:\n  %s [OPTIONS] [FILENAME0] [FILENAME1] ...\n\n" \
 			"Options:\n", program_name);
+
+	fprintf(stderr, "-v or --verbose to print verbose log information.\n\n");
 
 	fprintf(stderr, "-h or --help to open this HELP dialogue.\n\n");
 
@@ -592,6 +601,7 @@ main(int argc, char *argv[])
 	char *opt_rendering_intent = NULL;
 	struct weston_option cli_options[] = {
 		{ WESTON_OPTION_BOOLEAN, "help", 'h', &opt_help },
+		{ WESTON_OPTION_BOOLEAN, "verbose", 'v', &verbose },
 		{ WESTON_OPTION_STRING, "rendering-intent", 'r', &opt_rendering_intent },
 	};
 
