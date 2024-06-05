@@ -1680,7 +1680,6 @@ update_buffer_release_fences(struct weston_compositor *compositor,
 
 	wl_list_for_each_reverse(pnode, &output->paint_node_z_order_list,
 				 z_order_link) {
-		struct weston_view *view = pnode->view;
 		struct gl_surface_state *gs;
 		struct weston_buffer_release *buffer_release;
 		int fence_fd;
@@ -1688,7 +1687,7 @@ update_buffer_release_fences(struct weston_compositor *compositor,
 		if (pnode->plane != &output->primary_plane)
 			continue;
 
-		gs = get_surface_state(view->surface);
+		gs = get_surface_state(pnode->surface);
 		buffer_release = gs->buffer_release_ref.buffer_release;
 
 		if (!gs->used_in_output_repaint || !buffer_release)
@@ -2184,7 +2183,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 				 z_order_link) {
 		if (pnode->plane == &output->primary_plane) {
 			struct gl_surface_state *gs =
-				get_surface_state(pnode->view->surface);
+				get_surface_state(pnode->surface);
 			gs->used_in_output_repaint = false;
 		}
 	}
