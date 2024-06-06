@@ -1374,6 +1374,66 @@ store_indices(size_t count,
 }
 
 static void
+set_debug_mode(struct gl_renderer *gr,
+	       struct gl_shader_config *sconf,
+	       const uint32_t *barycentrics,
+	       bool opaque)
+{
+	/* Debug mode tints indexed by gl_debug_mode enumeration. While tints
+	 * are meant to be premultiplied, debug modes can have invalid colors in
+	 * order to create visual effects. */
+	static const float tints[DEBUG_MODE_LAST][4] = {
+		{},                           /* DEBUG_MODE_NONE */
+		{ 0.0f, 0.0f, 0.0f, 0.3f },   /* DEBUG_MODE_WIREFRAME */
+		{},                           /* DEBUG_MODE_BATCHES */
+		{ 0.4f, -0.4f, -0.4f, 0.0f }, /* DEBUG_MODE_DAMAGE */
+		{ -0.4f, -0.4f, 0.7f, 0.0f }, /* DEBUG_MODE_OPAQUE */
+	};
+	static const float batch_tints[][4] = {
+		{ 0.9f, 0.0f, 0.0f, 0.9f },
+		{ 0.0f, 0.9f, 0.0f, 0.9f },
+		{ 0.0f, 0.0f, 0.9f, 0.9f },
+		{ 0.9f, 0.9f, 0.0f, 0.9f },
+		{ 0.9f, 0.0f, 0.9f, 0.9f },
+		{ 0.0f, 0.9f, 0.9f, 0.9f },
+		{ 0.9f, 0.9f, 0.9f, 0.9f },
+	};
+	int i;
+
+	switch (gr->debug_mode) {
+	case DEBUG_MODE_WIREFRAME:
+		/* Wireframe rendering is based on Celes & Abraham's "Fast and
+		 * versatile texture-based wireframe rendering", 2011. */
+		sconf->req.wireframe = true;
+		sconf->wireframe_tex = gr->wireframe_tex;
+		glEnableVertexAttribArray(SHADER_ATTRIB_LOC_BARYCENTRIC);
+		glVertexAttribPointer(SHADER_ATTRIB_LOC_BARYCENTRIC, 4,
+				      GL_UNSIGNED_BYTE, GL_TRUE, 0,
+				      barycentrics);
+		FALLTHROUGH;
+
+	case DEBUG_MODE_DAMAGE:
+		sconf->req.tint = true;
+		copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
+		break;
+
+	case DEBUG_MODE_OPAQUE:
+		sconf->req.tint = opaque;
+		copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
+		break;
+
+	case DEBUG_MODE_BATCHES:
+		sconf->req.tint = true;
+		i = gr->nbatches++ % ARRAY_LENGTH(batch_tints);
+		copy_uniform4f(sconf->tint, batch_tints[i]);
+		break;
+
+	default:
+		unreachable("Invalid debug mode");
+	}
+}
+
+static void
 draw_mesh(struct gl_renderer *gr,
 	  struct weston_paint_node *pnode,
 	  struct gl_shader_config *sconf,
@@ -1385,61 +1445,8 @@ draw_mesh(struct gl_renderer *gr,
 {
 	assert(nidx > 0);
 
-	if (gr->debug_mode) {
-		/* Debug mode tints indexed by gl_debug_mode enumeration. While
-		 * tints are meant to be premultiplied, debug modes can have
-		 * invalid colors in order to create visual effects. */
-		static const float tints[DEBUG_MODE_LAST][4] = {
-			{},                           /* DEBUG_MODE_NONE */
-			{ 0.0f, 0.0f, 0.0f, 0.3f },   /* DEBUG_MODE_WIREFRAME */
-			{},                           /* DEBUG_MODE_BATCHES */
-			{ 0.4f, -0.4f, -0.4f, 0.0f }, /* DEBUG_MODE_DAMAGE */
-			{ -0.4f, -0.4f, 0.7f, 0.0f }, /* DEBUG_MODE_OPAQUE */
-		};
-		static const float batch_tints[][4] = {
-			{ 0.9f, 0.0f, 0.0f, 0.9f },
-			{ 0.0f, 0.9f, 0.0f, 0.9f },
-			{ 0.0f, 0.0f, 0.9f, 0.9f },
-			{ 0.9f, 0.9f, 0.0f, 0.9f },
-			{ 0.9f, 0.0f, 0.9f, 0.9f },
-			{ 0.0f, 0.9f, 0.9f, 0.9f },
-			{ 0.9f, 0.9f, 0.9f, 0.9f },
-		};
-		int i;
-
-		switch (gr->debug_mode) {
-		case DEBUG_MODE_WIREFRAME:
-			/* Wireframe rendering is based on Celes & Abraham's
-			 * "Fast and versatile texture-based wireframe
-			 * rendering", 2011. */
-			sconf->req.wireframe = true;
-			sconf->wireframe_tex = gr->wireframe_tex;
-			glEnableVertexAttribArray(SHADER_ATTRIB_LOC_BARYCENTRIC);
-			glVertexAttribPointer(SHADER_ATTRIB_LOC_BARYCENTRIC, 4,
-					      GL_UNSIGNED_BYTE, GL_TRUE, 0,
-					      barycentrics);
-			FALLTHROUGH;
-
-		case DEBUG_MODE_DAMAGE:
-			sconf->req.tint = true;
-			copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
-			break;
-
-		case DEBUG_MODE_OPAQUE:
-			sconf->req.tint = opaque;
-			copy_uniform4f(sconf->tint, tints[gr->debug_mode]);
-			break;
-
-		case DEBUG_MODE_BATCHES:
-			sconf->req.tint = true;
-			i = gr->nbatches++ % ARRAY_LENGTH(batch_tints);
-			copy_uniform4f(sconf->tint, batch_tints[i]);
-			break;
-
-		default:
-			unreachable("Invalid debug mode");
-		}
-	}
+	if (gr->debug_mode)
+		set_debug_mode(gr, sconf, barycentrics, opaque);
 
 	if (!gl_renderer_use_program(gr, sconf))
 		gl_renderer_send_shader_error(pnode); /* Use fallback shader. */
