@@ -554,6 +554,9 @@ struct weston_paint_node {
 
 	uint32_t try_view_on_plane_failure_reasons;
 	bool is_opaque;
+	bool is_direct;
+	bool draw_solid;
+	struct weston_solid_buffer_values solid;
 };
 
 struct weston_paint_node *

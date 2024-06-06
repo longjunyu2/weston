@@ -187,6 +187,49 @@ paint_node_damage_below(struct weston_paint_node *pnode)
 	}
 }
 
+ /* Checks if a paint node should be replaced by a solid placeholder
+  * Checks for 2 types of censor requirements
+  * - recording_censor: Censor protected view when a
+  *   protected view is captured.
+  * - unprotected_censor: Censor regions of protected views
+  *   when displayed on an output which has lower protection capability.
+  * Checks if direct_display is in use.
+  */
+static void
+maybe_replace_paint_node(struct weston_paint_node *pnode)
+{
+	struct weston_output *output = pnode->output;
+	struct weston_surface *surface = pnode->surface;
+	struct weston_buffer *buffer = pnode->surface->buffer_ref.buffer;
+	bool recording_censor =
+		(output->disable_planes > 0) &&
+		(surface->desired_protection > WESTON_HDCP_DISABLE);
+	bool unprotected_censor =
+		(surface->desired_protection > output->current_protection);
+	struct weston_solid_buffer_values placeholder_color = {
+		0.40f, 0.0f, 0.0f, 1.0f
+	};
+
+	pnode->draw_solid = false;
+	pnode->is_direct = false;
+	if (buffer->direct_display) {
+		pnode->draw_solid = true;
+		pnode->is_direct = true;
+		pnode->is_opaque = true;
+		pnode->solid = placeholder_color;
+		return;
+	}
+	if (surface->protection_mode !=
+	    WESTON_SURFACE_PROTECTION_MODE_ENFORCED)
+		return;
+
+	if (recording_censor || unprotected_censor) {
+		pnode->draw_solid = true;
+		pnode->is_opaque = true;
+		pnode->solid = placeholder_color;
+	}
+}
+
 /* Paint nodes contain filter and transform information that needs to be
  * up to date before assign_planes() is called. But there are also
  * damage related bits that must be updated after assign_planes()
@@ -266,6 +309,7 @@ paint_node_update_late(struct weston_paint_node *pnode)
 		pnode->plane_next = NULL;
 	}
 
+	maybe_replace_paint_node(pnode);
 	if (buffer_dirty)
 		surf->compositor->renderer->attach(pnode);
 
@@ -3199,6 +3243,9 @@ paint_node_add_damage(struct weston_paint_node *node)
 
 	assert(!view->transform.dirty);
 
+	if (node->draw_solid)
+		return;
+
 	pixman_region32_init(&damage);
 	if (view->transform.enabled) {
 		pixman_box32_t *extents;
@@ -3224,8 +3271,12 @@ paint_node_flush_surface_damage(struct weston_paint_node *pnode)
 	struct weston_buffer *buffer = surface->buffer_ref.buffer;
 	struct weston_paint_node *walk_node;
 
-	if (buffer->type == WESTON_BUFFER_SHM)
+	if (buffer->type == WESTON_BUFFER_SHM) {
+		if (pnode->draw_solid)
+			return;
+
 		surface->compositor->renderer->flush_damage(pnode);
+	}
 
 	if (!pixman_region32_not_empty(&surface->damage))
 		return;

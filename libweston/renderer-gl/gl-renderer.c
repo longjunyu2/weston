@@ -1078,9 +1078,10 @@ ensure_surface_buffer_is_ready(struct gl_renderer *gr,
 
 static void
 prepare_placeholder(struct gl_shader_config *sconf,
-		    struct weston_output *output)
+		    struct weston_paint_node *pnode)
 {
 	struct weston_color_transform *ctransf;
+	struct weston_output *output = pnode->output;
 	struct gl_renderer *gr = get_renderer(output->compositor);
 	struct gl_shader_config alt = {
 		.req = {
@@ -1089,9 +1090,12 @@ prepare_placeholder(struct gl_shader_config *sconf,
 		},
 		.projection = sconf->projection,
 		.view_alpha = sconf->view_alpha,
-		.unicolor = { 0.40, 0.0, 0.0, 1.0 },
+		.unicolor = { pnode->solid.r,
+			      pnode->solid.g,
+			      pnode->solid.b,
+			      pnode->solid.a,
+		},
 	};
-
 	ctransf = output->color_outcome->from_sRGB_to_blend;
 	if (!gl_shader_config_set_color_transform(gr, &alt, ctransf)) {
 		weston_log("GL-renderer: %s failed to generate a color transformation.\n",
@@ -1100,46 +1104,6 @@ prepare_placeholder(struct gl_shader_config *sconf,
 
 	*sconf = alt;
 }
-
- /* Checks if a paint node should be replaced by a solid placeholder
-  * Checks for 2 types of censor requirements
-  * - recording_censor: Censor protected view when a
-  *   protected view is captured.
-  * - unprotected_censor: Censor regions of protected views
-  *   when displayed on an output which has lower protection capability.
-  * Checks if direct_display is in use.
-  * If replacement is needed, smashes the GL shader config.
-  */
-static void
-maybe_replace_paint_node(struct gl_shader_config *sconf,
-			 struct weston_paint_node *pnode)
-{
-	struct weston_output *output = pnode->output;
-	struct weston_surface *surface = pnode->surface;
-	struct gl_surface_state *gs = get_surface_state(surface);
-	struct weston_buffer *buffer = gs->buffer_ref.buffer;
-	bool recording_censor =
-		(output->disable_planes > 0) &&
-		(surface->desired_protection > WESTON_HDCP_DISABLE);
-
-	bool unprotected_censor =
-		(surface->desired_protection > output->current_protection);
-
-	if (buffer->direct_display) {
-		prepare_placeholder(sconf, output);
-		return;
-	}
-
-	/* When not in enforced mode, the client is notified of the protection */
-	/* change, so content censoring is not required */
-	if (surface->protection_mode !=
-	    WESTON_SURFACE_PROTECTION_MODE_ENFORCED)
-		return;
-
-	if (recording_censor || unprotected_censor)
-		prepare_placeholder(sconf, output);
-}
-
 static void
 gl_shader_config_set_input_textures(struct gl_shader_config *sconf,
 				    struct gl_surface_state *gs)
@@ -1578,7 +1542,7 @@ draw_paint_node(struct weston_paint_node *pnode,
 	if (!pixman_region32_not_empty(&repaint))
 		goto out;
 
-	if (ensure_surface_buffer_is_ready(gr, gs) < 0)
+	if (!pnode->draw_solid && ensure_surface_buffer_is_ready(gr, gs) < 0)
 		goto out;
 
 	if (pnode->needs_filtering)
@@ -1613,7 +1577,8 @@ draw_paint_node(struct weston_paint_node *pnode,
 	pixman_region32_subtract(&surface_blend, &surface_blend,
 				 &surface_opaque);
 
-	maybe_replace_paint_node(&sconf, pnode);
+	if (pnode->draw_solid)
+		prepare_placeholder(&sconf, pnode);
 
 	if (pixman_region32_not_empty(&surface_opaque)) {
 		struct gl_shader_config alt = sconf;
@@ -1691,6 +1656,9 @@ update_buffer_release_fences(struct weston_compositor *compositor,
 		int fence_fd;
 
 		if (pnode->plane != &output->primary_plane)
+			continue;
+
+		if (pnode->draw_solid)
 			continue;
 
 		gs = get_surface_state(pnode->surface);
@@ -3342,18 +3310,19 @@ ensure_renderer_gl_buffer_state(struct weston_surface *surface,
 }
 
 static void
-attach_direct_display_censor_placeholder(struct weston_surface *surface,
-					 struct weston_buffer *buffer)
+attach_direct_display_placeholder(struct weston_paint_node *pnode)
 {
+	struct weston_surface *surface = pnode->surface;
+	struct weston_buffer *buffer = surface->buffer_ref.buffer;
 	struct gl_buffer_state *gb;
 
 	gb = ensure_renderer_gl_buffer_state(surface, buffer);
 
 	/* uses the same color as the content-protection placeholder */
-	gb->color[0] = 0.40f;
-	gb->color[1] = 0.0f;
-	gb->color[2] = 0.0f;
-	gb->color[3] = 1.0f;
+	gb->color[0] = pnode->solid.r;
+	gb->color[1] = pnode->solid.g;
+	gb->color[2] = pnode->solid.b;
+	gb->color[3] = pnode->solid.a;
 
 	gb->shader_variant = SHADER_VARIANT_SOLID;
 }
@@ -3369,11 +3338,6 @@ gl_renderer_attach_dmabuf(struct weston_surface *surface,
 	struct linux_dmabuf_buffer *dmabuf = buffer->dmabuf;
 	GLenum target;
 	int i;
-
-	if (buffer->direct_display) {
-		attach_direct_display_censor_placeholder(surface, buffer);
-		return true;
-	}
 
 	/* Thanks to linux-dmabuf being totally independent of libweston,
 	 * the first time a dmabuf is attached, the gl_buffer_state will
@@ -3490,7 +3454,8 @@ gl_renderer_attach_solid(struct weston_surface *surface,
 
 static void
 gl_renderer_attach_internal(struct weston_surface *es,
-			    struct weston_buffer *buffer)
+			    struct weston_buffer *buffer,
+			    struct weston_paint_node *direct_pnode)
 {
 	struct gl_surface_state *gs = get_surface_state(es);
 
@@ -3516,6 +3481,11 @@ gl_renderer_attach_internal(struct weston_surface *es,
 	if (!buffer)
 		goto out;
 
+	if (direct_pnode) {
+		attach_direct_display_placeholder(direct_pnode);
+		goto success;
+	}
+
 	switch (buffer->type) {
 	case WESTON_BUFFER_SHM:
 		gl_renderer_attach_shm(es, buffer);
@@ -3536,6 +3506,7 @@ gl_renderer_attach_internal(struct weston_surface *es,
 		goto out;
 	}
 
+success:
 	weston_buffer_reference(&gs->buffer_ref, buffer,
 				BUFFER_MAY_BE_ACCESSED);
 	weston_buffer_release_reference(&gs->buffer_release_ref,
@@ -3555,7 +3526,10 @@ gl_renderer_attach(struct weston_paint_node *pnode)
 	struct weston_surface *es = pnode->surface;
 	struct weston_buffer *buffer = es->buffer_ref.buffer;
 
-	gl_renderer_attach_internal(es, buffer);
+	if (pnode->is_direct)
+		gl_renderer_attach_internal(es, buffer, pnode);
+	else
+		gl_renderer_attach_internal(es, buffer, NULL);
 }
 
 static uint32_t
@@ -3616,11 +3590,13 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 	GLenum status;
 	int ret = -1;
 
-	gl_renderer_attach_internal(surface, surface->buffer_ref.buffer);
+	gl_renderer_attach_internal(surface, surface->buffer_ref.buffer, NULL);
 	gs = get_surface_state(surface);
 	gb = gs->buffer;
 	buffer = gs->buffer_ref.buffer;
 	assert(buffer);
+	if (buffer->direct_display)
+		return -1;
 
 	cw = buffer->width;
 	ch = buffer->height;
