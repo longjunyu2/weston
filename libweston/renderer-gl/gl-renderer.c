@@ -1590,7 +1590,13 @@ draw_paint_node(struct weston_paint_node *pnode,
 		goto out;
 
 	/* XXX: Should we be using ev->transform.opaque here? */
-	pixman_region32_init(&surface_opaque);
+	if (pnode->is_opaque)
+		pixman_region32_init_rect(&surface_opaque, 0, 0,
+					  pnode->surface->width,
+					  pnode->surface->height);
+	else
+		pixman_region32_init(&surface_opaque);
+
 	if (pnode->view->geometry.scissor_enabled)
 		pixman_region32_intersect(&surface_opaque,
 					  &pnode->surface->opaque,
