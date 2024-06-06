@@ -27,6 +27,7 @@
 #include "config.h"
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -108,6 +109,71 @@ swizzle_row(JSAMPLE *row, JDIMENSION width)
 	}
 }
 
+struct jpeg_image_data {
+	JSAMPLE *data;
+	bool all_data_read;
+};
+
+static pixman_image_t *
+load_jpeg_image(struct jpeg_decompress_struct *cinfo,
+		struct jpeg_image_data *jpeg_image_data)
+{
+	JSAMPLE *rows[4];
+	int stride, first;
+	unsigned int i;
+	pixman_image_t *pixman_image;
+
+	stride = cinfo->output_width * 4;
+	jpeg_image_data->data = malloc(stride * cinfo->output_height);
+	if (jpeg_image_data->data == NULL) {
+		fprintf(stderr, "couldn't allocate image data\n");
+		return NULL;
+	}
+
+	while (cinfo->output_scanline < cinfo->output_height) {
+		first = cinfo->output_scanline;
+		for (i = 0; i < ARRAY_LENGTH(rows); i++)
+			rows[i] = jpeg_image_data->data + (first + i) * stride;
+
+		jpeg_read_scanlines(cinfo, rows, ARRAY_LENGTH(rows));
+		for (i = 0; first + i < cinfo->output_scanline; i++)
+			swizzle_row(rows[i], cinfo->output_width);
+	}
+	jpeg_image_data->all_data_read = true;
+
+	pixman_image = pixman_image_create_bits(PIXMAN_a8r8g8b8,
+						cinfo->output_width,
+						cinfo->output_height,
+						(uint32_t *)jpeg_image_data->data,
+						stride);
+	pixman_image_set_destroy_function(pixman_image, pixman_image_destroy_func,
+					  jpeg_image_data->data);
+	jpeg_image_data->data = NULL;
+
+	return pixman_image;
+}
+
+static int
+load_jpeg_icc(struct jpeg_decompress_struct *cinfo,
+	      struct icc_profile_data **icc_profile_data)
+{
+	JOCTET *profdata;
+	uint32_t proflen;
+
+	if (!jpeg_read_icc_profile(cinfo, &profdata, &proflen)) {
+		/* Not an error, the file simply does not have an ICC embedded. */
+		*icc_profile_data = NULL;
+		return 0;
+	}
+
+	*icc_profile_data = icc_profile_data_create(profdata, proflen);
+	free(profdata);
+	if (*icc_profile_data == NULL)
+		return -1;
+
+	return 0;
+}
+
 static void
 error_exit(j_common_ptr cinfo)
 {
@@ -120,66 +186,61 @@ load_jpeg(FILE *fp, uint32_t image_load_flags)
 	struct weston_image *image;
 	struct jpeg_decompress_struct cinfo;
 	struct jpeg_error_mgr jerr;
-	pixman_image_t *pixman_image;
-	unsigned int i;
-	int stride, first;
-	JSAMPLE *data, *rows[4];
+	struct jpeg_image_data jpeg_image_data = { 0 };
 	jmp_buf env;
-
-	if (image_load_flags & WESTON_IMAGE_LOAD_ICC)
-		fprintf(stderr, "We still don't support reading ICC profile from JPEG\n");
-
-	if (!(image_load_flags & WESTON_IMAGE_LOAD_IMAGE))
-		return NULL;
+	int ret;
 
 	cinfo.err = jpeg_std_error(&jerr);
 	jerr.error_exit = error_exit;
 	cinfo.client_data = env;
 	if (setjmp(env))
-		return NULL;
+		goto err;
 
 	jpeg_create_decompress(&cinfo);
-
 	jpeg_stdio_src(&cinfo, fp);
 
-	jpeg_read_header(&cinfo, TRUE);
+	/**
+	 * libjpeg.txt says that if we want to call jpeg_read_icc_profile(), we
+	 * need to call the function below before calling jpeg_read_header().
+	 */
+	if (image_load_flags & WESTON_IMAGE_LOAD_ICC)
+		jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 0xFFFF);
 
+	jpeg_read_header(&cinfo, TRUE);
 	cinfo.out_color_space = JCS_RGB;
 	jpeg_start_decompress(&cinfo);
 
-	stride = cinfo.output_width * 4;
-	data = malloc(stride * cinfo.output_height);
-	if (data == NULL) {
-		fprintf(stderr, "couldn't allocate image data\n");
-		return NULL;
+	image = xzalloc(sizeof(*image));
+
+	if (image_load_flags & WESTON_IMAGE_LOAD_IMAGE) {
+		image->pixman_image = load_jpeg_image(&cinfo, &jpeg_image_data);
+		if (!image->pixman_image)
+			goto err;
 	}
-
-	while (cinfo.output_scanline < cinfo.output_height) {
-		first = cinfo.output_scanline;
-		for (i = 0; i < ARRAY_LENGTH(rows); i++)
-			rows[i] = data + (first + i) * stride;
-
-		jpeg_read_scanlines(&cinfo, rows, ARRAY_LENGTH(rows));
-		for (i = 0; first + i < cinfo.output_scanline; i++)
-			swizzle_row(rows[i], cinfo.output_width);
+	if (image_load_flags & WESTON_IMAGE_LOAD_ICC) {
+		ret = load_jpeg_icc(&cinfo, &image->icc_profile_data);
+		if (ret < 0)
+			goto err;
 	}
 
 	jpeg_finish_decompress(&cinfo);
-
 	jpeg_destroy_decompress(&cinfo);
-
-	pixman_image = pixman_image_create_bits(PIXMAN_a8r8g8b8,
-					cinfo.output_width,
-					cinfo.output_height,
-					(uint32_t *) data, stride);
-
-	pixman_image_set_destroy_function(pixman_image,
-				pixman_image_destroy_func, data);
-
-	image = xzalloc(sizeof(*image));
-	image->pixman_image = pixman_image;
-
 	return image;
+
+err:
+	free(jpeg_image_data.data);
+	/**
+	 * libjpeg.txt says that it is an error to call finish_decompress()
+	 * before reading the total number of scanlines. But it documents that
+	 * destroy_decompress() also aborts the decompression, so we can safely
+	 * call that if the reading process is not finished.
+	 */
+	if (jpeg_image_data.all_data_read)
+		jpeg_finish_decompress(&cinfo);
+	jpeg_destroy_decompress(&cinfo);
+	if (image)
+		weston_image_destroy(image);
+	return NULL;
 }
 
 #else
