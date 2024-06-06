@@ -1605,7 +1605,7 @@ draw_paint_node(struct weston_paint_node *pnode,
 		pixman_region32_intersect(&surface_blend, &surface_blend,
 					  &pnode->view->geometry.scissor);
 	pixman_region32_subtract(&surface_blend, &surface_blend,
-				 &pnode->surface->opaque);
+				 &surface_opaque);
 
 	maybe_replace_paint_node(&sconf, pnode);
 
