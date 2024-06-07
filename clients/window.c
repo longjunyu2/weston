@@ -1396,6 +1396,9 @@ surface_destroy(struct surface *surface)
 	if (surface->subsurface)
 		wl_subsurface_destroy(surface->subsurface);
 
+	if (surface->viewport)
+		wp_viewport_destroy(surface->viewport);
+
 	wl_surface_destroy(surface->surface);
 
 	if (surface->toysurface)
