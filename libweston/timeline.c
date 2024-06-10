@@ -265,27 +265,32 @@ emit_weston_output(struct timeline_emit_context *ctx, void *obj)
 }
 
 
-static void
+static struct weston_timeline_subscription_object *
 check_weston_surface_description(struct weston_log_subscription *sub,
 				 struct weston_surface *s,
-				 struct weston_timeline_subscription *tm_sub,
-				 struct weston_timeline_subscription_object *sub_obj)
+				 struct weston_timeline_subscription *tm_sub)
 {
 	struct weston_surface *mains;
 	char d[512];
 	char mainstr[32];
-
-	if (!weston_timeline_check_object_refresh(sub_obj))
-		return;
+	struct weston_timeline_subscription_object *sub_obj;
+	struct weston_timeline_subscription_object *parent_obj;
 
 	mains = weston_surface_get_main_surface(s);
-	if (mains != s) {
-		struct weston_timeline_subscription_object *new_sub_obj;
 
-		new_sub_obj = weston_timeline_subscription_surface_ensure(tm_sub, mains);
-		check_weston_surface_description(sub, mains, tm_sub, new_sub_obj);
+	if (mains != s)
+		parent_obj = check_weston_surface_description(sub, mains, tm_sub);
+
+	sub_obj = weston_timeline_subscription_surface_ensure(tm_sub, s);
+	assert(sub_obj->id != 0);
+	if (!weston_timeline_check_object_refresh(sub_obj))
+		return sub_obj;
+
+	if (mains != s) {
+		assert(parent_obj);
+
 		if (snprintf(mainstr, sizeof(mainstr), ", \"main_surface\":%u",
-			     new_sub_obj->id) < 0)
+			     parent_obj->id) < 0)
 			mainstr[0] = '\0';
 	} else {
 		mainstr[0] = '\0';
@@ -299,6 +304,8 @@ check_weston_surface_description(struct weston_log_subscription *sub,
 				       sub_obj->id);
 	fprint_quoted_string(sub, d[0] ? d : NULL);
 	weston_log_subscription_printf(sub, "%s }\n", mainstr);
+
+	return sub_obj;
 }
 
 static int
@@ -306,16 +313,13 @@ emit_weston_surface(struct timeline_emit_context *ctx, void *obj)
 {
 	struct weston_log_subscription *sub = ctx->subscription;
 	struct weston_surface *surface = obj;
-	struct weston_timeline_subscription_object *sub_obj;
 	struct weston_timeline_subscription *tl_sub;
+	struct weston_timeline_subscription_object *sub_obj;
 
 	tl_sub = weston_log_subscription_get_data(sub);
-	sub_obj = weston_timeline_subscription_surface_ensure(tl_sub, surface);
-	check_weston_surface_description(sub, surface, tl_sub, sub_obj);
+	sub_obj = check_weston_surface_description(sub, surface, tl_sub);
 
-	assert(sub_obj->id != 0);
 	fprintf(ctx->cur, "\"ws\":%u", sub_obj->id);
-
 	return 1;
 }
 
