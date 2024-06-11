@@ -163,9 +163,13 @@ check-commit:
 
 base-container-pre:
   rules:
+    # this run always in merge request
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: always
-    # default, only run by default on MR.
+    # run always on main to allow docs to publish
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_PROJECT_PATH == "wayland/weston" && $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+      when: always
+    # allow to run manually in a branch
     - when: manual
   stage: "Pre Base container"
   script: echo "exit 0"
