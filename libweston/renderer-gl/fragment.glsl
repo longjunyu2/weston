@@ -102,12 +102,11 @@ yuva2rgba(vec4 yuva)
 
 	/* ITU-R BT.601 & BT.709 quantization (limited range) */
 
-	/* Y = 255/219 * (x - 16/256) */
-	Y = 1.16438356 * (yuva.x - 0.0625);
+	Y = 255.0/219.0 * (yuva.x - 16.0/255.0);
 
-	/* Remove offset 128/256, but the 255/224 multiplier comes later */
-	su = yuva.y - 0.5;
-	sv = yuva.z - 0.5;
+	/* Remove offset 128/255, but the 255/224 multiplier comes later */
+	su = yuva.y - 128.0/255.0;
+	sv = yuva.z - 128.0/255.0;
 
 	/*
 	 * ITU-R BT.601 encoding coefficients (inverse), with the
