@@ -2527,9 +2527,9 @@ gl_format_from_internal(GLenum internal_format)
 }
 
 static void
-gl_renderer_flush_damage_internal(struct weston_surface *surface,
-				  bool just_accumulate)
+gl_renderer_flush_damage(struct weston_paint_node *pnode)
 {
+	struct weston_surface *surface = pnode->surface;
 	const struct weston_testsuite_quirks *quirks =
 		&surface->compositor->test_data.test_quirks;
 	struct weston_buffer *buffer = surface->buffer_ref.buffer;
@@ -2544,7 +2544,7 @@ gl_renderer_flush_damage_internal(struct weston_surface *surface,
 	pixman_region32_union(&gb->texture_damage,
 			      &gb->texture_damage, &surface->damage);
 
-	if (just_accumulate)
+	if (pnode->plane != &pnode->output->primary_plane)
 		return;
 
 	/* This can happen if a SHM wl_buffer gets destroyed before we flush
@@ -2622,23 +2622,6 @@ done:
 	weston_buffer_reference(&gs->buffer_ref, buffer,
 				BUFFER_WILL_NOT_BE_ACCESSED);
 	weston_buffer_release_reference(&gs->buffer_release_ref, NULL);
-}
-
-static void
-gl_renderer_flush_damage(struct weston_paint_node *pnode)
-{
-	bool just_accumulate = false;
-
-	/* Avoid upload, if the texture won't be used this time.
-	 * We still accumulate the damage in texture_damage, and
-	 * hold the reference to the buffer, in case the surface
-	 * migrates back to the primary plane.
-	 */
-	if (pnode->plane != &pnode->output->primary_plane)
-		just_accumulate = true;
-
-	gl_renderer_flush_damage_internal(pnode->surface,
-					  just_accumulate);
 }
 
 static void
@@ -3597,10 +3580,10 @@ gl_renderer_attach_solid(struct weston_surface *surface,
 }
 
 static void
-gl_renderer_attach_internal(struct weston_surface *es,
-			    struct weston_buffer *buffer,
-			    struct weston_paint_node *direct_pnode)
+gl_renderer_attach(struct weston_paint_node *pnode)
 {
+	struct weston_surface *es = pnode->surface;
+	struct weston_buffer *buffer = es->buffer_ref.buffer;
 	struct gl_surface_state *gs = get_surface_state(es);
 
 	if (gs->buffer_ref.buffer == buffer)
@@ -3625,8 +3608,8 @@ gl_renderer_attach_internal(struct weston_surface *es,
 	if (!buffer)
 		goto out;
 
-	if (direct_pnode) {
-		attach_direct_display_placeholder(direct_pnode);
+	if (pnode->is_direct) {
+		attach_direct_display_placeholder(pnode);
 		goto success;
 	}
 
@@ -3683,18 +3666,6 @@ gl_renderer_buffer_init(struct weston_compositor *etc,
 	buffer->renderer_private = gb;
 	gb->destroy_listener.notify = handle_buffer_destroy;
 	wl_signal_add(&buffer->destroy_signal, &gb->destroy_listener);
-}
-
-static void
-gl_renderer_attach(struct weston_paint_node *pnode)
-{
-	struct weston_surface *es = pnode->surface;
-	struct weston_buffer *buffer = es->buffer_ref.buffer;
-
-	if (pnode->is_direct)
-		gl_renderer_attach_internal(es, buffer, pnode);
-	else
-		gl_renderer_attach_internal(es, buffer, NULL);
 }
 
 static uint32_t

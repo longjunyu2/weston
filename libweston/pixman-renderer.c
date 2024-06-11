@@ -730,9 +730,10 @@ pixman_renderer_surface_set_color(struct weston_surface *es,
 }
 
 static void
-pixman_renderer_attach_internal(struct weston_surface *es,
-				struct weston_buffer *buffer)
+pixman_renderer_attach(struct weston_paint_node *pnode)
 {
+	struct weston_surface *es = pnode->surface;
+	struct weston_buffer *buffer = pnode->surface->buffer_ref.buffer;
 	struct pixman_surface_state *ps = get_surface_state(es);
 	struct wl_shm_buffer *shm_buffer;
 	const struct pixel_format_info *pixel_info;
@@ -804,15 +805,6 @@ pixman_renderer_attach_internal(struct weston_surface *es,
 		buffer_state_handle_buffer_destroy;
 	wl_signal_add(&buffer->destroy_signal,
 		      &ps->buffer_destroy_listener);
-}
-
-static void
-pixman_renderer_attach(struct weston_paint_node *pnode)
-{
-	struct weston_surface *es = pnode->surface;
-	struct weston_buffer *buffer = pnode->surface->buffer_ref.buffer;
-
-	pixman_renderer_attach_internal(es, buffer);
 }
 
 static void
