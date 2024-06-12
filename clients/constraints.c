@@ -540,10 +540,10 @@ shm_pool_get_buffer(struct shm_pool *pool, const struct surface *surface)
 	if (buffer && !buffer->used)
 		return buffer;
 
+	buffer = NULL;
 	for (i = 0; i < ARRAY_LENGTH(pool->buffers); i++) {
 		if (!pool->buffers[i].used) {
 			buffer = &pool->buffers[i];
-			buffer->used = true;
 			/* ARRAY_LENGTH(pool->buffers) is a factor of pool->size */
 			offset = pool->size / ARRAY_LENGTH(pool->buffers) * i;
 			break;
@@ -576,7 +576,6 @@ shm_pool_get_buffer(struct shm_pool *pool, const struct surface *surface)
 		    CAIRO_STATUS_SUCCESS) {
 			fprintf(stderr, "cairo failed to create surface\n");
 			wl_buffer_destroy(buffer->wl_buffer);
-			buffer->used = false;
 			buffer->data = NULL;
 			return NULL;
 		}
@@ -604,7 +603,7 @@ shm_pool_deinit(const struct shm_pool *pool)
 	for (i = 0; i < ARRAY_LENGTH(pool->buffers); i++) {
 		const struct buffer *b = &pool->buffers[i];
 
-		if (b->used) {
+		if (b->wl_buffer) {
 			wl_buffer_destroy(b->wl_buffer);
 			cairo_surface_destroy(b->cairo_surface);
 		}
@@ -719,6 +718,7 @@ surface_redraw(struct surface *surface)
 		surface_draw_line(surface, surface->constraints->state);
 		surface->needs_redraw = false;
 
+		buffer->used = true;
 		wl_surface_attach(surface->wl_surface, buffer->wl_buffer, 0, 0);
 		wl_surface_damage(surface->wl_surface, 0, 0, surface->width, surface->height);
 	}
