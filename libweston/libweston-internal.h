@@ -556,7 +556,8 @@ struct weston_paint_node {
 	bool surf_xform_valid;
 
 	uint32_t try_view_on_plane_failure_reasons;
-	bool is_opaque;
+	bool is_fully_opaque;
+	bool is_fully_blended;
 	bool is_direct;
 	bool draw_solid;
 	struct weston_solid_buffer_values solid;

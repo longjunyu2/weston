@@ -114,6 +114,10 @@ subsurface_committed(struct weston_surface *surface,
 static void
 weston_view_geometry_dirty_internal(struct weston_view *view);
 
+static bool
+weston_view_is_fully_blended(struct weston_view *ev,
+			     pixman_region32_t *region);
+
 static void
 weston_view_dirty_paint_nodes(struct weston_view *view)
 {
@@ -137,7 +141,8 @@ weston_view_dirty_paint_nodes(struct weston_view *view)
 		 * when moving a non-opaque surface on a plane, like
 		 * the mouse cursor.
 		 */
-		if (node->plane == &node->output->primary_plane || node->is_opaque)
+		if (node->plane == &node->output->primary_plane ||
+		    !node->is_fully_blended)
 			node->status |= PAINT_NODE_VISIBILITY_DIRTY;
 	}
 }
@@ -215,7 +220,8 @@ maybe_replace_paint_node(struct weston_paint_node *pnode)
 	if (buffer->direct_display) {
 		pnode->draw_solid = true;
 		pnode->is_direct = true;
-		pnode->is_opaque = true;
+		pnode->is_fully_opaque = true;
+		pnode->is_fully_blended = false;
 		pnode->solid = placeholder_color;
 		return;
 	}
@@ -225,7 +231,8 @@ maybe_replace_paint_node(struct weston_paint_node *pnode)
 
 	if (recording_censor || unprotected_censor) {
 		pnode->draw_solid = true;
-		pnode->is_opaque = true;
+		pnode->is_fully_opaque = true;
+		pnode->is_fully_blended = false;
 		pnode->solid = placeholder_color;
 	}
 }
@@ -251,8 +258,10 @@ paint_node_update_early(struct weston_paint_node *pnode)
 
 		pnode->valid_transform = weston_matrix_to_transform(mat,
 								    &pnode->transform);
-		pnode->is_opaque = weston_view_is_opaque(pnode->view,
-							 &pnode->view->transform.boundingbox);
+		pnode->is_fully_opaque = weston_view_is_opaque(pnode->view,
+							       &pnode->view->transform.boundingbox);
+		pnode->is_fully_blended = weston_view_is_fully_blended(pnode->view,
+								       &pnode->view->transform.boundingbox);
 	}
 
 	pnode->status &= ~(PAINT_NODE_VIEW_DIRTY | PAINT_NODE_OUTPUT_DIRTY);
@@ -2267,6 +2276,21 @@ weston_view_is_opaque(struct weston_view *ev, pixman_region32_t *region)
 	pixman_region32_fini(&r);
 
 	return ret;
+}
+
+static bool
+weston_view_is_fully_blended(struct weston_view *ev, pixman_region32_t *region)
+{
+	if (ev->alpha < 1.0)
+		return true;
+
+	if (ev->surface->is_opaque)
+		return false;
+
+	if (ev->transform.dirty)
+		return false;
+
+	return !pixman_region32_not_empty(&ev->transform.opaque);
 }
 
 /** Check if the view has a valid buffer available
