@@ -183,7 +183,7 @@ error_exit(j_common_ptr cinfo)
 static struct weston_image *
 load_jpeg(FILE *fp, uint32_t image_load_flags)
 {
-	struct weston_image *volatile image;
+	struct weston_image *volatile image = NULL;
 	struct jpeg_decompress_struct cinfo;
 	struct jpeg_error_mgr jerr;
 	struct jpeg_image_data jpeg_image_data = { 0 };
