@@ -110,8 +110,8 @@ swizzle_row(JSAMPLE *row, JDIMENSION width)
 }
 
 struct jpeg_image_data {
-	JSAMPLE *data;
-	bool all_data_read;
+	JSAMPLE *volatile data;
+	bool volatile all_data_read;
 };
 
 static pixman_image_t *
@@ -183,7 +183,7 @@ error_exit(j_common_ptr cinfo)
 static struct weston_image *
 load_jpeg(FILE *fp, uint32_t image_load_flags)
 {
-	struct weston_image *image;
+	struct weston_image *volatile image;
 	struct jpeg_decompress_struct cinfo;
 	struct jpeg_error_mgr jerr;
 	struct jpeg_image_data jpeg_image_data = { 0 };
@@ -411,7 +411,7 @@ load_png_icc(FILE *fp, png_struct *png, png_info *info,
 static struct weston_image *
 load_png(FILE *fp, uint32_t image_load_flags)
 {
-	struct weston_image *image = NULL;
+	struct weston_image *volatile image = NULL;
 	struct png_image_data png_image_data = { 0 };
 	png_struct *png;
 	png_info *info;
