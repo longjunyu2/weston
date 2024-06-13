@@ -2848,6 +2848,9 @@ weston_buffer_from_resource(struct weston_compositor *ec,
 		buffer->type = WESTON_BUFFER_RENDERER_OPAQUE;
 	}
 
+	if (ec->renderer->buffer_init)
+		ec->renderer->buffer_init(ec, buffer);
+
 	/* Don't accept any formats we can't reason about: the importer should
 	 * make sure this never happens */
 	assert(buffer->pixel_format);

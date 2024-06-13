@@ -99,6 +99,9 @@ struct weston_renderer {
 	bool (*fill_buffer_info)(struct weston_compositor *ec,
 				 struct weston_buffer *buffer);
 
+	void (*buffer_init)(struct weston_compositor *ec,
+			    struct weston_buffer *buffer);
+
 	enum weston_renderer_type type;
 	const struct gl_renderer_interface *gl;
 	const struct pixman_renderer_interface *pixman;

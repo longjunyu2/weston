@@ -3335,25 +3335,10 @@ gl_renderer_attach_dmabuf(struct weston_surface *surface,
 	struct gl_renderer *gr = get_renderer(surface->compositor);
 	struct gl_surface_state *gs = get_surface_state(surface);
 	struct gl_buffer_state *gb;
-	struct linux_dmabuf_buffer *dmabuf = buffer->dmabuf;
 	GLenum target;
 	int i;
 
-	/* Thanks to linux-dmabuf being totally independent of libweston,
-	 * the first time a dmabuf is attached, the gl_buffer_state will
-	 * only be set as userdata on the dmabuf, not on the weston_buffer.
-	 * When this happens, steal it away into the weston_buffer. */
-	if (!buffer->renderer_private) {
-		gb = linux_dmabuf_buffer_get_user_data(dmabuf);
-		assert(gb);
-		linux_dmabuf_buffer_set_user_data(dmabuf, NULL, NULL);
-		buffer->renderer_private = gb;
-		gb->destroy_listener.notify = handle_buffer_destroy;
-		wl_signal_add(&buffer->destroy_signal, &gb->destroy_listener);
-	}
-
 	assert(buffer->renderer_private);
-	assert(linux_dmabuf_buffer_get_user_data(dmabuf) == NULL);
 	gb = buffer->renderer_private;
 
 	gs->buffer = gb;
@@ -3518,6 +3503,27 @@ out:
 	weston_buffer_reference(&gs->buffer_ref, NULL,
 				BUFFER_WILL_NOT_BE_ACCESSED);
 	weston_buffer_release_reference(&gs->buffer_release_ref, NULL);
+}
+
+static void
+gl_renderer_buffer_init(struct weston_compositor *etc,
+			struct weston_buffer *buffer)
+{
+	struct gl_buffer_state *gb;
+
+	if (buffer->type != WESTON_BUFFER_DMABUF)
+		return;
+
+	/* Thanks to linux-dmabuf being totally independent of libweston,
+	 * the gl_buffer_state willonly be set as userdata on the dmabuf,
+	 * not on the weston_buffer. Steal it away into the weston_buffer. */
+	assert(!buffer->renderer_private);
+	gb = linux_dmabuf_buffer_get_user_data(buffer->dmabuf);
+	assert(gb);
+	linux_dmabuf_buffer_set_user_data(buffer->dmabuf, NULL, NULL);
+	buffer->renderer_private = gb;
+	gb->destroy_listener.notify = handle_buffer_destroy;
+	wl_signal_add(&buffer->destroy_signal, &gb->destroy_listener);
 }
 
 static void
@@ -4177,6 +4183,7 @@ gl_renderer_display_create(struct weston_compositor *ec,
 	gr->base.destroy = gl_renderer_destroy;
 	gr->base.surface_copy_content = gl_renderer_surface_copy_content;
 	gr->base.fill_buffer_info = gl_renderer_fill_buffer_info;
+	gr->base.buffer_init = gl_renderer_buffer_init;
 	gr->base.type = WESTON_RENDERER_GL;
 
 	if (gl_renderer_setup_egl_display(gr, options->egl_native_display) < 0)
