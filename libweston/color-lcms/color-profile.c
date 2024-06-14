@@ -311,6 +311,21 @@ ensure_output_profile_extract(struct cmlcms_color_profile *cprof,
 	return ret;
 }
 
+static const char *
+icc_profile_class_name(cmsProfileClassSignature s)
+{
+	switch (s) {
+	case cmsSigInputClass: return "Input";
+	case cmsSigDisplayClass: return "Display";
+	case cmsSigOutputClass: return "Output";
+	case cmsSigLinkClass: return "Link";
+	case cmsSigAbstractClass: return "Abstract";
+	case cmsSigColorSpaceClass: return "ColorSpace";
+	case cmsSigNamedColorClass: return "NamedColor";
+	default: return "(unknown)";
+	}
+}
+
 /* FIXME: sync with spec! */
 static bool
 validate_icc_profile(struct lcmsProfilePtr profile, char **errmsg)
@@ -318,6 +333,7 @@ validate_icc_profile(struct lcmsProfilePtr profile, char **errmsg)
 	cmsColorSpaceSignature cs = cmsGetColorSpace(profile.p);
 	uint32_t nr_channels = cmsChannelsOf(cs);
 	uint8_t version = cmsGetEncodedICCversion(profile.p) >> 24;
+	cmsProfileClassSignature class_sig = cmsGetDeviceClass(profile.p);
 
 	if (version != 2 && version != 4) {
 		str_printf(errmsg,
@@ -333,8 +349,10 @@ validate_icc_profile(struct lcmsProfilePtr profile, char **errmsg)
 		return false;
 	}
 
-	if (cmsGetDeviceClass(profile.p) != cmsSigDisplayClass) {
-		str_printf(errmsg, "ICC profile is required to be of Display device class, but it is not.");
+	if (class_sig != cmsSigDisplayClass) {
+		str_printf(errmsg, "ICC profile is required to be of Display device class, "
+				   "but it is %s class (0x%08x)",
+			   icc_profile_class_name(class_sig), (unsigned)class_sig);
 		return false;
 	}
 
