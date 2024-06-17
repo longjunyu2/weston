@@ -1665,7 +1665,8 @@ repaint_views(struct weston_output *output, pixman_region32_t *damage)
 
 	wl_list_for_each_reverse(pnode, &output->paint_node_z_order_list,
 				 z_order_link) {
-		if (pnode->plane == &output->primary_plane)
+		if (pnode->plane == &output->primary_plane ||
+		    pnode->need_hole)
 			draw_paint_node(pnode, damage);
 	}
 

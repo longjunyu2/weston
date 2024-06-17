@@ -225,6 +225,15 @@ maybe_replace_paint_node(struct weston_paint_node *pnode)
 		pnode->solid = placeholder_color;
 		return;
 	}
+	if (pnode->need_hole) {
+		pnode->draw_solid = true;
+		pnode->is_fully_opaque = true;
+		pnode->is_fully_blended = false;
+		pnode->solid = (struct weston_solid_buffer_values) {
+			               0.0, 0.0, 0.0, 0.0
+		               };
+		return;
+	}
 	if (surface->protection_mode !=
 	    WESTON_SURFACE_PROTECTION_MODE_ENFORCED)
 		return;
