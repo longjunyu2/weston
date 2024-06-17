@@ -3601,8 +3601,13 @@ weston_output_flush_damage_for_plane(struct weston_output *output,
 
 	wl_list_for_each(pnode, &output->paint_node_z_order_list,
 			 z_order_link) {
-		if (pnode->plane != plane)
-			continue;
+		if (pnode->plane != plane) {
+			if (plane != &output->primary_plane)
+				continue;
+			/* For primary plane, add the damage of nodes need holes. */
+			if (!pnode->need_hole)
+				continue;
+		}
 		changed = true;
 
 		/* We can safely clip paint node damage to visible region
