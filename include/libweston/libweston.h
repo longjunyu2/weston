@@ -347,6 +347,7 @@ enum weston_transfer_function {
 	WESTON_TF_LOG_316,
 	WESTON_TF_XVYCC,
 	WESTON_TF_HLG,
+	WESTON_TF_POWER,
 };
 
 enum weston_color_characteristics_groups {

@@ -107,6 +107,11 @@ struct weston_color_tf_info {
 
         /** CM&HDR protocol extension value representing the tf. */
         uint32_t protocol_tf;
+
+	/* The protocol also has support for parameterized functions, i.e.
+	 * certain known functions that clients can define passing arbitrary
+	 * parameters. */
+	bool has_parameters;
 };
 
 const struct weston_color_feature_info *

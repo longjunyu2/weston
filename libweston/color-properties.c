@@ -40,6 +40,11 @@
 
 #include "color-management-v1-server-protocol.h"
 
+enum tf_has_parameters {
+        YES_PARAMETERS = true,
+        NO_PARAMETERS = false,
+};
+
 static const struct weston_color_feature_info color_feature_info_table[] = {
 	{
 		.feature = WESTON_COLOR_FEATURE_ICC,
@@ -254,72 +259,91 @@ static const struct weston_color_tf_info color_tf_info_table[] = {
 		.tf = WESTON_TF_LINEAR,
 		.desc = "Linear transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_LINEAR,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_GAMMA22,
 		.desc = "Assumed display gamma 2.2 transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_GAMMA22,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_GAMMA28,
 		.desc = "Assumed display gamma 2.8 transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_GAMMA28,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_SRGB,
 		.desc = "sRGB piece-wise transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_SRGB,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_EXT_SRGB,
 		.desc = "Extended sRGB piece-wise transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_EXT_SRGB,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_BT709,
 		.desc = "BT.709 transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_BT709,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_BT1361,
 		.desc = "BT.1361 extended transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_BT1361,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_ST240,
 		.desc = "SMPTE ST 240 transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_ST240,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_ST428,
 		.desc = "SMPTE ST 428 transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_ST428,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_ST2084_PQ,
 		.desc = "Perceptual quantizer transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_ST2084_PQ,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_LOG_100,
 		.desc = "Logarithmic 100:1 transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_LOG_100,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_LOG_316,
 		.desc = "Logarithmic (100*Sqrt(10) : 1) transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_LOG_316,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_XVYCC,
 		.desc = "IEC 61966-2-4 transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_XVYCC,
+		.has_parameters = NO_PARAMETERS,
 	},
 	{
 		.tf = WESTON_TF_HLG,
 		.desc = "Hybrid log-gamma transfer function",
 		.protocol_tf = XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_HLG,
+		.has_parameters = NO_PARAMETERS,
 	},
+        {
+		.tf = WESTON_TF_POWER,
+		.desc = "Parameterized power-law transfer function",
+		.has_parameters = YES_PARAMETERS,
+        },
 };
 
 WL_EXPORT const struct weston_color_feature_info *
