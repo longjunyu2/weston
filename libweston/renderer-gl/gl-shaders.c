@@ -219,7 +219,7 @@ create_shader_description_string(const struct gl_shader_requirements *req)
 	char *str;
 
 	size = asprintf(&str, "%s %s %s %s %s %cinput_is_premult %cgreen",
-			gl_shader_texcoord_input_to_string(req->variant),
+			gl_shader_texcoord_input_to_string(req->texcoord_input),
 			gl_shader_texture_variant_to_string(req->variant),
 			gl_shader_color_curve_to_string(req->color_pre_curve),
 			gl_shader_color_mapping_to_string(req->color_mapping),
