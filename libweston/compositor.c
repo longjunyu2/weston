@@ -2761,7 +2761,21 @@ weston_buffer_destroy_handler(struct wl_listener *listener, void *data)
 		container_of(listener, struct weston_buffer, destroy_listener);
 
 	buffer->resource = NULL;
-	buffer->shm_buffer = NULL;
+	/* wayland-server will destroy the SHM/dmabuf/legacy wl_buffer after we
+	 * return. */
+	switch (buffer->type) {
+	case WESTON_BUFFER_SHM:
+		buffer->shm_buffer = NULL;
+		break;
+	case WESTON_BUFFER_DMABUF:
+		buffer->dmabuf = NULL;
+		break;
+	case WESTON_BUFFER_SOLID:
+		break;
+	case WESTON_BUFFER_RENDERER_OPAQUE:
+		buffer->legacy_buffer = NULL;
+		break;
+	}
 
 	if (buffer->busy_count + buffer->passive_count > 0)
 		return;
