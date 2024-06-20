@@ -341,7 +341,7 @@ to_weston_coordinate(RdpPeerContext *peerContext, int32_t *x, int32_t *y)
 
 		if (rdp_head_contains(head, sx, sy)) {
 			struct weston_output *output = head->base.output;
-			float scale = 1.0f / head->base.output->scale;
+			float scale = 1.0f / head->base.output->current_scale;
 
 			sx -= head->config.x;
 			sy -= head->config.y;
