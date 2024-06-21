@@ -82,6 +82,10 @@ to ship a file containing a certificate.
 \fB\-\-vnc\-tls\-cert\fR=\fIfile\fR
 The file containing the certificate for doing TLS security. To have TLS security you also need
 to ship a key file.
+.TP
+\fB\-\-disable\-transport\-layer\-security
+Disable Transport Layer Security. If specified, VNC will be enabled with password-only
+authentication. This option is not recommended, as it creates security risk.
 
 
 .\" ***************************************************************
