@@ -777,6 +777,11 @@ pixman_renderer_attach_internal(struct weston_surface *es,
 	}
 
 	shm_buffer = buffer->shm_buffer;
+	/* This can happen if a SHM wl_buffer gets destroyed before we attach,
+	 * because wayland-server just nukes the wl_shm_buffer from underneath
+	 * us. */
+	if (!shm_buffer)
+		return;
 
 	pixel_info = pixel_format_get_info_shm(wl_shm_buffer_get_format(shm_buffer));
 	if (!pixel_info || !pixman_format_supported_source(pixel_info->pixman_format)) {
