@@ -1,2 +1,9 @@
 #!/bin/sh
-@DOXYGEN_CMD@ @DOXYGEN_CONF@ && @SPHINX_CMD@ -E -W -q -j auto -d @DOCTREES_DIR@ @SRCDIR@ @OUTDIR@
+
+if [ "@MESON_WERROR@" = "YES" ]; then
+	SPHINX_WERROR="-W"
+else
+	SPHINX_WERROR=""
+fi
+
+@DOXYGEN_CMD@ @DOXYGEN_CONF@ && @SPHINX_CMD@ $SPHINX_WERROR -E -q -j auto -d @DOCTREES_DIR@ @SRCDIR@ @OUTDIR@
