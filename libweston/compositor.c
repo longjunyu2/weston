@@ -10189,6 +10189,7 @@ weston_compositor_load_backend(struct weston_compositor *compositor,
 		return NULL;
 
 	b = wl_container_of(compositor->backend_list.next, b, link);
+	b->backend_type = backend;
 
 	/* Return the last loaded backend. */
 	return b;
@@ -10455,4 +10456,22 @@ weston_output_finish_frame_from_timer(struct weston_output *output)
 		ts = now;
 
 	weston_output_finish_frame(output, &ts, 0);
+}
+
+/** Retrieve the backend type of as described in enum
+ * weston_compositor_backend. 
+ *
+ * Note that the backend must be loaded, with weston_compositor_load_backend
+ *
+ * \param backend weston_backend in question
+ * \returns a type of enum weston_compositor_backend
+ *
+ * \sa weston_compositor_load_backend
+ *
+ */
+WL_EXPORT enum weston_compositor_backend
+weston_get_backend_type(struct weston_backend *backend)
+{
+	assert(backend);
+	return backend->backend_type;
 }

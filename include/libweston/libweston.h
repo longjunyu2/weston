@@ -2202,6 +2202,8 @@ void
 weston_output_schedule_repaint_reset(struct weston_output *output);
 void
 weston_output_schedule_repaint_restart(struct weston_output *output);
+enum weston_compositor_backend
+weston_get_backend_type(struct weston_backend *backend);
 void
 weston_compositor_schedule_repaint(struct weston_compositor *compositor);
 void

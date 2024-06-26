@@ -129,6 +129,11 @@ struct weston_backend {
 	 */
 	bool (*can_scanout_dmabuf)(struct weston_backend *backend,
 				   struct linux_dmabuf_buffer *buffer);
+
+	/** Identifies a particular backend_type from one
+	 * defined in weston_compositor_backend.
+	 */
+	enum weston_compositor_backend backend_type;
 };
 
 /* weston_head */
