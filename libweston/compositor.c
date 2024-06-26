@@ -4036,16 +4036,23 @@ static void
 idle_repaint(void *data)
 {
 	struct weston_output *output = data;
+	struct weston_compositor *compositor = output->compositor;
 	int ret;
 
 	assert(output->repaint_status == REPAINT_BEGIN_FROM_IDLE);
 	output->repaint_status = REPAINT_AWAITING_COMPLETION;
 	output->idle_repaint_source = NULL;
-	ret = output->start_repaint_loop(output);
-	if (ret == -EBUSY)
-		weston_output_schedule_repaint_restart(output);
-	else if (ret != 0)
+
+	if (compositor->state == WESTON_COMPOSITOR_SLEEPING ||
+	    compositor->state == WESTON_COMPOSITOR_OFFSCREEN)
 		weston_output_schedule_repaint_reset(output);
+	else {
+		ret = output->start_repaint_loop(output);
+		if (ret == -EBUSY)
+			weston_output_schedule_repaint_restart(output);
+		else if (ret != 0)
+			weston_output_schedule_repaint_reset(output);
+	}
 }
 
 WL_EXPORT void
