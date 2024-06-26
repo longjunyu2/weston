@@ -50,3 +50,6 @@ int
 wet_output_set_colorimetry_mode(struct weston_output *output,
 				struct weston_config_section *section,
 				bool have_color_manager);
+
+typedef void (*wet_head_additional_setup)(struct weston_head *head,
+					  struct weston_head *head_to_mirror);

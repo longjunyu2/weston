@@ -1869,7 +1869,9 @@ weston_output_lazy_align(struct weston_output *output)
 
 static void
 simple_head_enable(struct wet_compositor *wet, struct wet_backend *wb,
-		   struct weston_head *head)
+		   struct weston_head *head, struct weston_head *head_to_mirror,
+		   wet_head_additional_setup wet_head_pre_enable,
+		   wet_head_additional_setup wet_head_post_enable)
 {
 	struct weston_output *output;
 	int ret = 0;
@@ -1884,7 +1886,10 @@ simple_head_enable(struct wet_compositor *wet, struct wet_backend *wb,
 		return;
 	}
 
-	weston_output_lazy_align(output);
+	if (wet_head_pre_enable && head_to_mirror)
+		wet_head_pre_enable(head, head_to_mirror);
+	else
+		weston_output_lazy_align(output);
 
 	if (wb->simple_output_configure)
 		ret = wb->simple_output_configure(output);
@@ -1905,6 +1910,9 @@ simple_head_enable(struct wet_compositor *wet, struct wet_backend *wb,
 
 		return;
 	}
+
+	if (wet_head_post_enable && head)
+		wet_head_post_enable(head, head_to_mirror);
 
 	wet_head_tracker_create(wet, head);
 
@@ -1958,7 +1966,7 @@ simple_heads_changed(struct wl_listener *listener, void *arg)
 		non_desktop = weston_head_is_non_desktop(head);
 
 		if (connected && !enabled && !non_desktop) {
-			simple_head_enable(wet, wb, head);
+			simple_head_enable(wet, wb, head, NULL, NULL, NULL);
 		} else if (!connected && enabled) {
 			simple_head_disable(head);
 		} else if (enabled && changed) {
