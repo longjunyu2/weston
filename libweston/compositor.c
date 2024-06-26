@@ -7247,10 +7247,6 @@ weston_head_get_destroy_listener(struct weston_head *head,
 	return wl_signal_get(&head->destroy_signal, notify);
 }
 
-static void
-weston_output_set_position(struct weston_output *output,
-			   struct weston_coord_global pos);
-
 /* Move other outputs when one is resized so the space remains contiguous. */
 static void
 weston_compositor_reflow_outputs(struct weston_compositor *compositor,
@@ -7345,7 +7341,7 @@ weston_output_init_geometry(struct weston_output *output,
 /**
  * \ingroup output
  */
-static void
+WL_EXPORT void
 weston_output_set_position(struct weston_output *output,
 			   struct weston_coord_global pos)
 {

@@ -2820,6 +2820,14 @@ weston_compositor_add_screenshot_authority(struct weston_compositor *compositor,
 int
 weston_compositor_backends_loaded(struct weston_compositor *compositor);
 
+void
+weston_output_set_position(struct weston_output *output,
+			   struct weston_coord_global pos);
+
+int
+weston_output_mode_set_native(struct weston_output *output,
+			      struct weston_mode *mode,
+			      int32_t scale);
 #ifdef  __cplusplus
 }
 #endif

@@ -151,6 +151,7 @@ struct wet_compositor {
 	bool use_color_manager;
 	bool drm_backend_loaded;
 	struct wl_listener screenshot_auth;
+	struct wl_listener output_created_listener;
 	enum require_outputs require_outputs;
 };
 
@@ -1681,6 +1682,135 @@ allow_content_protection(struct weston_output *output,
 	weston_output_allow_protection(output, allow_hdcp);
 }
 
+static int
+wet_config_find_output_mirror(struct weston_output *output,
+				 struct wet_compositor *wet,
+				 char **mirror_key_value,
+				 char **mirror_output_name,
+				 struct weston_config_section **section)
+{
+	const char *section_name;
+	int ret = 0;
+
+	while (weston_config_next_section(wet->config, section, &section_name)) {
+		char *output_name = NULL;
+		char *mirror_of_key = NULL;
+
+		/* ignore sections we're not interested in */
+		if (strcmp(section_name, "output"))
+			continue;
+
+		weston_config_section_get_string(*section, "mirror-of",
+						 &mirror_of_key, NULL);
+
+		/* ignore outputs which do not have the mirror of key */
+		if (!mirror_of_key)
+			continue;
+
+		*mirror_key_value = mirror_of_key;
+		weston_config_section_get_string(*section, "name",
+						 &output_name, NULL);
+
+		if (output_name) {
+			*mirror_output_name = output_name;
+			goto out;
+		}
+
+		free(output_name);
+	}
+
+	ret = -1;
+out:
+	return ret;
+}
+
+static struct weston_head *
+wet_head_find_by_name(struct wet_compositor *wet, const char *name)
+{
+	struct weston_head *it = NULL;
+	struct weston_head *head_found = NULL;
+
+	while ((it = weston_compositor_iterate_heads(wet->compositor, it))) {
+		if (!strcmp(it->name, name)) {
+			head_found = it;
+			break;
+		}
+	}
+
+	return head_found;
+}
+
+
+static struct wet_backend *
+wet_get_backend_from_head(struct wet_compositor *wet, struct weston_head *head)
+{
+	struct wet_backend *b = NULL;
+	wl_list_for_each(b, &wet->backend_list, compositor_link)
+		if (b->backend == head->backend)
+			return b;
+
+	return NULL;
+}
+
+static struct weston_head *
+wet_config_find_head_to_mirror(struct weston_output *output,
+			       struct wet_compositor *wet)
+{
+	struct weston_head *head = NULL;
+	struct weston_config_section *section = NULL;
+
+	do {
+		char *mof_name = NULL;
+		char *remote_output_name = NULL;
+
+		/* do we have a mirror-of key at all? */
+		if (wet_config_find_output_mirror(output, wet, &mof_name,
+						  &remote_output_name,
+						  &section))
+			break;
+
+		assert(mof_name);
+
+		/* do we have a matching output between signal event and the
+		 * output to mirror ? */
+		if (strcmp(mof_name, output->name)) {
+			free(mof_name);
+			free(remote_output_name);
+			continue;
+		}
+
+		/* grab the output name of this 'remote_output_name' */
+		head = wet_head_find_by_name(wet, remote_output_name);
+
+		free(mof_name);
+		free(remote_output_name);
+	} while (!head);
+
+	return head;
+}
+
+static bool
+wet_config_head_has_mirror_of_entry(struct wet_compositor *wet, char *head_name)
+{
+	struct weston_config_section *section;
+
+	section = weston_config_get_section(wet->config, "output", "name", head_name);
+
+	if (section) {
+		char *mirror_of_key;
+
+		weston_config_section_get_string(section, "mirror-of",
+						 &mirror_of_key, NULL);
+
+		if (mirror_of_key) {
+			free(mirror_of_key);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static void
 parse_simple_mode(struct weston_output *output,
 		  struct weston_config_section *section, int *width,
@@ -1874,7 +2004,20 @@ simple_head_enable(struct wet_compositor *wet, struct wet_backend *wb,
 		   wet_head_additional_setup wet_head_post_enable)
 {
 	struct weston_output *output;
+	enum weston_compositor_backend backend_type;
 	int ret = 0;
+
+	backend_type = weston_get_backend_type(head->backend);
+
+	/* remote type of outputs: RDP/VNC/PipeWire that mirror out
+	 * a native one will be handled automatically with the help
+	 * of compositor outputs signals */
+	if ((backend_type == WESTON_BACKEND_RDP ||
+	     backend_type == WESTON_BACKEND_VNC ||
+	     backend_type == WESTON_BACKEND_PIPEWIRE) &&
+	     wet_config_head_has_mirror_of_entry(wet, head->name) &&
+	     !head_to_mirror)
+		return;
 
 	output = weston_compositor_create_output(wet->compositor, head,
 						 head->name);
@@ -2360,12 +2503,104 @@ static void
 wet_output_handle_destroy(struct wl_listener *listener, void *data)
 {
 	struct wet_output *output;
+	struct wet_compositor *wet;
+	struct weston_head *head = NULL;
 
 	output = wl_container_of(listener, output, output_destroy_listener);
 	assert(output->output == data);
 
+	wet = output->layoutput->compositor;
+	head = wet_config_find_head_to_mirror(output->output, wet);
+	if (head && !wet->compositor->shutting_down) {
+		simple_head_disable(head);
+	}
+
+
 	output->output = NULL;
 	wl_list_remove(&output->output_destroy_listener.link);
+}
+
+static void
+wet_output_overlap_pre_enable(struct weston_head *head,
+			      struct weston_head *head_to_mirror)
+{
+	weston_output_set_position(head->output, head_to_mirror->output->pos);
+}
+
+static void
+wet_output_compute_output_from_mirror(struct weston_output *output,
+				      struct weston_output *mirror,
+				      struct weston_mode *mode,
+				      int *scale)
+{
+	mode->width = output->native_mode_copy.width /
+			mirror->current_scale;
+
+	mode->height = output->native_mode_copy.height /
+			mirror->current_scale;
+
+	mode->refresh = output->native_mode_copy.refresh;
+	*scale = output->current_scale;
+}
+
+/*
+ * "A" is being a mirror-of output "B" then:
+ *
+ * - "A" defaults to scale=1, but the [output] section may define another
+ *   scale, or the remote backend may provide the scale from the client.
+ * - The resolution of "A" is determined from the desktop area of "B" and the
+ *   output scale of "A".
+ */
+static void
+wet_output_overlap_post_enable(struct weston_head *head,
+			       struct weston_head *head_to_mirror)
+{
+	struct weston_mode mode;
+	int scale = 1;
+
+	wet_output_compute_output_from_mirror(head_to_mirror->output,
+					      head->output, &mode, &scale);
+
+	weston_log("Setting modeline to output '%s' to %dx%d, scale: %d\n",
+			head->name, mode.width, mode.height, scale);
+
+	weston_output_mode_set_native(head->output, &mode, scale);
+}
+
+static void
+wet_output_handle_create(struct wl_listener *listener, void *data)
+{
+	struct wet_compositor *wet =
+		container_of(listener, struct wet_compositor, output_created_listener);
+	struct weston_output *output = data;
+	struct weston_head *head = NULL;
+	struct weston_head *head_to_mirror =
+		weston_output_get_first_head(output);
+
+	struct wet_backend *wb;
+
+	/* just ignore events from other remote backends */
+	switch (weston_get_backend_type(output->backend)) {
+	case WESTON_BACKEND_RDP:
+	case WESTON_BACKEND_VNC:
+	case WESTON_BACKEND_PIPEWIRE:
+		return;
+	default:
+		break;
+	}
+
+	head = wet_config_find_head_to_mirror(output, wet);
+	if (!head)
+		return;
+
+	wb = wet_get_backend_from_head(wet, head);
+	assert(wb);
+
+	simple_head_enable(wet, wb, head, head_to_mirror,
+			   wet_output_overlap_pre_enable,
+			   wet_output_overlap_post_enable);
+	weston_head_reset_device_changed(head);
+
 }
 
 static struct wet_output *
@@ -3944,6 +4179,15 @@ load_backends(struct weston_compositor *ec, const char *backends,
 	return 0;
 }
 
+static void
+wet_handle_mirror_outputs(struct wet_compositor *wet)
+{
+       wet->output_created_listener.notify = wet_output_handle_create;
+
+       wl_signal_add(&wet->compositor->output_created_signal,
+                     &wet->output_created_listener);
+}
+
 static char *
 copy_command_line(int argc, char * const argv[])
 {
@@ -4358,6 +4602,8 @@ wet_main(int argc, char *argv[], const struct weston_testsuite_data *test_data)
 	if (weston_compositor_backends_loaded(wet.compositor) < 0)
 		goto out;
 
+	wet_handle_mirror_outputs(&wet);
+
 	if (test_data && !check_compositor_capabilities(wet.compositor,
 				test_data->test_quirks.required_capabilities)) {
 		ret = WET_MAIN_RET_MISSING_CAPS;
@@ -4492,6 +4738,8 @@ out:
 	if (wet_xwl)
 		wet_xwayland_destroy(wet.compositor, wet_xwl);
 
+	if (wet.output_created_listener.notify)
+		wl_list_remove(&wet.output_created_listener.link);
 	weston_compositor_destroy(wet.compositor);
 	wet_compositor_destroy_layout(&wet);
 	weston_log_scope_destroy(protocol_scope);
