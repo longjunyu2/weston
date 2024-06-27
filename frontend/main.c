@@ -88,6 +88,8 @@ struct wet_layoutput;
 
 struct wet_head_tracker {
 	struct wl_listener head_destroy_listener;
+	struct wl_listener resized_listener;
+	struct wet_compositor *wet;
 };
 
 /** User data for each weston_output */
@@ -1905,6 +1907,9 @@ static void
 wet_head_tracker_destroy(struct wet_head_tracker *track)
 {
 	wl_list_remove(&track->head_destroy_listener.link);
+	if (track->resized_listener.notify)
+		wl_list_remove(&track->resized_listener.link);
+
 	free(track);
 }
 
@@ -2568,6 +2573,31 @@ wet_output_overlap_post_enable(struct weston_head *head,
 }
 
 static void
+simple_heads_output_sharing_resize(struct wl_listener *listener, void *data)
+{
+	struct weston_head *head = data;
+	struct weston_head *head_to_mirror = NULL;
+	struct weston_output *output;
+	struct wet_head_tracker *head_track =
+		container_of(listener, struct wet_head_tracker, resized_listener);
+	struct wet_compositor *wet = head_track->wet;
+	struct weston_mode mode;
+	int scale = 1;
+
+	output = weston_head_get_output(head);
+	head_to_mirror = wet_config_find_head_to_mirror(output, wet);
+	if (!head_to_mirror)
+		return;
+
+	weston_output_set_position(head_to_mirror->output, output->pos);
+
+	wet_output_compute_output_from_mirror(head->output,
+					      head_to_mirror->output,
+					      &mode, &scale);
+	weston_output_mode_set_native(head_to_mirror->output, &mode, scale);
+}
+
+static void
 wet_output_handle_create(struct wl_listener *listener, void *data)
 {
 	struct wet_compositor *wet =
@@ -2576,6 +2606,7 @@ wet_output_handle_create(struct wl_listener *listener, void *data)
 	struct weston_head *head = NULL;
 	struct weston_head *head_to_mirror =
 		weston_output_get_first_head(output);
+	struct wet_head_tracker *head_track;
 
 	struct wet_backend *wb;
 
@@ -2601,6 +2632,12 @@ wet_output_handle_create(struct wl_listener *listener, void *data)
 			   wet_output_overlap_post_enable);
 	weston_head_reset_device_changed(head);
 
+	head_track = wet_head_tracker_from_head(head);
+	head_track->wet = wet;
+	head_track->resized_listener.notify = simple_heads_output_sharing_resize;
+
+	wl_signal_add(&wet->compositor->output_resized_signal,
+		      &head_track->resized_listener);
 }
 
 static struct wet_output *
