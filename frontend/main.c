@@ -3544,7 +3544,7 @@ pipewire_backend_output_configure(struct weston_output *output)
 
 	weston_config_section_get_string(section, "gbm-format", &gbm_format, NULL);
 
-	weston_output_set_scale(output, 1);
+	wet_output_set_scale(output, section, 1, 0);
 	weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL);
 
 	api->set_gbm_format(output, gbm_format);
@@ -3641,12 +3641,16 @@ rdp_backend_output_configure(struct weston_output *output)
 	struct weston_head *head = NULL;
 	int scale = 1;
 	struct weston_mode new_mode = {};
+	struct weston_config_section *section = NULL;
 
 	head = weston_output_get_first_head(output);
 	if (!head) {
 		weston_log("RDP backend: Failed to get proper head for output %s\n", output->name);
 		return -1;
 	}
+
+	section = weston_config_get_section(wet_get_config(output->compositor),
+					    "output", "name", output->name);
 
 	api->head_get_monitor(head, &config);
 
@@ -3671,7 +3675,7 @@ rdp_backend_output_configure(struct weston_output *output)
 
 	api->output_set_mode(output, &new_mode);
 
-	weston_output_set_scale(output, scale);
+	wet_output_set_scale(output, section, scale, 0);
 	weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL);
 
 	weston_log("rdp_backend_output_configure.. Done\n");
@@ -3770,7 +3774,7 @@ vnc_backend_output_configure(struct weston_output *output)
 
 	weston_config_section_get_bool(section, "resizeable", &resizeable, true);
 
-	weston_output_set_scale(output, 1);
+	wet_output_set_scale(output, section, 1, 0);
 	weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL);
 
 	if (api->output_set_size(output, width, height, resizeable) < 0) {
