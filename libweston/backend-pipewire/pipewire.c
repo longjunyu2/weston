@@ -250,13 +250,6 @@ finish_frame_handler(void *data)
 {
 	struct pipewire_output *output = data;
 
-	/*
-	 * Skip weston_output_finish_frame() if the repaint state machine was
-	 * reset, e.g. by calling weston_compositor_sleep().
-	 */
-	if (output->base.repaint_status != REPAINT_AWAITING_COMPLETION)
-		return 1;
-
 	weston_output_finish_frame_from_timer(&output->base);
 
 	return 1;
