@@ -137,18 +137,8 @@ static int
 finish_frame_handler(void *data)
 {
 	struct headless_output *output = data;
-	struct timespec ts;
 
-	weston_compositor_read_presentation_clock(output->base.compositor, &ts);
-
-	/* If another output's repaint failed before this repaint finished,
-	 * this repaint will have been cancelled by now. In this case we cannot
-	 * go through finish_frame, because the repaint machinery does not
-	 * expect this. */
-	if (output->base.repaint_status != REPAINT_AWAITING_COMPLETION)
-		return -1;
-
-	weston_output_finish_frame(&output->base, &ts, 0);
+	weston_output_finish_frame_from_timer(&output->base);
 
 	return 1;
 }
