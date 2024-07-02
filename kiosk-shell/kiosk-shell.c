@@ -963,8 +963,9 @@ desktop_surface_removed(struct weston_desktop_surface *desktop_surface,
 						     WESTON_ACTIVATE_FLAG_NONE);
 		} else {
 			kiosk_seat->focused_surface = NULL;
-			kiosk_shell_output_set_active_surface_tree(shoutput,
-								   NULL);
+			if (shoutput)
+				kiosk_shell_output_set_active_surface_tree(shoutput,
+									   NULL);
 		}
 	}
 
