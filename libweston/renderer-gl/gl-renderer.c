@@ -1543,15 +1543,15 @@ draw_paint_node(struct weston_paint_node *pnode,
 		pixman_region32_init_rect(&surface_opaque, 0, 0,
 					  pnode->surface->width,
 					  pnode->surface->height);
-	else
+	else {
 		pixman_region32_init(&surface_opaque);
+		pixman_region32_copy(&surface_opaque, &pnode->surface->opaque);
+	}
 
 	if (pnode->view->geometry.scissor_enabled)
 		pixman_region32_intersect(&surface_opaque,
-					  &pnode->surface->opaque,
+					  &surface_opaque,
 					  &pnode->view->geometry.scissor);
-	else
-		pixman_region32_copy(&surface_opaque, &pnode->surface->opaque);
 
 	/* blended region is whole surface minus opaque region: */
 	pixman_region32_init_rect(&surface_blend, 0, 0,
