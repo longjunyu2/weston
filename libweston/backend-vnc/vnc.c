@@ -498,7 +498,7 @@ vnc_client_cleanup(struct nvnc_client *client)
 	free(peer);
 	weston_log("VNC Client disconnected\n");
 
-	if (wl_list_empty(&output->peers))
+	if (output && wl_list_empty(&output->peers))
 		weston_output_power_off(&output->base);
 }
 
@@ -868,6 +868,7 @@ vnc_output_disable(struct weston_output *base)
 	if (!output->base.enabled)
 		return 0;
 
+	nvnc_remove_display(backend->server, output->display);
 	nvnc_display_unref(output->display);
 	nvnc_fb_pool_unref(output->fb_pool);
 
@@ -929,19 +930,13 @@ vnc_create_output(struct weston_backend *backend, const char *name)
 }
 
 static void
-vnc_shutdown(struct weston_backend *base)
-{
-	struct vnc_backend *backend = container_of(base, struct vnc_backend, base);
-
-	nvnc_close(backend->server);
-}
-
-static void
 vnc_destroy(struct weston_backend *base)
 {
 	struct vnc_backend *backend = container_of(base, struct vnc_backend, base);
 	struct weston_compositor *ec = backend->compositor;
 	struct weston_head *head, *next;
+
+	nvnc_close(backend->server);
 
 	wl_list_remove(&backend->base.link);
 
@@ -1150,7 +1145,6 @@ vnc_backend_create(struct weston_compositor *compositor,
 	wl_list_init(&backend->base.link);
 
 	backend->compositor = compositor;
-	backend->base.shutdown = vnc_shutdown;
 	backend->base.destroy = vnc_destroy;
 	backend->base.create_output = vnc_create_output;
 	backend->vnc_monitor_refresh_rate = config->refresh_rate * 1000;
