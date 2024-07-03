@@ -180,6 +180,9 @@ static void defer_animation_destroy(struct weston_view_animation *animation)
 	struct weston_compositor *ec = animation->view->surface->compositor;
 	struct wl_event_loop *loop = wl_display_get_event_loop(ec->wl_display);
 
+	if (animation->idle_destroy_source)
+		return;
+
 	animation->idle_destroy_source =
 		wl_event_loop_add_idle(loop, idle_animation_destroy,
 				       animation);
@@ -202,10 +205,7 @@ weston_view_animation_frame(struct weston_animation *base,
 	weston_spring_update(&animation->spring, time);
 
 	if (weston_spring_done(&animation->spring)) {
-		if (animation->idle_destroy_source)
-			wl_event_source_remove(animation->idle_destroy_source);
-
-		weston_view_animation_destroy(animation);
+		defer_animation_destroy(animation);
 		return;
 	}
 
