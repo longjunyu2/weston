@@ -649,7 +649,6 @@ cursor_bo_update(struct drm_output *output, struct weston_view *ev)
 	struct gbm_bo *bo = output->gbm_cursor_fb[output->current_cursor]->bo;
 	struct weston_buffer *buffer = ev->surface->buffer_ref.buffer;
 	uint32_t buf[device->cursor_width * device->cursor_height];
-	int32_t stride;
 	uint8_t *s;
 	int i;
 
@@ -659,13 +658,12 @@ cursor_bo_update(struct drm_output *output, struct weston_view *ev)
 
 	memset(buf, 0, sizeof buf);
 
-	stride = wl_shm_buffer_get_stride(buffer->shm_buffer);
 	s = wl_shm_buffer_get_data(buffer->shm_buffer);
 
 	wl_shm_buffer_begin_access(buffer->shm_buffer);
 	for (i = 0; i < buffer->height; i++)
 		memcpy(buf + i * device->cursor_width,
-		       s + i * stride,
+		       s + i * buffer->stride,
 		       buffer->width * 4);
 	wl_shm_buffer_end_access(buffer->shm_buffer);
 
@@ -2887,7 +2885,7 @@ drm_writeback_success_screenshot(struct drm_writeback_state *state)
 	src_stride = state->fb->strides[0];
 
 	dst = wl_shm_buffer_get_data(buffer->shm_buffer);
-	dst_stride = wl_shm_buffer_get_stride(buffer->shm_buffer);
+	dst_stride = buffer->stride;
 
 	width = state->fb->width;
 	height = state->fb->height;

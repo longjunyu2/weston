@@ -539,7 +539,6 @@ vnc_output_update_cursor(struct vnc_output *output)
 	struct weston_buffer *buffer;
 	struct weston_surface *cursor_surface;
 	struct nvnc_fb *fb;
-	int32_t stride;
 	uint8_t *src, *dst;
 	int i;
 
@@ -556,8 +555,6 @@ vnc_output_update_cursor(struct vnc_output *output)
 	cursor_surface = output->cursor_surface;
 	buffer = cursor_surface->buffer_ref.buffer;
 
-	stride = wl_shm_buffer_get_stride(buffer->shm_buffer);
-
 	fb = nvnc_fb_new(buffer->width, buffer->height, DRM_FORMAT_ARGB8888,
 			 buffer->width);
 	assert(fb);
@@ -567,7 +564,7 @@ vnc_output_update_cursor(struct vnc_output *output)
 
 	wl_shm_buffer_begin_access(buffer->shm_buffer);
 	for (i = 0; i < buffer->height; i++)
-		memcpy(dst + i * 4 * buffer->width, src + i * stride,
+		memcpy(dst + i * 4 * buffer->width, src + i * buffer->stride,
 		       4 * buffer->width);
 	wl_shm_buffer_end_access(buffer->shm_buffer);
 

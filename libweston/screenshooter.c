@@ -148,7 +148,7 @@ screenshooter_frame_notify(struct wl_listener *listener, void *data)
 			     0, 0, output->current_mode->width,
 			     output->current_mode->height);
 
-	stride = wl_shm_buffer_get_stride(l->buffer->shm_buffer);
+	stride = l->buffer->stride;
 
 	d = wl_shm_buffer_get_data(l->buffer->shm_buffer);
 	s = pixels + stride * (l->buffer->height - 1);

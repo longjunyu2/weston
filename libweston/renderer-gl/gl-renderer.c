@@ -760,7 +760,7 @@ gl_renderer_do_capture(struct gl_renderer *gr, struct weston_buffer *into,
 	wl_shm_buffer_begin_access(shm);
 
 	ret = gl_renderer_do_read_pixels(gr, fmt, wl_shm_buffer_get_data(shm),
-					 wl_shm_buffer_get_stride(shm), rect);
+					 into->stride, rect);
 
 	wl_shm_buffer_end_access(shm);
 
@@ -980,7 +980,7 @@ gl_renderer_do_capture_tasks(struct gl_renderer *gr,
 			continue;
 		}
 
-		if (wl_shm_buffer_get_stride(buffer->shm_buffer) % 4 != 0) {
+		if (buffer->stride % 4 != 0) {
 			weston_capture_task_retire_failed(ct, "GL: buffer stride not multiple of 4");
 			continue;
 		}
@@ -2576,7 +2576,6 @@ gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer)
 	struct gl_renderer *gr = get_renderer(ec);
 	struct gl_surface_state *gs = get_surface_state(es);
 	struct gl_buffer_state *gb;
-	struct wl_shm_buffer *shm_buffer = buffer->shm_buffer;
 	struct weston_buffer *old_buffer = gs->buffer_ref.buffer;
 	GLenum gl_format[3] = {0, 0, 0};
 	GLenum gl_pixel_type;
@@ -2614,7 +2613,7 @@ gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer)
 		 */
 		if (!bpp)
 			bpp = pixel_format_get_info(yuv->plane[0].format)->bpp;
-		pitch = wl_shm_buffer_get_stride(shm_buffer) / (bpp / 8);
+		pitch = buffer->stride / (bpp / 8);
 
 		/* well, they all are so far ... */
 		gl_pixel_type = GL_UNSIGNED_BYTE;
@@ -2655,7 +2654,7 @@ gl_renderer_attach_shm(struct weston_surface *es, struct weston_buffer *buffer)
 			shader_variant = SHADER_VARIANT_RGBA;
 
 		assert(bpp > 0 && !(bpp & 7));
-		pitch = wl_shm_buffer_get_stride(shm_buffer) / (bpp / 8);
+		pitch = buffer->stride / (bpp / 8);
 
 		gl_format[0] = buffer->pixel_format->gl_format;
 		gl_pixel_type = buffer->pixel_format->gl_type;

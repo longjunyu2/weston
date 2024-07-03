@@ -95,7 +95,7 @@ noop_renderer_attach(struct weston_paint_node *pnode)
 
 	shm_buffer = buffer->shm_buffer;
 	data = wl_shm_buffer_get_data(shm_buffer);
-	stride = wl_shm_buffer_get_stride(shm_buffer);
+	stride = buffer->stride;
 	height = buffer->height;
 	size = stride * height;
 

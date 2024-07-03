@@ -594,7 +594,7 @@ pixman_renderer_do_capture(struct weston_buffer *into, pixman_image_t *from)
 	dest = pixman_image_create_bits(into->pixel_format->pixman_format,
 					into->width, into->height,
 					wl_shm_buffer_get_data(shm),
-					wl_shm_buffer_get_stride(shm));
+					into->stride);
 	abort_oom_if_null(dest);
 
 	pixman_image_composite32(PIXMAN_OP_SRC, from, NULL /* mask */, dest,
@@ -798,7 +798,7 @@ pixman_renderer_attach_internal(struct weston_surface *es,
 	ps->image = pixman_image_create_bits(pixel_info->pixman_format,
 		buffer->width, buffer->height,
 		wl_shm_buffer_get_data(shm_buffer),
-		wl_shm_buffer_get_stride(shm_buffer));
+		buffer->stride);
 
 	ps->buffer_destroy_listener.notify =
 		buffer_state_handle_buffer_destroy;

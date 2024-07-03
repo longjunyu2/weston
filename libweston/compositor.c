@@ -2839,6 +2839,7 @@ weston_buffer_from_resource(struct weston_compositor *ec,
 		buffer->shm_buffer = shm;
 		buffer->width = wl_shm_buffer_get_width(shm);
 		buffer->height = wl_shm_buffer_get_height(shm);
+		buffer->stride = wl_shm_buffer_get_stride(shm);
 		buffer->buffer_origin = ORIGIN_TOP_LEFT;
 		/* wl_shm might create a buffer with an unknown format, so check
 		 * and reject */

@@ -1636,6 +1636,7 @@ struct weston_buffer {
 	};
 
 	int32_t width, height;
+	int32_t stride;
 	uint32_t busy_count;
 	uint32_t passive_count;
 	enum {
