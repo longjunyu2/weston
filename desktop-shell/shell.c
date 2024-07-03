@@ -4879,14 +4879,12 @@ desktop_shell_notify_session(struct wl_listener *listener, void *data)
 	struct desktop_shell *shell =
 		container_of(listener, struct desktop_shell, session_listener);
 	struct weston_compositor *compositor = data;
-	struct weston_seat *seat;
+	struct shell_seat *shseat;
 
 	if (!compositor->session_active)
 		return;
 
-	wl_list_for_each(seat, &shell->seat_list, link) {
-		struct shell_seat *shseat = get_shell_seat(seat);
-
+	wl_list_for_each(shseat, &shell->seat_list, link) {
 		if (!shseat)
 			 continue;
 
