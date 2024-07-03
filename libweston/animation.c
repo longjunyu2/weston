@@ -168,6 +168,14 @@ handle_animation_view_destroy(struct wl_listener *listener, void *data)
 }
 
 static void
+idle_animation_destroy(void *data)
+{
+	struct weston_view_animation *animation = data;
+
+	weston_view_animation_destroy(animation);
+}
+
+static void
 weston_view_animation_frame(struct weston_animation *base,
 			    struct weston_output *output,
 			    const struct timespec *time)
@@ -207,14 +215,6 @@ weston_view_animation_frame(struct weston_animation *base,
 	 */
 	if (animation->view->output_mask == 0)
 		weston_compositor_schedule_repaint(compositor);
-}
-
-static void
-idle_animation_destroy(void *data)
-{
-	struct weston_view_animation *animation = data;
-
-	weston_view_animation_destroy(animation);
 }
 
 static struct weston_view_animation *
