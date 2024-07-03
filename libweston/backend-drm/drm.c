@@ -2715,6 +2715,13 @@ drm_head_create(struct drm_device *device, drmModeConnector *conn,
 		goto err_update;
 
 	head->backlight = backlight_init(drm_device, conn->connector_type);
+	if (head->backlight && head->backlight->max_brightness == 0) {
+		weston_log("Failed to retreive a valid value for max_brightness"
+			   " from connector %d. Backlight disabled\n",
+			   head->connector.connector_id);
+		backlight_destroy(head->backlight);
+		head->backlight = NULL;
+	}
 
 	if (conn->connector_type == DRM_MODE_CONNECTOR_LVDS ||
 	    conn->connector_type == DRM_MODE_CONNECTOR_eDP)
