@@ -203,6 +203,12 @@ option(
 )
 
 option(
+	'tests',
+	type: 'boolean',
+	value: true,
+	description: 'Compile Weston tests'
+)
+option(
 	'test-junit-xml',
 	type: 'boolean',
 	value: true,
