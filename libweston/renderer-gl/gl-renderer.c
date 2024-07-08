@@ -3755,7 +3755,6 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 	GLenum status;
 	int ret = -1;
 
-	gl_renderer_attach_internal(surface, surface->buffer_ref.buffer, NULL);
 	gs = get_surface_state(surface);
 	gb = gs->buffer;
 	buffer = gs->buffer_ref.buffer;
@@ -3771,8 +3770,6 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 		*(uint32_t *)target = pack_color(format, gb->color);
 		return 0;
 	case WESTON_BUFFER_SHM:
-		gl_renderer_flush_damage_internal(surface, false);
-		/* fall through */
 	case WESTON_BUFFER_DMABUF:
 	case WESTON_BUFFER_RENDERER_OPAQUE:
 		break;

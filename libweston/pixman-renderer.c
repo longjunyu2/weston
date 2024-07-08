@@ -912,8 +912,6 @@ pixman_renderer_surface_copy_content(struct weston_surface *surface,
 	if (!ps->image)
 		return -1;
 
-	pixman_renderer_attach_internal(surface, surface->buffer_ref.buffer);
-
 	out_buf = pixman_image_create_bits(format, width, height,
 					   target, width * bytespp);
 

@@ -5522,6 +5522,9 @@ weston_surface_get_bounding_box(struct weston_surface *surface)
  * - the machine must be little-endian due to Pixman formats.
  *
  * NOTE: Pixman formats are premultiplied.
+ *
+ * FURTHER NOTE: Surface contents will be in the state they were last
+ * rendered, even if a new buffer has been attached since that time.
  */
 WL_EXPORT int
 weston_surface_copy_content(struct weston_surface *surface,
