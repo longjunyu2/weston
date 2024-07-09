@@ -3871,8 +3871,10 @@ output_repaint_timer_handler(void *data)
 	compositor->last_repaint_start = now;
 
 	wl_list_for_each(output, &compositor->output_list, link) {
-		if (!weston_output_check_repaint(output, &now))
+		if (!weston_output_check_repaint(output, &now)) {
+			output->will_repaint = false;
 			continue;
+		}
 
 		output->will_repaint = true;
 		output->backend->will_repaint = true;
@@ -3897,7 +3899,6 @@ output_repaint_timer_handler(void *data)
 			if (!output->will_repaint)
 				continue;
 
-			output->will_repaint = false;
 			ret = weston_output_repaint(output, &now);
 			if (ret)
 				break;

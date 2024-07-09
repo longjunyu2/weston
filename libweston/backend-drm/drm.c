@@ -944,7 +944,7 @@ drm_repaint_flush_device(struct drm_device *device)
 {
 	struct drm_backend *b = device->backend;
 	struct drm_pending_state *pending_state;
-	struct drm_output_state *output_state;
+	struct weston_output *base;
 	int ret;
 
 	pending_state = device->repaint_data;
@@ -962,13 +962,15 @@ drm_repaint_flush_device(struct drm_device *device)
 	if (ret == 0)
 		return;
 
-	wl_list_for_each(output_state, &pending_state->output_list, link) {
-		struct drm_output *tmp = output_state->output;
+	wl_list_for_each(base, &b->compositor->output_list, link) {
+		struct drm_output *tmp = to_drm_output(base);
+		if (!base->will_repaint || !tmp || tmp->device != device)
+			continue;
 
 		if (ret == -EBUSY)
-			weston_output_schedule_repaint_restart(&tmp->base);
+			weston_output_schedule_repaint_restart(base);
 		else
-			weston_output_schedule_repaint_reset(&tmp->base);
+			weston_output_schedule_repaint_reset(base);
 	}
 }
 
