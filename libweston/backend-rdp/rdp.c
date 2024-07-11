@@ -1104,8 +1104,8 @@ xf_peer_activate(freerdp_peer* client)
 	}
 
 	weston_output = &output->base;
-	width = weston_output->width * weston_output->scale;
-	height = weston_output->height * weston_output->scale;
+	width = weston_output->width * weston_output->current_scale;
+	height = weston_output->height * weston_output->current_scale;
 	rfx_context_reset(peerCtx->rfx_context, width, height);
 	nsc_context_reset(peerCtx->nsc_context, width, height);
 

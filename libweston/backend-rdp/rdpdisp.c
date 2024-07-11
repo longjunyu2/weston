@@ -316,8 +316,8 @@ rdp_head_contains(struct rdp_head *rdp_head, int32_t x, int32_t y)
 			return false;
 
 		return rect_contains(x, y, output->pos.c.x, output->pos.c.y,
-				     output->width * output->scale,
-				     output->height * output->scale);
+				     output->width * output->current_scale,
+				     output->height * output->current_scale);
 	}
 
 	return rect_contains(x, y, config->x, config->y,
