@@ -655,7 +655,6 @@ struct weston_output {
 			  uint16_t *b);
 
 	bool enabled; /**< is in the output_list, not pending list */
-	int scale;
 
 	struct weston_color_profile *color_profile;
 	bool from_blend_to_output_by_backend;

@@ -7256,7 +7256,7 @@ weston_output_transform_scale_init(struct weston_output *output, uint32_t transf
 {
 	output->transform = transform;
 	output->native_scale = scale;
-	output->current_scale = scale;
+	assert(output->current_scale > 0);
 
 	convert_size_by_transform_scale(&output->width, &output->height,
 					output->current_mode->width,
@@ -7629,14 +7629,10 @@ weston_compositor_remove_output(struct weston_output *output)
 	compositor->output_id_pool &= ~(1u << output->id);
 	output->id = 0xffffffff; /* invalid */
 }
-
 /** Sets the output scale for a given output.
  *
  * \param output The weston_output object that the scale is set for.
  * \param scale  Scale factor for the given output.
- *
- * It only supports setting scale for an output that
- * is not enabled and it can only be ran once.
  *
  * \ingroup output
  */
@@ -7644,9 +7640,10 @@ WL_EXPORT void
 weston_output_set_scale(struct weston_output *output,
 			int32_t scale)
 {
-	output->scale = scale;
-	if (!output->enabled)
+	if (!output->enabled) {
+		output->current_scale = scale;
 		return;
+	}
 
 	if (output->current_scale == scale)
 		return;
@@ -7684,7 +7681,8 @@ weston_output_set_transform(struct weston_output *output,
 		return;
 	}
 
-	weston_output_transform_scale_init(output, transform, output->scale);
+	weston_output_transform_scale_init(output, transform,
+					   output->current_scale);
 
 	pixman_region32_init(&old_region);
 	pixman_region32_copy(&old_region, &output->region);
@@ -8046,7 +8044,7 @@ weston_output_init(struct weston_output *output,
 	/* Add some (in)sane defaults which can be used
 	 * for checking if an output was properly configured
 	 */
-	output->scale = 0;
+	output->current_scale = 0;
 	/* Can't use -1 on uint32_t and 0 is valid enum value */
 	output->transform = UINT32_MAX;
 
@@ -8175,17 +8173,18 @@ weston_output_enable(struct weston_output *output)
 	}
 
 	/* Make sure the scale is set up */
-	assert(output->scale);
+	assert(output->current_scale);
 
 	/* Make sure we have a transform set */
 	assert(output->transform != UINT32_MAX);
 
-	output->original_scale = output->scale;
+	output->original_scale = output->current_scale;
 
 	wl_signal_init(&output->frame_signal);
 	wl_signal_init(&output->destroy_signal);
 
-	weston_output_transform_scale_init(output, output->transform, output->scale);
+	weston_output_transform_scale_init(output, output->transform,
+					   output->current_scale);
 
 	weston_output_init_geometry(output, output->pos);
 
@@ -9332,7 +9331,7 @@ weston_compositor_print_scene_graph(struct weston_compositor *ec)
 			output->current_mode->width,
 			output->current_mode->height,
 			output->current_mode->refresh / 1000.0);
-		fprintf(fp, "\tscale: %d\n", output->scale);
+		fprintf(fp, "\tscale: %d\n", output->current_scale);
 
 		fprintf(fp, "\trepaint status: %s\n",
 			output_repaint_status_text(output));

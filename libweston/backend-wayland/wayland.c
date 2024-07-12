@@ -1521,7 +1521,7 @@ wayland_output_set_size(struct weston_output *base, int width, int height)
 	assert(!output->base.current_mode);
 
 	/* Make sure we have scale set. */
-	assert(output->base.scale);
+	assert(output->base.current_scale);
 
 	if (width < 1) {
 		weston_log("Invalid width \"%d\" for output %s\n",
@@ -1542,8 +1542,8 @@ wayland_output_set_size(struct weston_output *base, int width, int height)
 		weston_head_set_physical_size(head, width, height);
 	}
 
-	output_width = width * output->base.scale;
-	output_height = height * output->base.scale;
+	output_width = width * output->base.current_scale;
+	output_height = height * output->base.current_scale;
 
 	output->mode.flags =
 		WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED;
@@ -1576,7 +1576,7 @@ wayland_output_setup_for_parent_output(struct wayland_output *output,
 		return -1;
 	}
 
-	output->base.scale = 1;
+	output->base.current_scale = 1;
 	output->base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
 
 	output->parent.output = poutput->global;
@@ -1600,7 +1600,7 @@ wayland_output_setup_fullscreen(struct wayland_output *output,
 	struct wayland_backend *b = output->backend;
 	int width = 0, height = 0;
 
-	output->base.scale = 1;
+	output->base.current_scale = 1;
 	output->base.transform = WL_OUTPUT_TRANSFORM_NORMAL;
 
 	if (wayland_backend_create_output_surface(output) < 0)

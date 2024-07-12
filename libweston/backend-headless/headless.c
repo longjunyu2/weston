@@ -405,7 +405,7 @@ headless_output_set_size(struct weston_output *base,
 	assert(!output->base.current_mode);
 
 	/* Make sure we have scale set. */
-	assert(output->base.scale);
+	assert(output->base.current_scale);
 
 	wl_list_for_each(head, &output->base.head_list, output_link) {
 		weston_head_set_monitor_strings(head, "weston", "headless",
@@ -415,8 +415,8 @@ headless_output_set_size(struct weston_output *base,
 		weston_head_set_physical_size(head, width, height);
 	}
 
-	output_width = width * output->base.scale;
-	output_height = height * output->base.scale;
+	output_width = width * output->base.current_scale;
+	output_height = height * output->base.current_scale;
 
 	output->mode.flags =
 		WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED;

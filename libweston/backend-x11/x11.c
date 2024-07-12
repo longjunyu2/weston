@@ -1147,7 +1147,7 @@ x11_output_set_size(struct weston_output *base, int width, int height)
 	assert(!output->base.current_mode);
 
 	/* Make sure we have scale set. */
-	assert(output->base.scale);
+	assert(output->base.current_scale);
 
 	if (width < WINDOW_MIN_WIDTH) {
 		weston_log("Invalid width \"%d\" for output %s\n",
@@ -1168,8 +1168,8 @@ x11_output_set_size(struct weston_output *base, int width, int height)
 			height * scrn->height_in_millimeters / scrn->height_in_pixels);
 	}
 
-	output_width = width * output->base.scale;
-	output_height = height * output->base.scale;
+	output_width = width * output->base.current_scale;
+	output_height = height * output->base.current_scale;
 
 	output->mode.flags =
 		WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED;
@@ -1178,12 +1178,12 @@ x11_output_set_size(struct weston_output *base, int width, int height)
 	output->mode.height = output_height;
 	output->mode.refresh = 60000;
 	output->native = output->mode;
-	output->scale = output->base.scale;
+	output->scale = output->base.current_scale;
 	wl_list_insert(&output->base.mode_list, &output->mode.link);
 
 	output->base.current_mode = &output->mode;
 	output->base.native_mode = &output->native;
-	output->base.native_scale = output->base.scale;
+	output->base.native_scale = output->base.current_scale;
 
 	return 0;
 }
