@@ -136,6 +136,7 @@ static void
 rdp_peer_refresh_nsc(pixman_region32_t *damage, pixman_image_t *image, freerdp_peer *peer)
 {
 	int width, height;
+	int32_t left;
 	uint32_t *ptr;
 	rdpUpdate *update = peer->context->update;
 	SURFACE_BITS_COMMAND cmd = { 0 };
@@ -144,12 +145,18 @@ rdp_peer_refresh_nsc(pixman_region32_t *damage, pixman_image_t *image, freerdp_p
 	Stream_Clear(context->encode_stream);
 	Stream_SetPosition(context->encode_stream, 0);
 
-	width = (damage->extents.x2 - damage->extents.x1);
+	/* nsc_compose_message() appears to require a 16 byte alignment,
+	 * otherwise it will read off the end of the region while doing
+	 * SIMD optimizations. Align our left edge and post a little
+	 * extra damage to hit this constraint.
+	 */
+	left = damage->extents.x1 - (damage->extents.x1 % 16);
+	width = (damage->extents.x2 - left);
 	height = (damage->extents.y2 - damage->extents.y1);
 
 	cmd.cmdType = CMDTYPE_SET_SURFACE_BITS;
 	cmd.skipCompression = TRUE;
-	cmd.destLeft = damage->extents.x1;
+	cmd.destLeft = left;
 	cmd.destTop = damage->extents.y1;
 	cmd.destRight = damage->extents.x2;
 	cmd.destBottom = damage->extents.y2;
@@ -158,7 +165,7 @@ rdp_peer_refresh_nsc(pixman_region32_t *damage, pixman_image_t *image, freerdp_p
 	cmd.bmp.width = width;
 	cmd.bmp.height = height;
 
-	ptr = pixman_image_get_data(image) + damage->extents.x1 +
+	ptr = pixman_image_get_data(image) + left +
 				damage->extents.y1 * (pixman_image_get_stride(image) / sizeof(uint32_t));
 
 	nsc_compose_message(context->nsc_context, context->encode_stream, (BYTE *)ptr,
