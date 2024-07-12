@@ -4801,7 +4801,7 @@ weston_surface_commit_state(struct weston_surface *surface,
 	/* wl_surface.set_input_region */
 	if (status & (WESTON_SURFACE_DIRTY_SIZE | WESTON_SURFACE_DIRTY_INPUT)) {
 		pixman_region32_intersect_rect(&surface->input, &state->input,
-				       	       0, 0,
+					       0, 0,
 					       surface->width, surface->height);
 	}
 

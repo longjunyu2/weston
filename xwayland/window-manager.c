@@ -1442,6 +1442,7 @@ weston_wm_window_set_pending_state(struct weston_wm_window *window)
 	pixman_region32_fini(&window->surface->pending.input);
 	pixman_region32_init_rect(&window->surface->pending.input,
 				  input_x, input_y, input_w, input_h);
+	window->surface->pending.status |= WESTON_SURFACE_DIRTY_INPUT;
 
 	xwayland_interface->set_window_geometry(window->shsurf,
 						input_x, input_y,
