@@ -102,11 +102,6 @@ Activate clicked window
 Change the opacity of a window
 .P
 .RE
-.B mod + \fI<Vertical Scroll>\fB
-.RS 4
-Zoom/magnify the visible desktop
-.P
-.RE
 .B mod + \fI<Left button>\fB
 .RS 4
 Click and drag to move a window
