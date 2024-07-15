@@ -696,6 +696,7 @@ gl_renderer_create_fbo(struct weston_output *output,
 
 static bool
 gl_renderer_do_read_pixels(struct gl_renderer *gr,
+			   struct gl_output_state *go,
 			   const struct pixel_format_info *fmt,
 			   void *pixels, int stride,
 			   const struct weston_geometry *rect)
@@ -708,6 +709,14 @@ gl_renderer_do_read_pixels(struct gl_renderer *gr,
 	assert(fmt->gl_format != 0);
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
+
+	if (!is_y_flipped(go)) {
+		if (gr->has_pack_reverse)
+			glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_FALSE);
+		glReadPixels(rect->x, rect->y, rect->width, rect->height,
+			     fmt->gl_format, fmt->gl_type, pixels);
+		return true;
+	}
 
 	if (gr->has_pack_reverse) {
 		/* Make glReadPixels() return top row first. */
@@ -770,7 +779,8 @@ gl_renderer_do_read_pixels(struct gl_renderer *gr,
 }
 
 static bool
-gl_renderer_do_capture(struct gl_renderer *gr, struct weston_buffer *into,
+gl_renderer_do_capture(struct gl_renderer *gr, struct gl_output_state *go,
+		       struct weston_buffer *into,
 		       const struct weston_geometry *rect)
 {
 	struct wl_shm_buffer *shm = into->shm_buffer;
@@ -782,7 +792,7 @@ gl_renderer_do_capture(struct gl_renderer *gr, struct weston_buffer *into,
 
 	wl_shm_buffer_begin_access(shm);
 
-	ret = gl_renderer_do_read_pixels(gr, fmt, wl_shm_buffer_get_data(shm),
+	ret = gl_renderer_do_read_pixels(gr, go, fmt, wl_shm_buffer_get_data(shm),
 					 into->stride, rect);
 
 	wl_shm_buffer_end_access(shm);
@@ -898,6 +908,7 @@ async_capture_handler_fd(int fd, uint32_t mask, void *data)
 
 static void
 gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
+				 struct gl_output_state *go,
 				 struct weston_output *output,
 				 struct weston_capture_task *task,
 				 const struct weston_geometry *rect)
@@ -916,7 +927,8 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	if (gr->has_pack_reverse)
-		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_TRUE);
+		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE,
+			      is_y_flipped(go) ? GL_TRUE : GL_FALSE);
 
 	gl_task = create_capture_task(task, gr, rect);
 
@@ -1010,11 +1022,11 @@ gl_renderer_do_capture_tasks(struct gl_renderer *gr,
 		}
 
 		if (gr->has_pbo) {
-			gl_renderer_do_read_pixels_async(gr, output, ct, &rect);
+			gl_renderer_do_read_pixels_async(gr, go, output, ct, &rect);
 			continue;
 		}
 
-		if (gl_renderer_do_capture(gr, buffer, &rect))
+		if (gl_renderer_do_capture(gr, go, buffer, &rect))
 			weston_capture_task_retire_complete(ct);
 		else
 			weston_capture_task_retire_failed(ct, "GL: capture failed");
@@ -2430,8 +2442,8 @@ gl_renderer_repaint_output(struct weston_output *output,
 			pixels += extents.x1;
 		}
 
-		gl_renderer_do_read_pixels(gr, compositor->read_format, pixels,
-					   stride, &rect);
+		gl_renderer_do_read_pixels(gr, go, compositor->read_format,
+					   pixels, stride, &rect);
 
 		if (gr->gl_version >= gr_gl_version(3, 0))
 			glPixelStorei(GL_PACK_ROW_LENGTH, 0);
