@@ -4079,7 +4079,7 @@ gl_renderer_output_create(struct weston_output *output,
 		return -1;
 
 	go->egl_surface = surface;
-	go->y_flip = -1.0f;
+	go->y_flip = surface == EGL_NO_SURFACE ? 1.0f : -1.0f;
 
 	if (gr->has_disjoint_timer_query)
 		gr->gen_queries(1, &go->render_query);
