@@ -2125,10 +2125,10 @@ blit_shadow_to_output(struct weston_output *output,
 		},
 		.projection = {
 			.d = { /* transpose */
-				 2.0f,  0.0f, 0.0f, 0.0f,
-				 0.0f,  2.0f, 0.0f, 0.0f,
-				 0.0f,  0.0f, 1.0f, 0.0f,
-				-1.0f, -1.0f, 0.0f, 1.0f
+				 2.0f,  0.0f,        0.0f, 0.0f,
+				 0.0f, -1.0f * 2.0f, 0.0f, 0.0f,
+				 0.0f,  0.0f,        1.0f, 0.0f,
+				-1.0f,  1.0f,        0.0f, 1.0f
 			},
 			.type = WESTON_MATRIX_TRANSFORM_SCALE |
 				WESTON_MATRIX_TRANSFORM_TRANSLATE,
@@ -2145,7 +2145,8 @@ blit_shadow_to_output(struct weston_output *output,
 	int n_rects;
 	int i;
 	pixman_region32_t translated_damage;
-	GLfloat verts[4 * 2];
+	struct { GLfloat x, y; } position[4];
+	struct { GLfloat s, t; } texcoord[4];
 
 	ctransf = output->color_outcome->from_blend_to_output;
 	if (!gl_shader_config_set_color_transform(gr, &sconf, ctransf)) {
@@ -2170,21 +2171,36 @@ blit_shadow_to_output(struct weston_output *output,
 
 	rects = pixman_region32_rectangles(&translated_damage, &n_rects);
 	for (i = 0; i < n_rects; i++) {
+		const GLfloat x1 = rects[i].x1 / width;
+		const GLfloat x2 = rects[i].x2 / width;
+		const GLfloat y1 = rects[i].y1 / height;
+		const GLfloat y2 = rects[i].y2 / height;
+		const GLfloat y1_flipped = 1.0f - y1;
+		const GLfloat y2_flipped = 1.0f - y2;
 
-		verts[0] = rects[i].x1 / width;
-		verts[1] = (height - rects[i].y1) / height;
-		verts[2] = rects[i].x2 / width;
-		verts[3] = (height - rects[i].y1) / height;
+		position[0].x = x1;
+		position[0].y = y1;
+		position[1].x = x2;
+		position[1].y = y1;
+		position[2].x = x2;
+		position[2].y = y2;
+		position[3].x = x1;
+		position[3].y = y2;
 
-		verts[4] = rects[i].x2 / width;
-		verts[5] = (height - rects[i].y2) / height;
-		verts[6] = rects[i].x1 / width;
-		verts[7] = (height - rects[i].y2) / height;
+		texcoord[0].s = x1;
+		texcoord[0].t = y1_flipped;
+		texcoord[1].s = x2;
+		texcoord[1].t = y1_flipped;
+		texcoord[2].s = x2;
+		texcoord[2].t = y2_flipped;
+		texcoord[3].s = x1;
+		texcoord[3].t = y2_flipped;
 
 		glVertexAttribPointer(SHADER_ATTRIB_LOC_POSITION, 2, GL_FLOAT,
-				      GL_FALSE, 0, verts);
+				      GL_FALSE, 0, position);
+
 		glVertexAttribPointer(SHADER_ATTRIB_LOC_TEXCOORD, 2, GL_FLOAT,
-				      GL_FALSE, 0, verts);
+				      GL_FALSE, 0, texcoord);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 	}
 
