@@ -236,8 +236,12 @@ drm_head_info_from_edid(struct drm_head_info *dhi,
 	const char *msg;
 
 	di_ctx = di_info_parse_edid(data, length);
-	if (!di_ctx)
+	if (!di_ctx) {
+		memset(dhi, 0, sizeof(*dhi));
+		dhi->eotf_mask = WESTON_EOTF_MODE_SDR;
+		dhi->colorimetry_mask = WESTON_COLORIMETRY_MODE_DEFAULT;
 		return;
+	}
 
 	msg = di_info_get_failure_msg(di_ctx);
 	if (msg)
@@ -533,7 +537,7 @@ update_head_from_connector(struct drm_head *head)
 	if (!drm_head_maybe_update_display_data(head, props))
 		return;
 
-	struct drm_head_info dhi = { .eotf_mask = WESTON_EOTF_MODE_SDR };
+	struct drm_head_info dhi;
 
 	drm_head_info_from_edid(&dhi, head->display_data, head->display_data_len);
 
