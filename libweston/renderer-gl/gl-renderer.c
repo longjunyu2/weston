@@ -1867,14 +1867,10 @@ draw_output_border_texture(struct gl_renderer *gr,
 		glBindTexture(GL_TEXTURE_2D, img->tex);
 	}
 
-	if (go->border_status & (1 << side)) {
-		glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
-		glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
-		glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
+	if (go->border_status & (1 << side))
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA_EXT,
 			     img->tex_width, img->height, 0,
 			     GL_BGRA_EXT, GL_UNSIGNED_BYTE, img->data);
-	}
 
 	sconf->input_tex_filter = GL_NEAREST;
 	sconf->input_tex[0] = img->tex;
@@ -2553,8 +2549,6 @@ gl_renderer_flush_damage(struct weston_paint_node *pnode)
 	glActiveTexture(GL_TEXTURE0);
 
 	if (gb->needs_full_upload || quirks->gl_force_full_upload) {
-		glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
-		glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
 		wl_shm_buffer_begin_access(buffer->shm_buffer);
 
 		for (j = 0; j < gb->num_textures; j++) {
@@ -2606,6 +2600,10 @@ gl_renderer_flush_damage(struct weston_paint_node *pnode)
 	wl_shm_buffer_end_access(buffer->shm_buffer);
 
 done:
+	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+	glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
+	glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
+
 	pixman_region32_fini(&gb->texture_damage);
 	pixman_region32_init(&gb->texture_damage);
 	gb->needs_full_upload = false;

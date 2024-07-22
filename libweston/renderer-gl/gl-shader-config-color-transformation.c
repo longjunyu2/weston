@@ -208,10 +208,6 @@ gl_color_curve_lut_3x1d(struct gl_renderer *gr,
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, sizeof (float));
-	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
-	glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
-	glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, lut_len, nr_rows, 0,
 		     GL_RED_EXT, GL_FLOAT, lut);
 
@@ -250,9 +246,6 @@ gl_3d_lut(struct gl_renderer *gr,
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glPixelStorei(GL_UNPACK_SKIP_PIXELS_EXT, 0);
-	glPixelStorei(GL_UNPACK_SKIP_ROWS_EXT, 0);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
 	gr->tex_image_3d(GL_TEXTURE_3D, 0, GL_RGB32F, dim_size, dim_size, dim_size, 0,
 			 GL_RGB, GL_FLOAT, lut);
 
