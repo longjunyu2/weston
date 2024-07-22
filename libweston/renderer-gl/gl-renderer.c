@@ -737,8 +737,6 @@ gl_renderer_do_read_pixels(struct gl_renderer *gr,
 	assert(fmt->gl_type != 0);
 	assert(fmt->gl_format != 0);
 
-	glPixelStorei(GL_PACK_ALIGNMENT, 4);
-
 	if (!is_y_flipped(go)) {
 		glReadPixels(rect->x, rect->y, rect->width, rect->height,
 			     fmt->gl_format, fmt->gl_type, pixels);
@@ -947,7 +945,6 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 	assert(fmt->gl_type != 0);
 	assert(fmt->gl_format != 0);
 
-	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	if (gr->has_pack_reverse && is_y_flipped(go))
 		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_TRUE);
 
@@ -2498,6 +2495,7 @@ gl_renderer_read_pixels(struct weston_output *output,
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
 	glReadPixels(x, y, width, height, format->gl_format,
 		     format->gl_type, pixels);
+	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
 	return 0;
 }
@@ -3707,7 +3705,6 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 		.input_tex_filter = GL_NEAREST,
 	};
 	const pixman_format_code_t format = PIXMAN_a8b8g8r8;
-	const size_t bytespp = 4; /* PIXMAN_a8b8g8r8 */
 	const GLenum gl_format = GL_RGBA; /* PIXMAN_a8b8g8r8 little-endian */
 	struct gl_renderer *gr = get_renderer(surface->compositor);
 	struct gl_surface_state *gs;
@@ -3781,7 +3778,6 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
 	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 
-	glPixelStorei(GL_PACK_ALIGNMENT, bytespp);
 	glReadPixels(src_x, src_y, width, height, gl_format,
 		     GL_UNSIGNED_BYTE, target);
 	ret = 0;
