@@ -765,10 +765,10 @@ rdp_peer_context_new(freerdp_peer* client, RdpPeerContext* context)
 
 	return TRUE;
 
-out_error_nsc:
-	rfx_context_free(context->rfx_context);
 out_error_stream:
 	nsc_context_free(context->nsc_context);
+out_error_nsc:
+	rfx_context_free(context->rfx_context);
 	return FALSE;
 }
 
