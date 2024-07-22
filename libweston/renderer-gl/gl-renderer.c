@@ -729,9 +729,10 @@ gl_renderer_do_read_pixels(struct gl_renderer *gr,
 			   void *pixels, int stride,
 			   const struct weston_geometry *rect)
 {
-	void *read_target;
 	pixman_image_t *tmp = NULL;
 	void *tmp_data = NULL;
+	pixman_image_t *image;
+	pixman_transform_t flip;
 
 	assert(fmt->gl_type != 0);
 	assert(fmt->gl_format != 0);
@@ -749,59 +750,53 @@ gl_renderer_do_read_pixels(struct gl_renderer *gr,
 	if (gr->has_pack_reverse) {
 		/* Make glReadPixels() return top row first. */
 		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_TRUE);
-		read_target = pixels;
-	} else {
-		/*
-		 * glReadPixels() returns bottom row first. We need to
-		 * read into a temporary buffer and y-flip it.
-		 */
-		tmp_data = malloc(stride * rect->height);
-		if (!tmp_data)
-			return false;
+		glReadPixels(rect->x, rect->y, rect->width, rect->height,
+			     fmt->gl_format, fmt->gl_type, pixels);
+		return true;
+	}
 
-		tmp = pixman_image_create_bits(fmt->pixman_format,
-					       rect->width, rect->height,
-					       tmp_data, stride);
-		if (!tmp) {
-			free(tmp_data);
-			return false;
-		}
+	/*
+	 * glReadPixels() returns bottom row first. We need to read into a
+	 * temporary buffer and y-flip it.
+	 */
 
-		read_target = pixman_image_get_data(tmp);
+	tmp_data = malloc(stride * rect->height);
+	if (!tmp_data)
+		return false;
+
+	tmp = pixman_image_create_bits(fmt->pixman_format, rect->width,
+				       rect->height, tmp_data, stride);
+	if (!tmp) {
+		free(tmp_data);
+		return false;
 	}
 
 	glReadPixels(rect->x, rect->y, rect->width, rect->height,
-		     fmt->gl_format, fmt->gl_type, read_target);
+		     fmt->gl_format, fmt->gl_type, pixman_image_get_data(tmp));
 
-	if (tmp) {
-		pixman_image_t *image;
-		pixman_transform_t flip;
+	image = pixman_image_create_bits_no_clear(fmt->pixman_format,
+						  rect->width, rect->height,
+						  pixels, stride);
+	abort_oom_if_null(image);
 
-		image = pixman_image_create_bits_no_clear(fmt->pixman_format,
-							  rect->width,
-							  rect->height,
-							  pixels, stride);
-		abort_oom_if_null(image);
+	pixman_transform_init_scale(&flip, pixman_fixed_1,
+				    pixman_fixed_minus_1);
+	pixman_transform_translate(&flip, NULL, 0,
+				   pixman_int_to_fixed(rect->height));
+	pixman_image_set_transform(tmp, &flip);
 
-		pixman_transform_init_scale(&flip, pixman_fixed_1,
-					    pixman_fixed_minus_1);
-		pixman_transform_translate(&flip, NULL,	0,
-					   pixman_int_to_fixed(rect->height));
-		pixman_image_set_transform(tmp, &flip);
+	pixman_image_composite32(PIXMAN_OP_SRC,
+				 tmp,       /* src */
+				 NULL,      /* mask */
+				 image,     /* dest */
+				 0, 0,      /* src x,y */
+				 0, 0,      /* mask x,y */
+				 0, 0,      /* dest x,y */
+				 rect->width, rect->height);
 
-		pixman_image_composite32(PIXMAN_OP_SRC,
-					 tmp,       /* src */
-					 NULL,      /* mask */
-					 image,     /* dest */
-					 0, 0,      /* src x,y */
-					 0, 0,      /* mask x,y */
-					 0, 0,      /* dest x,y */
-					 rect->width, rect->height);
-
-		pixman_image_unref(image);
-		pixman_image_unref(tmp);
-		free(tmp_data);
-	}
+	pixman_image_unref(image);
+	pixman_image_unref(tmp);
+	free(tmp_data);
 
 	return true;
 }
