@@ -211,7 +211,7 @@ drm_virtual_output_repaint(struct weston_output *output_base)
 	struct drm_pending_state *pending_state;
 	struct drm_device *device;
 
-	assert(output->virtual);
+	assert(output->is_virtual);
 
 	device = output->device;
 	pending_state = device->repaint_data;
@@ -267,7 +267,7 @@ drm_virtual_output_destroy(struct weston_output *base)
 {
 	struct drm_output *output = to_drm_output(base);
 
-	assert(output->virtual);
+	assert(output->is_virtual);
 
 	if (output->base.enabled)
 		drm_virtual_output_deinit(&output->base);
@@ -289,7 +289,7 @@ drm_virtual_output_enable(struct weston_output *output_base)
 	struct drm_device *device = output->device;
 	struct drm_backend *b = device->backend;
 
-	assert(output->virtual);
+	assert(output->is_virtual);
 
 	if (output_base->compositor->renderer->type == WESTON_RENDERER_PIXMAN) {
 		weston_log("Not support pixman renderer on Virtual output\n");
@@ -335,7 +335,7 @@ drm_virtual_output_disable(struct weston_output *base)
 {
 	struct drm_output *output = to_drm_output(base);
 
-	assert(output->virtual);
+	assert(output->is_virtual);
 
 	if (output->base.enabled)
 		drm_virtual_output_deinit(&output->base);
@@ -363,7 +363,7 @@ drm_virtual_output_create(struct weston_compositor *c, char *name,
 		return NULL;
 	}
 
-	output->virtual = true;
+	output->is_virtual = true;
 	output->virtual_destroy = destroy_func;
 	output->gbm_bo_flags = GBM_BO_USE_LINEAR | GBM_BO_USE_RENDERING;
 

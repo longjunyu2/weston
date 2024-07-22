@@ -980,7 +980,7 @@ drm_assign_planes(struct weston_output *output_base)
 	drm_debug(b, "\t[repaint] preparing state for output %s (%lu)\n",
 		  output_base->name, (unsigned long) output_base->id);
 
-	if (!device->sprites_are_broken && !output->virtual && b->gbm) {
+	if (!device->sprites_are_broken && !output->is_virtual && b->gbm) {
 		drm_debug(b, "\t[repaint] trying planes-only build state\n");
 		state = drm_output_propose_state(output_base, pending_state, mode);
 		if (!state) {

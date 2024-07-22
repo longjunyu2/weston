@@ -198,7 +198,7 @@ drm_plane_is_available(struct drm_plane *plane, struct drm_output *output)
 {
 	assert(plane->state_cur);
 
-	if (output->virtual)
+	if (output->is_virtual)
 		return false;
 
 	/* The plane still has a request not yet completed by the kernel. */
@@ -701,7 +701,7 @@ drm_output_repaint(struct weston_output *output_base)
 	struct drm_device *device;
 
 	assert(output);
-	assert(!output->virtual);
+	assert(!output->is_virtual);
 
 	device = output->device;
 	pending_state = device->repaint_data;
@@ -1480,7 +1480,7 @@ drm_set_dpms(struct weston_output *output_base, enum dpms_enum level)
 	int ret;
 
 	assert(output);
-	assert(!output->virtual);
+	assert(!output->is_virtual);
 
 	if (output->state_cur->dpms == level)
 		return;
@@ -2288,7 +2288,7 @@ drm_output_enable(struct weston_output *base)
 	int ret;
 
 	assert(output);
-	assert(!output->virtual);
+	assert(!output->is_virtual);
 
 	/* TODO: drop this hack when we rework the output configuration API. For
 	 * now we need this because the frontend may call
@@ -2406,7 +2406,7 @@ drm_output_destroy(struct weston_output *base)
 	struct drm_device *device = output->device;
 
 	assert(output);
-	assert(!output->virtual);
+	assert(!output->is_virtual);
 
 	if (output->page_flip_pending || output->atomic_complete_pending) {
 		if (!base->compositor->shutting_down) {
@@ -2452,7 +2452,7 @@ drm_output_disable(struct weston_output *base)
 	struct drm_output *output = to_drm_output(base);
 
 	assert(output);
-	assert(!output->virtual);
+	assert(!output->is_virtual);
 
 	if (output->page_flip_pending || output->atomic_complete_pending) {
 		output->disable_pending = true;

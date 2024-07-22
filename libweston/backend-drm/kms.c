@@ -1388,7 +1388,7 @@ drm_pending_state_clear_tearing(struct drm_pending_state *pending_state)
 	struct drm_output_state *output_state;
 
 	wl_list_for_each(output_state, &pending_state->output_list, link) {
-		if (output_state->output->virtual)
+		if (output_state->output->is_virtual)
 			continue;
 		output_state->tear = false;
 	}
@@ -1514,7 +1514,7 @@ drm_pending_state_apply_atomic(struct drm_pending_state *pending_state,
 	}
 
 	wl_list_for_each(output_state, &pending_state->output_list, link) {
-		if (output_state->output->virtual)
+		if (output_state->output->is_virtual)
 			continue;
 		if (mode == DRM_STATE_APPLY_SYNC)
 			assert(output_state->dpms == WESTON_DPMS_OFF);
@@ -1648,7 +1648,7 @@ drm_pending_state_apply(struct drm_pending_state *pending_state)
 		struct drm_output *output = output_state->output;
 		int ret;
 
-		if (output->virtual) {
+		if (output->is_virtual) {
 			drm_output_assign_state(output_state,
 						DRM_STATE_APPLY_ASYNC);
 			continue;
