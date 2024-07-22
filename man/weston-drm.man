@@ -155,11 +155,6 @@ Make this output (connector) a clone of another. The argument
 .BR name " value of another output section. The
 referred to output section must exist. When this key is present in an
 output section, all other keys have no effect on the configuration.
-
-NOTE: cms-colord plugin does not work correctly with this option. The plugin
-chooses an arbitrary monitor to load the color profile for, but the
-profile is applied equally to all cloned monitors regardless of their
-properties.
 .TP
 \fBforce-on\fR=\fItrue\fR
 Force the output to be enabled even if the connector is disconnected.

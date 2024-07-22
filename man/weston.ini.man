@@ -115,14 +115,14 @@ directory are:
 .BI "xwayland=" true
 ask Weston to load the XWayland module (boolean).
 .TP 7
-.BI "modules=" cms-colord.so,screen-share.so
-specifies the modules to load (string). Available modules in the
+.BI "modules=" screen-share.so
+specifies the modules to load (string, comma separated). Available modules
+in the
 .IR "@weston_modules_dir@"
 directory are:
 .PP
 .RS 10
 .nf
-.BR cms-colord.so
 .BR screen-share.so
 .fi
 .RE

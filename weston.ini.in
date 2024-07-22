@@ -1,5 +1,5 @@
 [core]
-#modules=cms-colord.so
+#modules=screen-share.so
 #xwayland=true
 #shell=desktop
 #gbm-format=xrgb2101010

@@ -43,7 +43,7 @@
 variables:
   FDO_UPSTREAM_REPO: wayland/weston
   FDO_REPO_SUFFIX: "$BUILD_OS-$FDO_DISTRIBUTION_VERSION/$BUILD_ARCH"
-  FDO_DISTRIBUTION_TAG: '2024-07-24-00-virtme-ng'
+  FDO_DISTRIBUTION_TAG: '2024-08-05-00-rm-plugins'
 
 
 include:
@@ -427,8 +427,6 @@ aarch64-debian-container_prep:
       -Db_coverage=true
       -Dwerror=true
       -Dtest-skip-is-failure=true
-      -Ddeprecated-color-management-static=true
-      -Ddeprecated-color-management-colord=true
   after_script:
   - ninja -C "$BUILDDIR" coverage-html > "$BUILDDIR/meson-logs/ninja-coverage-html.txt"
   - ninja -C "$BUILDDIR" coverage-xml
