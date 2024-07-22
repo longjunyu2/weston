@@ -740,8 +740,6 @@ gl_renderer_do_read_pixels(struct gl_renderer *gr,
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
 	if (!is_y_flipped(go)) {
-		if (gr->has_pack_reverse)
-			glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_FALSE);
 		glReadPixels(rect->x, rect->y, rect->width, rect->height,
 			     fmt->gl_format, fmt->gl_type, pixels);
 		return true;
@@ -752,6 +750,7 @@ gl_renderer_do_read_pixels(struct gl_renderer *gr,
 		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_TRUE);
 		glReadPixels(rect->x, rect->y, rect->width, rect->height,
 			     fmt->gl_format, fmt->gl_type, pixels);
+		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_FALSE);
 		return true;
 	}
 
@@ -949,9 +948,8 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 	assert(fmt->gl_format != 0);
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
-	if (gr->has_pack_reverse)
-		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE,
-			      is_y_flipped(go) ? GL_TRUE : GL_FALSE);
+	if (gr->has_pack_reverse && is_y_flipped(go))
+		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_TRUE);
 
 	gl_task = create_capture_task(task, gr, rect);
 
@@ -993,6 +991,9 @@ gl_renderer_do_read_pixels_async(struct gl_renderer *gr,
 	}
 
 	wl_list_insert(&gr->pending_capture_list, &gl_task->link);
+
+	if (gr->has_pack_reverse && is_y_flipped(go))
+		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_FALSE);
 }
 
 static void
@@ -2484,7 +2485,6 @@ gl_renderer_read_pixels(struct weston_output *output,
 			uint32_t width, uint32_t height)
 {
 	struct gl_output_state *go = get_output_state(output);
-	struct gl_renderer *gr = get_renderer(output->compositor);
 
 	x += go->area.x;
 	y += go->fb_size.height - go->area.y - go->area.height;
@@ -2495,8 +2495,6 @@ gl_renderer_read_pixels(struct weston_output *output,
 	if (use_output(output) < 0)
 		return -1;
 
-	if (gr->has_pack_reverse)
-		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_FALSE);
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
 	glReadPixels(x, y, width, height, format->gl_format,
 		     format->gl_type, pixels);
@@ -3783,8 +3781,6 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
 	glDisableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 
-	if (gr->has_pack_reverse)
-		glPixelStorei(GL_PACK_REVERSE_ROW_ORDER_ANGLE, GL_FALSE);
 	glPixelStorei(GL_PACK_ALIGNMENT, bytespp);
 	glReadPixels(src_x, src_y, width, height, gl_format,
 		     GL_UNSIGNED_BYTE, target);
