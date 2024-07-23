@@ -38,6 +38,9 @@
 #include "shared/weston-egl-ext.h"  /* for PFN* stuff */
 #include "shared/helpers.h"
 
+/* Max number of images per buffer. */
+#define SHADER_INPUT_TEX_MAX 3
+
 /* Keep the following in sync with vertex.glsl. */
 enum gl_shader_texcoord_input {
 	SHADER_TEXCOORD_INPUT_ATTRIB = 0,
@@ -78,6 +81,19 @@ enum gl_shader_attrib_loc {
 	SHADER_ATTRIB_LOC_BARYCENTRIC,
 };
 
+enum gl_tex_unit {
+	TEX_UNIT_IMAGES = 0,
+	TEX_UNIT_COLOR_PRE_CURVE = SHADER_INPUT_TEX_MAX,
+	TEX_UNIT_COLOR_MAPPING,
+	TEX_UNIT_COLOR_POST_CURVE,
+	TEX_UNIT_WIREFRAME,
+	TEX_UNIT_LAST,
+};
+static_assert(TEX_UNIT_LAST < 8, "OpenGL ES 2.0 requires at least 8 texture "
+	      "units. Consider replacing this assert with a "
+	      "GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS check at display creation "
+	      "to require more.");
+
 /** GL shader requirements key
  *
  * This structure is used as a binary blob key for building and searching
@@ -114,9 +130,6 @@ static_assert(sizeof(struct gl_shader_requirements) ==
 struct gl_shader;
 struct weston_color_transform;
 struct dmabuf_allocator;
-
-#define SHADER_INPUT_TEX_MAX 3
-#define SHADER_WIREFRAME_TEX_UNIT SHADER_INPUT_TEX_MAX
 
 struct gl_shader_config {
 	struct gl_shader_requirements req;
