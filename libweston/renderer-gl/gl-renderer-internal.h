@@ -115,8 +115,8 @@ struct gl_shader;
 struct weston_color_transform;
 struct dmabuf_allocator;
 
-#define GL_SHADER_INPUT_TEX_MAX 3
-#define GL_SHADER_WIREFRAME_TEX_UNIT GL_SHADER_INPUT_TEX_MAX
+#define SHADER_INPUT_TEX_MAX 3
+#define SHADER_WIREFRAME_TEX_UNIT SHADER_INPUT_TEX_MAX
 
 struct gl_shader_config {
 	struct gl_shader_requirements req;
@@ -127,7 +127,7 @@ struct gl_shader_config {
 	GLfloat unicolor[4];
 	GLfloat tint[4];
 	GLint input_tex_filter; /* GL_NEAREST or GL_LINEAR */
-	GLuint input_tex[GL_SHADER_INPUT_TEX_MAX];
+	GLuint input_tex[SHADER_INPUT_TEX_MAX];
 	GLuint wireframe_tex;
 
 	union {

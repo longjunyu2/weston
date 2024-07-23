@@ -681,7 +681,7 @@ gl_shader_load_config(struct gl_shader *shader,
 	glUniform1f(shader->view_alpha_uniform, sconf->view_alpha);
 
 	in_tgt = gl_shader_texture_variant_get_target(sconf->req.variant);
-	for (i = 0; i < GL_SHADER_INPUT_TEX_MAX; i++) {
+	for (i = 0; i < SHADER_INPUT_TEX_MAX; i++) {
 		if (sconf->input_tex[i] == 0)
 			continue;
 
@@ -695,7 +695,7 @@ gl_shader_load_config(struct gl_shader *shader,
 	}
 
 	/* Fixed texture unit for color_pre_curve LUT if it is available */
-	i = GL_SHADER_INPUT_TEX_MAX;
+	i = SHADER_INPUT_TEX_MAX;
 	switch (sconf->req.color_pre_curve) {
 	case SHADER_COLOR_CURVE_IDENTITY:
 		break;
@@ -768,8 +768,8 @@ gl_shader_load_config(struct gl_shader *shader,
 
 	if (sconf->req.wireframe) {
 		assert(sconf->wireframe_tex != 0);
-		glUniform1i(shader->tex_uniform_wireframe, GL_SHADER_WIREFRAME_TEX_UNIT);
-		glActiveTexture(GL_TEXTURE0 + GL_SHADER_WIREFRAME_TEX_UNIT);
+		glUniform1i(shader->tex_uniform_wireframe, SHADER_WIREFRAME_TEX_UNIT);
+		glActiveTexture(GL_TEXTURE0 + SHADER_WIREFRAME_TEX_UNIT);
 		glBindTexture(GL_TEXTURE_2D, sconf->wireframe_tex);
 	}
 }

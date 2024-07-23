@@ -1198,10 +1198,10 @@ gl_shader_config_set_input_textures(struct gl_shader_config *sconf,
 
 	copy_uniform4f(sconf->unicolor, gb->color);
 
-	assert(gb->num_textures <= GL_SHADER_INPUT_TEX_MAX);
+	assert(gb->num_textures <= SHADER_INPUT_TEX_MAX);
 	for (i = 0; i < gb->num_textures; i++)
 		sconf->input_tex[i] = gb->textures[i];
-	for (; i < GL_SHADER_INPUT_TEX_MAX; i++)
+	for (; i < SHADER_INPUT_TEX_MAX; i++)
 		sconf->input_tex[i] = 0;
 }
 
