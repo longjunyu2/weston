@@ -33,6 +33,10 @@
  *    1. Fixed allocation using the gl_tex_unit enumeration.
  *    2. Any functions changing the active unit must restore it to 0 before
  *       return so that other functions can assume a default value.
+ *
+ * 1. Pixel storage modes
+ *    1. Any functions changing modes must restore them to their default values
+ *       before return so that other functions can assume default values.
  */
 
 #ifndef GL_RENDERER_INTERNAL_H
