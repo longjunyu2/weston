@@ -767,6 +767,8 @@ gl_shader_load_config(struct gl_shader *shader,
 
 	if (sconf->req.wireframe)
 		glUniform1i(shader->tex_uniform_wireframe, TEX_UNIT_WIREFRAME);
+
+	glActiveTexture(GL_TEXTURE0);
 }
 
 bool

@@ -26,6 +26,15 @@
  * SOFTWARE.
  */
 
+/*
+ * GL renderer best practices:
+ *
+ * 1. Texture units
+ *    1. Fixed allocation using the gl_tex_unit enumeration.
+ *    2. Any functions changing the active unit must restore it to 0 before
+ *       return so that other functions can assume a default value.
+ */
+
 #ifndef GL_RENDERER_INTERNAL_H
 #define GL_RENDERER_INTERNAL_H
 

@@ -201,7 +201,6 @@ gl_color_curve_lut_3x1d(struct gl_renderer *gr,
 
 	curve->u.lut_3x1d.fill_in(xform, lut, lut_len);
 
-	glActiveTexture(GL_TEXTURE0);
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -238,7 +237,6 @@ gl_3d_lut(struct gl_renderer *gr,
 
 	xform->mapping.u.lut3d.fill_in(xform, lut, dim_size);
 
-	glActiveTexture(GL_TEXTURE0);
 	glGenTextures(1, &tex3d);
 	glBindTexture(GL_TEXTURE_3D, tex3d);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

@@ -574,7 +574,6 @@ gl_fbo_texture_init(struct gl_fbo_texture *fbotex,
 	GLuint shadow_fbo;
 	GLuint shadow_tex;
 
-	glActiveTexture(GL_TEXTURE0);
 	glGenTextures(1, &shadow_tex);
 	glBindTexture(GL_TEXTURE_2D, shadow_tex);
 	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0,
@@ -1834,6 +1833,8 @@ update_wireframe_tex(struct gl_renderer *gr,
 		glTexImage2D(GL_TEXTURE_2D, i, GL_LUMINANCE, new_size, 1, 0,
 			     GL_LUMINANCE, GL_UNSIGNED_BYTE, buffer);
 	free(buffer);
+
+	glActiveTexture(GL_TEXTURE0);
 }
 
 static void
@@ -1986,7 +1987,6 @@ draw_output_borders(struct weston_output *output,
 	weston_matrix_scale(&sconf.projection,
 			    2.0 / fb->width, go->y_flip * 2.0 / fb->height, 1);
 
-	glActiveTexture(GL_TEXTURE0);
 	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_POSITION);
 	glEnableVertexAttribArray(SHADER_ATTRIB_LOC_TEXCOORD);
 
@@ -2547,8 +2547,6 @@ gl_renderer_flush_damage(struct weston_paint_node *pnode)
 
 	data = wl_shm_buffer_get_data(buffer->shm_buffer);
 
-	glActiveTexture(GL_TEXTURE0);
-
 	if (gb->needs_full_upload || quirks->gl_force_full_upload) {
 		wl_shm_buffer_begin_access(buffer->shm_buffer);
 
@@ -2649,8 +2647,6 @@ ensure_textures(struct gl_buffer_state *gb, GLenum target, int num_textures)
 	int i;
 
 	assert(gb->num_textures == 0);
-
-	glActiveTexture(GL_TEXTURE0);
 
 	for (i = 0; i < num_textures; i++) {
 		glGenTextures(1, &gb->textures[i]);
@@ -3458,6 +3454,7 @@ gl_renderer_attach_buffer(struct weston_surface *surface,
 		glBindTexture(target, gb->textures[i]);
 		gr->image_target_texture_2d(target, gb->images[i]);
 	}
+	glActiveTexture(GL_TEXTURE0);
 }
 
 static const struct weston_drm_format_array *
@@ -3710,7 +3707,6 @@ gl_renderer_surface_copy_content(struct weston_surface *surface,
 
 	gl_shader_config_set_input_textures(&sconf, gs);
 
-	glActiveTexture(GL_TEXTURE0);
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, cw, ch,
