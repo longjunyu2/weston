@@ -2934,28 +2934,6 @@ err_free:
 }
 
 static void
-gl_renderer_attach_egl(struct weston_surface *es, struct weston_buffer *buffer)
-{
-	struct weston_compositor *ec = es->compositor;
-	struct gl_renderer *gr = get_renderer(ec);
-	struct gl_surface_state *gs = get_surface_state(es);
-	struct gl_buffer_state *gb = buffer->renderer_private;
-	GLenum target;
-	int i;
-
-	assert(gb);
-
-	gs->buffer = gb;
-
-	target = gl_shader_texture_variant_get_target(gb->shader_variant);
-	for (i = 0; i < gb->num_images; i++) {
-		glActiveTexture(GL_TEXTURE0 + i);
-		glBindTexture(target, gb->textures[i]);
-		gr->image_target_texture_2d(target, gb->images[i]);
-	}
-}
-
-static void
 gl_renderer_destroy_dmabuf(struct linux_dmabuf_buffer *dmabuf)
 {
 	struct gl_buffer_state *gb =
@@ -3458,9 +3436,8 @@ attach_direct_display_placeholder(struct weston_paint_node *pnode)
 	gb->shader_variant = SHADER_VARIANT_SOLID;
 }
 
-
-static bool
-gl_renderer_attach_dmabuf(struct weston_surface *surface,
+static void
+gl_renderer_attach_buffer(struct weston_surface *surface,
 			  struct weston_buffer *buffer)
 {
 	struct gl_renderer *gr = get_renderer(surface->compositor);
@@ -3480,8 +3457,6 @@ gl_renderer_attach_dmabuf(struct weston_surface *surface,
 		glBindTexture(target, gb->textures[i]);
 		gr->image_target_texture_2d(target, gb->images[i]);
 	}
-
-	return true;
 }
 
 static const struct weston_drm_format_array *
@@ -3607,10 +3582,8 @@ gl_renderer_attach(struct weston_paint_node *pnode)
 		gl_renderer_attach_shm(es, buffer);
 		break;
 	case WESTON_BUFFER_DMABUF:
-		gl_renderer_attach_dmabuf(es, buffer);
-		break;
 	case WESTON_BUFFER_RENDERER_OPAQUE:
-		gl_renderer_attach_egl(es, buffer);
+		gl_renderer_attach_buffer(es, buffer);
 		break;
 	case WESTON_BUFFER_SOLID:
 		gl_renderer_attach_solid(es, buffer);
