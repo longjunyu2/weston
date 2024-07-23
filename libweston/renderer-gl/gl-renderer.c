@@ -1812,6 +1812,7 @@ update_wireframe_tex(struct gl_renderer *gr,
 	if (new_size <= gr->wireframe_size)
 		return;
 
+	glActiveTexture(GL_TEXTURE0 + TEX_UNIT_WIREFRAME);
 	if (gr->wireframe_size == 0) {
 		glGenTextures(1, &gr->wireframe_tex);
 		glBindTexture(GL_TEXTURE_2D, gr->wireframe_tex);
