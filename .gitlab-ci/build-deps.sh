@@ -64,7 +64,8 @@ pip3 install $PIP_ARGS sphinx_rtd_theme==1.0.0
 # The fork pulls in this support from the original GitHub PR, rebased on top of
 # a newer upstream version which fixes AArch64 support.
 if [[ -n "$KERNEL_DEFCONFIG" ]]; then
-	git clone --depth=1 --branch=v6.9 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux
+	# 6.3 is (still) used as >= 6.5 drm-writeback test will timeout
+	git clone --depth=1 --branch=v6.3 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git linux
 	cd linux
 
 	if [[ "${BUILD_ARCH}" = "x86-64" ]]; then
@@ -102,9 +103,8 @@ if [[ -n "$KERNEL_DEFCONFIG" ]]; then
 	mv linux/.config /weston-virtme/.config
 	rm -rf linux
 
-	git clone https://github.com/fooishbar/virtme
+	git clone --depth=1 --branch=v1.25 --recurse-submodules https://github.com/arighi/virtme-ng.git virtme
 	cd virtme
-	git checkout -b snapshot 036fc0c8b3ee0881a035abc47ab4f152546a4408
 	./setup.py install
 	cd ..
 fi

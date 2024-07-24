@@ -43,7 +43,7 @@
 variables:
   FDO_UPSTREAM_REPO: wayland/weston
   FDO_REPO_SUFFIX: "$BUILD_OS-$FDO_DISTRIBUTION_VERSION/$BUILD_ARCH"
-  FDO_DISTRIBUTION_TAG: '2024-02-14-00-lcms2'
+  FDO_DISTRIBUTION_TAG: '2024-07-24-00-virtme-ng'
 
 
 include:
@@ -280,7 +280,7 @@ aarch64-debian-container_prep:
   - ninja -k0 -j${FDO_CI_CONCURRENT:-4}
   - ninja install
   - test -n "${QEMU_SMP}" || QEMU_SMP=${FDO_CI_CONCURRENT:-4}
-  - virtme-run --rw --pwd --kimg /weston-virtme/${KERNEL_IMAGE} --kopt quiet --kopt log_buf_len=2M --script-dir ../.gitlab-ci/virtme-scripts --qemu-opts -m 4096 -smp ${QEMU_SMP}
+  - virtme-run --rw --pwd --kimg /weston-virtme/${KERNEL_IMAGE} --kopt quiet --kopt log_buf_len=2M --script-sh ../.gitlab-ci/virtme-scripts/run-weston-tests.sh --qemu-opts -m 4096 -smp ${QEMU_SMP}
   - TEST_RES=$(cat $TESTS_RES_PATH)
   - rm $TESTS_RES_PATH
   - cp -R /weston-virtme ./

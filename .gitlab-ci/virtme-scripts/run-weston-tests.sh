@@ -47,7 +47,3 @@ echo 0x00 > /sys/module/drm/parameters/debug
 #   - 1 means the tests failed, so the job itself should fail
 TESTS_RES_PATH=$(pwd)/tests-res.txt
 echo $TEST_RES > $TESTS_RES_PATH
-
-# shutdown virtme
-sync
-poweroff -f

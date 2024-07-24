@@ -115,6 +115,10 @@ apt-get -y --no-install-recommends install \
 	sysvinit-core \
 	x11proto-dev \
 	xwayland \
+	python3-argcomplete \
+	flake8 pylint \
+	cargo rustc \
+	iproute2 udev \
 	$MESA_DEV_PKGS \
 	$MESA_RUNTIME_PKGS \
 	$LINUX_DEV_PKGS \
