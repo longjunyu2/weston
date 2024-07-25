@@ -38,6 +38,7 @@ fixture_setup(struct weston_test_harness *harness)
 	setup.backend = WESTON_BACKEND_DRM;
 	setup.renderer = WESTON_RENDERER_PIXMAN;
 	setup.shell = SHELL_TEST_DESKTOP;
+	setup.logging_scopes = "log,drm-backend";
 
 	weston_ini_setup(&setup,
 			 cfgln("[shell]"),
