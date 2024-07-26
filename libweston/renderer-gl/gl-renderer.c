@@ -2348,7 +2348,9 @@ gl_renderer_repaint_output(struct weston_output *output,
 		pixman_region32_fini(&undamaged);
 	}
 
-	if (gr->has_egl_partial_update && !gr->debug_clear) {
+	if (gr->has_egl_partial_update &&
+	    go->egl_surface != EGL_NO_SURFACE &&
+	    !gr->debug_clear) {
 		int n_egl_rects;
 		EGLint *egl_rects;
 
