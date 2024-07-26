@@ -2375,7 +2375,8 @@ gl_renderer_repaint_output(struct weston_output *output,
 		glBindFramebuffer(GL_FRAMEBUFFER, rb->fbo);
 		glViewport(go->area.x, area_y,
 			   go->area.width, go->area.height);
-		blit_shadow_to_output(output, &rb->base.damage);
+		blit_shadow_to_output(output, gr->debug_clear ?
+				      &output->region : &rb->base.damage);
 	} else {
 		repaint_views(output, &rb->base.damage);
 	}
