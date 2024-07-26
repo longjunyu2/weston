@@ -2337,11 +2337,12 @@ gl_renderer_repaint_output(struct weston_output *output,
 	 * EGL_KHR_partial_update, since we damage the whole area. */
 	if (gr->debug_clear) {
 		pixman_region32_t undamaged;
+		pixman_region32_t *damaged =
+			shadow_exists(go) ? output_damage : &rb->base.damage;
 		int debug_mode = gr->debug_mode;
 
 		pixman_region32_init(&undamaged);
-		pixman_region32_subtract(&undamaged, &output->region,
-					 output_damage);
+		pixman_region32_subtract(&undamaged, &output->region, damaged);
 		gr->debug_mode = DEBUG_MODE_NONE;
 		repaint_views(output, &undamaged);
 		gr->debug_mode = debug_mode;
