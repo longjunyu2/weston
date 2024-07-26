@@ -2331,10 +2331,10 @@ gl_renderer_repaint_output(struct weston_output *output,
 		gr->wireframe_dirty = false;
 	}
 
-	/* In wireframe debug mode, redraw everything to make sure that we clear
-	 * any wireframes left over from previous draws on this buffer. This
-	 * precludes the use of EGL_EXT_swap_buffers_with_damage and
-	 * EGL_KHR_partial_update, since we damage the whole area. */
+	/* Some of the debug modes need an entire repaint to make sure that we
+	 * clear any debug left over on this buffer. This precludes the use of
+	 * EGL_EXT_swap_buffers_with_damage and EGL_KHR_partial_update, since we
+	 * damage the whole area. */
 	if (gr->debug_clear) {
 		pixman_region32_t undamaged;
 		pixman_region32_t *damaged =
@@ -2356,8 +2356,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 		EGLint *egl_rects;
 
 		/* For partial_update, we need to pass the region which has
-		 * changed since we last rendered into this specific buffer;
-		 * this is total_damage. */
+		 * changed since we last rendered into this specific buffer. */
 		pixman_region_to_egl(output, &rb->base.damage,
 				     &egl_rects, &n_egl_rects);
 		gr->set_damage_region(gr->egl_display, go->egl_surface,
