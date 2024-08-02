@@ -43,7 +43,7 @@
 variables:
   FDO_UPSTREAM_REPO: wayland/weston
   FDO_REPO_SUFFIX: "$BUILD_OS-$FDO_DISTRIBUTION_VERSION/$BUILD_ARCH"
-  FDO_DISTRIBUTION_TAG: '2024-08-05-00-rm-plugins'
+  FDO_DISTRIBUTION_TAG: '2024-08-14-00-freerdp3.x'
 
 
 include:
@@ -89,6 +89,7 @@ stages:
   variables:
     BUILD_OS: debian
     LLVM_VERSION: 11
+    FREERDP_VERSION: 2
     FDO_DISTRIBUTION_VERSION: bullseye
     FDO_DISTRIBUTION_EXEC: 'env FDO_CI_CONCURRENT=${FDO_CI_CONCURRENT} BUILD_ARCH=${BUILD_ARCH} KERNEL_IMAGE=${KERNEL_IMAGE} KERNEL_DEFCONFIG=${KERNEL_DEFCONFIG} LLVM_VERSION=${LLVM_VERSION} FDO_DISTRIBUTION_VERSION=${FDO_DISTRIBUTION_VERSION} bash .gitlab-ci/debian-install.sh'
 
@@ -96,6 +97,8 @@ stages:
   variables:
     BUILD_OS: debian
     LLVM_VERSION: 15
+    FREERDP_VERSION: 3
+    USE_BOOKWORM_BACKPORTS: y
     # If you upgrade from bookworm, see the use_tls=0 notes in tests/meson.build.
     FDO_DISTRIBUTION_VERSION: bookworm
     FDO_DISTRIBUTION_EXEC: 'env FDO_CI_CONCURRENT=${FDO_CI_CONCURRENT} BUILD_ARCH=${BUILD_ARCH} KERNEL_IMAGE=${KERNEL_IMAGE} KERNEL_DEFCONFIG=${KERNEL_DEFCONFIG} LLVM_VERSION=${LLVM_VERSION} FDO_DISTRIBUTION_VERSION=${FDO_DISTRIBUTION_VERSION} bash .gitlab-ci/debian-install.sh'
@@ -142,6 +145,10 @@ check-commit:
     - .os-debian
   variables:
     BUILD_ARCH: "armv7"
+    # Armv7 doesn't have freerdp3 in bookworm-backports so we don't build FreeRDP
+    MESON_DIST_OPTIONS: "-Dbackend-rdp=false"
+    # Inhibit installation of freerdp-dev
+    FREERDP_VERSION: 0
 
 .debian-lts-aarch64:
   extends:
@@ -276,7 +283,7 @@ aarch64-debian-container_prep:
   - .default-rules
   script:
   - cd "$BUILDDIR"
-  - meson --prefix="$PREFIX" --wrap-mode=nofallback -Db_sanitize=address ${MESON_OPTIONS} ${MESON_TOOLCHAIN_OPTIONS} ..
+  - meson --prefix="$PREFIX" --wrap-mode=nofallback -Db_sanitize=address ${MESON_OPTIONS} ${MESON_TOOLCHAIN_OPTIONS} ${MESON_DIST_OPTIONS} ..
   - ninja -k0 -j${FDO_CI_CONCURRENT:-4}
   - ninja install
   - test -n "${QEMU_SMP}" || QEMU_SMP=${FDO_CI_CONCURRENT:-4}
@@ -304,7 +311,7 @@ aarch64-debian-container_prep:
   - .default-rules
   script:
   - cd "$BUILDDIR"
-  - meson --prefix="$PREFIX" --wrap-mode=nofallback ${MESON_OPTIONS} ..
+  - meson --prefix="$PREFIX" --wrap-mode=nofallback ${MESON_OPTIONS} ${MESON_DIST_OPTIONS} ..
   - ninja -k0 -j${FDO_CI_CONCURRENT:-4}
   - ninja install
   - ninja clean

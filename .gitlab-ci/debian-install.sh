@@ -31,6 +31,9 @@ MESA_RUNTIME_PKGS="
 	libllvm${LLVM_VERSION}
 "
 
+if [ x"$USE_BOOKWORM_BACKPORTS" = "xy" ] ; then
+	echo 'deb http://deb.debian.org/debian bookworm-backports main' >> /etc/apt/sources.list
+fi
 apt-get update
 apt-get -y --no-install-recommends install \
 	autoconf \
@@ -40,7 +43,6 @@ apt-get -y --no-install-recommends install \
 	curl \
 	doxygen \
 	graphviz \
-	freerdp2-dev \
 	gcovr \
 	git \
 	hwdata \
@@ -123,6 +125,9 @@ apt-get -y --no-install-recommends install \
 	$MESA_RUNTIME_PKGS \
 	$LINUX_DEV_PKGS \
 
+if [ "$FREERDP_VERSION" -ne 0 ] ; then
+    apt-get -y --no-install-recommends install freerdp${FREERDP_VERSION}-dev
+fi
 
 # Actually build our dependencies ...
 ./.gitlab-ci/build-deps.sh

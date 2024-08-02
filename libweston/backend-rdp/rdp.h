@@ -27,6 +27,14 @@
 #ifndef RDP_H
 #define RDP_H
 
+/* Workaround an issue with clang and freerdp 3 headers. Another
+ * option would be to build with --std=c11 but weston itself isn't
+ * quite ready for that
+ */
+#if USE_FREERDP_VERSION >= 3 && defined(__clang__)
+#pragma clang diagnostic ignored "-Wtypedef-redefinition"
+#endif
+
 #include <freerdp/version.h>
 
 #include <freerdp/freerdp.h>
@@ -43,6 +51,8 @@
 #include <libweston/libweston.h>
 #include <libweston/backend-rdp.h>
 #include <libweston/weston-log.h>
+
+#include <winpr/string.h>
 
 #include "backend.h"
 
@@ -67,6 +77,17 @@
 /* From Linux's keyboard driver at drivers/input/keyboard/atkbd.c */
 #define ATKBD_RET_HANJA 0xf1
 #define ATKBD_RET_HANGEUL 0xf2
+
+/* freerdp2 vs 3 compat */
+#if USE_FREERDP_VERSION >= 3
+#define FORM_DATA_RESP_COMM(r, f)	(r).common.f
+#define XF_KEV_CODE_TYPE		UINT8
+#else
+#define FORM_DATA_RESP_COMM(r, f)	(r).f
+#define WINPR_KBD_TYPE_JAPANESE		KBD_TYPE_JAPANESE
+#define WINPR_KEYCODE_TYPE_XKB		KEYCODE_TYPE_EVDEV
+#define XF_KEV_CODE_TYPE		UINT16
+#endif
 
 struct rdp_backend {
 	struct weston_backend base;
