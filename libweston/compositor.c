@@ -1002,7 +1002,8 @@ weston_surface_create(struct weston_compositor *compositor)
 	surface->current_protection = WESTON_HDCP_DISABLE;
 	surface->protection_mode = WESTON_SURFACE_PROTECTION_MODE_RELAXED;
 
-	wl_list_init(&surface->cm_surface_resource_list);
+	wl_list_init(&surface->cm_feedback_surface_resource_list);
+	surface->cm_surface = NULL;
 
 	/* The surfaces start with no color profile and render intent. It's up
 	 * to the color manager what to do with that. Later, clients are able to
@@ -2705,7 +2706,7 @@ weston_surface_unref(struct weston_surface *surface)
 	struct wl_resource *cb, *next;
 	struct weston_view *ev, *nv;
 	struct weston_pointer_constraint *constraint, *next_constraint;
-	struct wl_resource *cm_surface_res, *cm_surface_res_tmp;
+	struct wl_resource *cm_feedback_surface_res, *cm_feedback_surface_res_tmp;
 	struct weston_paint_node *pnode, *pntmp;
 
 	if (!surface)
@@ -2761,12 +2762,15 @@ weston_surface_unref(struct weston_surface *surface)
 	weston_color_profile_unref(surface->color_profile);
 	weston_color_profile_unref(surface->preferred_color_profile);
 
-        wl_resource_for_each_safe(cm_surface_res, cm_surface_res_tmp,
-				  &surface->cm_surface_resource_list) {
-                wl_list_remove(wl_resource_get_link(cm_surface_res));
-                wl_list_init(wl_resource_get_link(cm_surface_res));
-                wl_resource_set_user_data(cm_surface_res, NULL);
+        wl_resource_for_each_safe(cm_feedback_surface_res,
+				  cm_feedback_surface_res_tmp,
+				  &surface->cm_feedback_surface_resource_list) {
+                wl_list_remove(wl_resource_get_link(cm_feedback_surface_res));
+                wl_list_init(wl_resource_get_link(cm_feedback_surface_res));
+                wl_resource_set_user_data(cm_feedback_surface_res, NULL);
         }
+	if (surface->cm_surface)
+		wl_resource_set_user_data(surface->cm_surface, NULL);
 
 	free(surface);
 }

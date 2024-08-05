@@ -2049,11 +2049,12 @@ struct weston_surface {
 	struct weston_color_profile *preferred_color_profile;
 	const struct weston_render_intent_info *render_intent;
 
-        /* xx_color_manager_v1.get_color_management_surface
+        /* xx_color_manager_v1.get_feedback_color_management_surface
 	 *
 	 * When a client uses this request, we add the wl_resource we create to
 	 * this list. */
-        struct wl_list cm_surface_resource_list;
+        struct wl_list cm_feedback_surface_resource_list;
+        struct wl_resource *cm_surface;
 };
 
 struct weston_subsurface {

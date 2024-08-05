@@ -65,7 +65,7 @@ const struct lcms_pipeline pipeline_sRGB = {
 };
 
 struct image_description {
-	struct xx_image_description_v2 *xx_image_descr;
+	struct xx_image_description_v4 *xx_image_descr;
 
 	enum image_description_status {
 		CM_IMAGE_DESC_NOT_CREATED = 0,
@@ -81,9 +81,9 @@ struct image_description {
 	uint32_t icc_size;
 
 	/* For parametric images descriptions. */
-	enum xx_color_manager_v2_primaries primaries_named;
+	enum xx_color_manager_v4_primaries primaries_named;
 	struct weston_color_gamut primaries;
-	enum xx_color_manager_v2_transfer_function tf_named;
+	enum xx_color_manager_v4_transfer_function tf_named;
 	float tf_power;
 	struct weston_color_gamut target_primaries;
 	float target_min_lum, target_max_lum;
@@ -92,7 +92,7 @@ struct image_description {
 };
 
 struct image_description_info {
-	struct xx_image_description_info_v2 *xx_image_description_info;
+	struct xx_image_description_info_v4 *xx_image_description_info;
 	struct image_description *image_descr;
 
 	/* Bitfield that holds what events the compositor has sent us through
@@ -102,10 +102,11 @@ struct image_description_info {
 };
 
 struct color_manager {
-        struct xx_color_manager_v2 *manager;
+        struct xx_color_manager_v4 *manager;
 
-	struct xx_color_management_output_v2 *output;
-	struct xx_color_management_surface_v2 *surface;
+	struct xx_color_management_output_v4 *output;
+	struct xx_color_management_surface_v4 *surface;
+	struct xx_color_management_feedback_surface_v4 *feedback_surface;
 
 	struct wl_list image_descr_list; /* image_description::link */
 
@@ -130,12 +131,12 @@ static void
 image_description_destroy(struct image_description *image_descr)
 {
 	wl_list_remove(&image_descr->link);
-	xx_image_description_v2_destroy(image_descr->xx_image_descr);
+	xx_image_description_v4_destroy(image_descr->xx_image_descr);
 	free(image_descr);
 }
 
 static void
-image_descr_ready(void *data, struct xx_image_description_v2 *xx_image_description_v2,
+image_descr_ready(void *data, struct xx_image_description_v4 *xx_image_description_v4,
 		  uint32_t identity)
 {
 	struct image_description *image_descr = data;
@@ -144,7 +145,7 @@ image_descr_ready(void *data, struct xx_image_description_v2 *xx_image_descripti
 }
 
 static void
-image_descr_failed(void *data, struct xx_image_description_v2 *xx_image_description_v2,
+image_descr_failed(void *data, struct xx_image_description_v4 *xx_image_description_v4,
 		   uint32_t cause, const char *msg)
 {
 	struct image_description *image_descr = data;
@@ -155,7 +156,7 @@ image_descr_failed(void *data, struct xx_image_description_v2 *xx_image_descript
 		"    cause: %u, msg: %s\n", cause, msg);
 }
 
-static const struct xx_image_description_v2_listener
+static const struct xx_image_description_v4_listener
 image_descr_iface = {
 	.ready = image_descr_ready,
 	.failed = image_descr_failed,
@@ -173,9 +174,9 @@ image_descr_info_received(struct image_description_info *image_descr_info,
 
 static void
 image_descr_info_primaries(void *data,
-			   struct xx_image_description_info_v2 *xx_image_description_info_v2,
-			   uint32_t r_x, uint32_t r_y, uint32_t g_x, uint32_t g_y,
-			   uint32_t b_x, uint32_t b_y, uint32_t w_x, uint32_t w_y)
+			   struct xx_image_description_info_v4 *xx_image_description_info_v4,
+			   int32_t r_x, int32_t r_y, int32_t g_x, int32_t g_y,
+			   int32_t b_x, int32_t b_y, int32_t w_x, int32_t w_y)
 {
 	struct image_description_info *image_descr_info = data;
 	struct image_description *image_descr = image_descr_info->image_descr;
@@ -196,7 +197,7 @@ image_descr_info_primaries(void *data,
 
 static void
 image_descr_info_primaries_named(void *data,
-				 struct xx_image_description_info_v2 *xx_image_description_info_v2,
+				 struct xx_image_description_info_v4 *xx_image_description_info_v4,
 				 uint32_t primaries)
 {
 	struct image_description_info *image_descr_info = data;
@@ -210,7 +211,7 @@ image_descr_info_primaries_named(void *data,
 
 static void
 image_descr_info_tf_named(void *data,
-			  struct xx_image_description_info_v2 *xx_image_description_info_v2,
+			  struct xx_image_description_info_v4 *xx_image_description_info_v4,
 			  uint32_t tf)
 {
 	struct image_description_info *image_descr_info = data;
@@ -224,7 +225,7 @@ image_descr_info_tf_named(void *data,
 
 static void
 image_descr_info_tf_power(void *data,
-			  struct xx_image_description_info_v2 *xx_image_description_info_v2,
+			  struct xx_image_description_info_v4 *xx_image_description_info_v4,
 			  uint32_t tf_power)
 {
 	struct image_description_info *image_descr_info = data;
@@ -238,9 +239,9 @@ image_descr_info_tf_power(void *data,
 
 static void
 image_descr_info_target_primaries(void *data,
-				  struct xx_image_description_info_v2 *xx_image_description_info_v2,
-				  uint32_t r_x, uint32_t r_y, uint32_t g_x, uint32_t g_y,
-				  uint32_t b_x, uint32_t b_y, uint32_t w_x, uint32_t w_y)
+				  struct xx_image_description_info_v4 *xx_image_description_info_v4,
+				  int32_t r_x, int32_t r_y, int32_t g_x, int32_t g_y,
+				  int32_t b_x, int32_t b_y, int32_t w_x, int32_t w_y)
 {
 	struct image_description_info *image_descr_info = data;
 	struct image_description *image_descr = image_descr_info->image_descr;
@@ -260,7 +261,7 @@ image_descr_info_target_primaries(void *data,
 
 static void
 image_descr_info_target_luminance(void *data,
-				  struct xx_image_description_info_v2 *xx_image_description_info_v2,
+				  struct xx_image_description_info_v4 *xx_image_description_info_v4,
 				  uint32_t min_lum, uint32_t max_lum)
 {
 	struct image_description_info *image_descr_info = data;
@@ -275,7 +276,7 @@ image_descr_info_target_luminance(void *data,
 
 static void
 image_descr_info_target_max_cll(void *data,
-				struct xx_image_description_info_v2 *xx_image_description_info_v2,
+				struct xx_image_description_info_v4 *xx_image_description_info_v4,
 				uint32_t maxCLL)
 {
 	struct image_description_info *image_descr_info = data;
@@ -289,7 +290,7 @@ image_descr_info_target_max_cll(void *data,
 
 static void
 image_descr_info_target_max_fall(void *data,
-				 struct xx_image_description_info_v2 *xx_image_description_info_v2,
+				 struct xx_image_description_info_v4 *xx_image_description_info_v4,
 				 uint32_t maxFALL)
 {
 	struct image_description_info *image_descr_info = data;
@@ -303,7 +304,7 @@ image_descr_info_target_max_fall(void *data,
 
 static void
 image_descr_info_icc_file_event(void *data,
-				struct xx_image_description_info_v2 *xx_image_description_info_v2,
+				struct xx_image_description_info_v4 *xx_image_description_info_v4,
 				int32_t icc_fd, uint32_t icc_size)
 {
 	struct image_description_info *image_descr_info = data;
@@ -361,19 +362,19 @@ are_events_received_valid(struct image_description_info *image_descr_info)
 
 	/* If we received tf named and exp power, they must match. */
 	if (received_tf_named && received_tf_power) {
-		if (image_descr->tf_named != XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_GAMMA22 &&
-		    image_descr->tf_named != XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_GAMMA28) {
+		if (image_descr->tf_named != XX_COLOR_MANAGER_V4_TRANSFER_FUNCTION_GAMMA22 &&
+		    image_descr->tf_named != XX_COLOR_MANAGER_V4_TRANSFER_FUNCTION_GAMMA28) {
 			testlog("    Error: parametric image description tf " \
 				"named is not pure power-law, but still received " \
 				"tf power event\n");
 			return false;
-		} else if (image_descr->tf_named == XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_GAMMA22 &&
+		} else if (image_descr->tf_named == XX_COLOR_MANAGER_V4_TRANSFER_FUNCTION_GAMMA22 &&
 			   image_descr->tf_power != 2.2f) {
 			testlog("    Error: parametric image description tf named " \
 				"is pure power-law 2.2, but tf power received is %f\n",
 				image_descr->tf_power);
 			return false;
-		} else if (image_descr->tf_named == XX_COLOR_MANAGER_V2_TRANSFER_FUNCTION_GAMMA28 &&
+		} else if (image_descr->tf_named == XX_COLOR_MANAGER_V4_TRANSFER_FUNCTION_GAMMA28 &&
 			   image_descr->tf_power != 2.8f) {
 			testlog("    Error: parametric image description tf named " \
 				"is pure power-law 2.8, but tf power received is %f\n",
@@ -390,12 +391,12 @@ are_events_received_valid(struct image_description_info *image_descr_info)
 
 static void
 image_descr_info_done(void *data,
-		      struct xx_image_description_info_v2 *xx_image_description_info_v2)
+		      struct xx_image_description_info_v4 *xx_image_description_info_v4)
 {
 	struct image_description_info *image_descr_info = data;
 	struct image_description *image_descr = image_descr_info->image_descr;
 
-	testlog("Image description info %p done:\n", xx_image_description_info_v2);
+	testlog("Image description info %p done:\n", xx_image_description_info_v4);
 
 	assert(are_events_received_valid(image_descr_info));
 
@@ -458,7 +459,7 @@ image_descr_info_done(void *data,
 		testlog("    Target maxFALL: %.4f\n", image_descr->target_max_fall);
 }
 
-static const struct xx_image_description_info_v2_listener
+static const struct xx_image_description_info_v4_listener
 image_descr_info_iface = {
 	.primaries = image_descr_info_primaries,
 	.primaries_named = image_descr_info_primaries_named,
@@ -473,7 +474,7 @@ image_descr_info_iface = {
 };
 
 static void
-cm_supported_intent(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+cm_supported_intent(void *data, struct xx_color_manager_v4 *xx_color_manager_v4,
 		    uint32_t render_intent)
 {
 	struct color_manager *cm = data;
@@ -482,7 +483,7 @@ cm_supported_intent(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
 }
 
 static void
-cm_supported_feature(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+cm_supported_feature(void *data, struct xx_color_manager_v4 *xx_color_manager_v4,
 		     uint32_t feature)
 {
 	struct color_manager *cm = data;
@@ -491,7 +492,7 @@ cm_supported_feature(void *data, struct xx_color_manager_v2 *xx_color_manager_v2
 }
 
 static void
-cm_supported_tf_named(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+cm_supported_tf_named(void *data, struct xx_color_manager_v4 *xx_color_manager_v4,
 		      uint32_t tf_code)
 {
 	/* only used to create image descriptions using parameters, which is
@@ -499,14 +500,14 @@ cm_supported_tf_named(void *data, struct xx_color_manager_v2 *xx_color_manager_v
 }
 
 static void
-cm_supported_primaries_named(void *data, struct xx_color_manager_v2 *xx_color_manager_v2,
+cm_supported_primaries_named(void *data, struct xx_color_manager_v4 *xx_color_manager_v4,
 			     uint32_t primaries_code)
 {
 	/* only used to create image descriptions using parameters, which is
 	 * still unsupported by Weston. */
 }
 
-static const struct xx_color_manager_v2_listener
+static const struct xx_color_manager_v4_listener
 cm_iface = {
 	.supported_intent = cm_supported_intent,
 	.supported_feature = cm_supported_feature,
@@ -522,28 +523,32 @@ color_manager_init(struct color_manager *cm, struct client *client)
 	wl_list_init(&cm->image_descr_list);
 
         cm->manager = bind_to_singleton_global(client,
-					       &xx_color_manager_v2_interface,
+					       &xx_color_manager_v4_interface,
 					       1);
-	xx_color_manager_v2_add_listener(cm->manager, &cm_iface, cm);
+	xx_color_manager_v4_add_listener(cm->manager, &cm_iface, cm);
 
-	cm->output = xx_color_manager_v2_get_output(cm->manager,
+	cm->output = xx_color_manager_v4_get_output(cm->manager,
 						    client->output->wl_output);
 
-	cm->surface = xx_color_manager_v2_get_surface(cm->manager,
+	cm->surface = xx_color_manager_v4_get_surface(cm->manager,
 						      client->surface->wl_surface);
+
+	cm->feedback_surface =
+		xx_color_manager_v4_get_feedback_surface(cm->manager,
+							 client->surface->wl_surface);
 
 	client_roundtrip(client);
 
 	/* For now, Weston only supports the ICC image description creator. All
 	 * the parametric parts of the protocol are still unsupported. */
-	assert(cm->supported_features == (1 << XX_COLOR_MANAGER_V2_FEATURE_ICC_V2_V4));
+	assert(cm->supported_features == (1 << XX_COLOR_MANAGER_V4_FEATURE_ICC_V2_V4));
 
 	/* Weston supports all rendering intents. */
-	assert(cm->supported_rendering_intents == ((1 << XX_COLOR_MANAGER_V2_RENDER_INTENT_PERCEPTUAL) |
-						   (1 << XX_COLOR_MANAGER_V2_RENDER_INTENT_RELATIVE) |
-						   (1 << XX_COLOR_MANAGER_V2_RENDER_INTENT_SATURATION) |
-						   (1 << XX_COLOR_MANAGER_V2_RENDER_INTENT_ABSOLUTE) |
-						   (1 << XX_COLOR_MANAGER_V2_RENDER_INTENT_RELATIVE_BPC)));
+	assert(cm->supported_rendering_intents == ((1 << XX_COLOR_MANAGER_V4_RENDER_INTENT_PERCEPTUAL) |
+						   (1 << XX_COLOR_MANAGER_V4_RENDER_INTENT_RELATIVE) |
+						   (1 << XX_COLOR_MANAGER_V4_RENDER_INTENT_SATURATION) |
+						   (1 << XX_COLOR_MANAGER_V4_RENDER_INTENT_ABSOLUTE) |
+						   (1 << XX_COLOR_MANAGER_V4_RENDER_INTENT_RELATIVE_BPC)));
 }
 
 static void
@@ -554,9 +559,10 @@ color_manager_fini(struct color_manager *cm)
 	wl_list_for_each_safe(image_descr, tmp, &cm->image_descr_list, link)
 		image_description_destroy(image_descr);
 
-	xx_color_management_output_v2_destroy(cm->output);
-	xx_color_management_surface_v2_destroy(cm->surface);
-        xx_color_manager_v2_destroy(cm->manager);
+	xx_color_management_output_v4_destroy(cm->output);
+	xx_color_management_surface_v4_destroy(cm->surface);
+	xx_color_management_feedback_surface_v4_destroy(cm->feedback_surface);
+	xx_color_manager_v4_destroy(cm->manager);
 }
 
 static struct image_description *
@@ -565,9 +571,9 @@ get_output_image_description(struct color_manager *cm)
 	struct image_description *image_descr = image_description_create();
 
 	image_descr->xx_image_descr =
-		xx_color_management_output_v2_get_image_description(cm->output);
+		xx_color_management_output_v4_get_image_description(cm->output);
 
-	xx_image_description_v2_add_listener(image_descr->xx_image_descr,
+	xx_image_description_v4_add_listener(image_descr->xx_image_descr,
 					     &image_descr_iface, image_descr);
 
 	wl_list_insert(&cm->image_descr_list, &image_descr->link);
@@ -581,9 +587,9 @@ get_surface_preferred_image_description(struct color_manager *cm)
 	struct image_description *image_descr = image_description_create();
 
 	image_descr->xx_image_descr =
-		xx_color_management_surface_v2_get_preferred(cm->surface);
+		xx_color_management_feedback_surface_v4_get_preferred(cm->feedback_surface);
 
-	xx_image_description_v2_add_listener(image_descr->xx_image_descr,
+	xx_image_description_v4_add_listener(image_descr->xx_image_descr,
 					     &image_descr_iface, image_descr);
 
 	wl_list_insert(&cm->image_descr_list, &image_descr->link);
@@ -593,7 +599,7 @@ get_surface_preferred_image_description(struct color_manager *cm)
 
 static struct image_description *
 create_icc_based_image_description(struct color_manager *cm,
-				   struct xx_image_description_creator_icc_v2 *image_descr_creator_icc,
+				   struct xx_image_description_creator_icc_v4 *image_descr_creator_icc,
 				   const char *icc_path)
 {
 	struct image_description *image_descr = image_description_create();
@@ -605,12 +611,12 @@ create_icc_based_image_description(struct color_manager *cm,
 
 	assert(fstat(icc_fd, &st) == 0);
 
-	xx_image_description_creator_icc_v2_set_icc_file(image_descr_creator_icc,
+	xx_image_description_creator_icc_v4_set_icc_file(image_descr_creator_icc,
 							 icc_fd, 0, st.st_size);
 	image_descr->xx_image_descr =
-		xx_image_description_creator_icc_v2_create(image_descr_creator_icc);
+		xx_image_description_creator_icc_v4_create(image_descr_creator_icc);
 
-	xx_image_description_v2_add_listener(image_descr->xx_image_descr,
+	xx_image_description_v4_add_listener(image_descr->xx_image_descr,
 					     &image_descr_iface, image_descr);
 
 	wl_list_insert(&cm->image_descr_list, &image_descr->link);
@@ -684,7 +690,7 @@ TEST(smoke_test)
 static void
 image_descr_info_destroy(struct image_description_info *image_descr_info)
 {
-	xx_image_description_info_v2_destroy(image_descr_info->xx_image_description_info);
+	xx_image_description_info_v4_destroy(image_descr_info->xx_image_description_info);
 	free(image_descr_info);
 }
 
@@ -698,9 +704,9 @@ image_descr_get_information(struct image_description *image_descr)
 	image_descr_info->image_descr = image_descr;
 
 	image_descr_info->xx_image_description_info =
-		xx_image_description_v2_get_information(image_descr->xx_image_descr);
+		xx_image_description_v4_get_information(image_descr->xx_image_descr);
 
-	xx_image_description_info_v2_add_listener(image_descr_info->xx_image_description_info,
+	xx_image_description_info_v4_add_listener(image_descr_info->xx_image_description_info,
 						  &image_descr_info_iface,
 						  image_descr_info);
 
@@ -767,17 +773,17 @@ TEST(create_parametric_image_description_creator_object)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_params_v2 *param_creator;
+	struct xx_image_description_creator_params_v4 *param_creator;
 
 	client = create_client_and_test_surface(100, 100, 100, 100);
 	color_manager_init(&cm, client);
 
 	/* Parametric image description creator is still unsupported */
-	param_creator = xx_color_manager_v2_new_parametric_creator(cm.manager);
-	expect_protocol_error(client, &xx_color_manager_v2_interface,
-			      XX_COLOR_MANAGER_V2_ERROR_UNSUPPORTED_FEATURE);
+	param_creator = xx_color_manager_v4_new_parametric_creator(cm.manager);
+	expect_protocol_error(client, &xx_color_manager_v4_interface,
+			      XX_COLOR_MANAGER_V4_ERROR_UNSUPPORTED_FEATURE);
 
-	xx_image_description_creator_params_v2_destroy(param_creator);
+	xx_image_description_creator_params_v4_destroy(param_creator);
 	color_manager_fini(&cm);
 	client_destroy(client);
 }
@@ -786,14 +792,14 @@ TEST(create_image_description_before_setting_icc_file)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_icc_v2 *image_descr_creator_icc;
-	struct xx_image_description_v2 *image_desc;
+	struct xx_image_description_creator_icc_v4 *image_descr_creator_icc;
+	struct xx_image_description_v4 *image_desc;
 
 	client = create_client_and_test_surface(100, 100, 100, 100);
 	color_manager_init(&cm, client);
 
 	image_descr_creator_icc =
-		xx_color_manager_v2_new_icc_creator(cm.manager);
+		xx_color_manager_v4_new_icc_creator(cm.manager);
 
 	/* Try creating image description based on ICC profile but without
 	 * setting the ICC file, what should fail.
@@ -801,11 +807,11 @@ TEST(create_image_description_before_setting_icc_file)
 	 * We expect a protocol error from unknown object, because the
 	 * image_descr_creator_icc wl_proxy will get destroyed with the create
 	 * call below. It is a destructor request. */
-	image_desc = xx_image_description_creator_icc_v2_create(image_descr_creator_icc);
+	image_desc = xx_image_description_creator_icc_v4_create(image_descr_creator_icc);
 	expect_protocol_error(client, NULL,
-			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_INCOMPLETE_SET);
+			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V4_ERROR_INCOMPLETE_SET);
 
-	xx_image_description_v2_destroy(image_desc);
+	xx_image_description_v4_destroy(image_desc);
 	color_manager_fini(&cm);
 	client_destroy(client);
 }
@@ -814,7 +820,7 @@ TEST(set_unreadable_icc_fd)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_icc_v2 *image_descr_creator_icc;
+	struct xx_image_description_creator_icc_v4 *image_descr_creator_icc;
 	int32_t icc_fd;
 	struct stat st;
 
@@ -822,7 +828,7 @@ TEST(set_unreadable_icc_fd)
 	color_manager_init(&cm, client);
 
 	image_descr_creator_icc =
-		xx_color_manager_v2_new_icc_creator(cm.manager);
+		xx_color_manager_v4_new_icc_creator(cm.manager);
 
 	/* The file is being open with WRITE, not READ permission. So the
 	 * compositor should complain. */
@@ -831,13 +837,13 @@ TEST(set_unreadable_icc_fd)
 	assert(fstat(icc_fd, &st) == 0);
 
 	/* Try setting the bad ICC file fd, it should fail. */
-	xx_image_description_creator_icc_v2_set_icc_file(image_descr_creator_icc,
+	xx_image_description_creator_icc_v4_set_icc_file(image_descr_creator_icc,
 							 icc_fd, 0, st.st_size);
-	expect_protocol_error(client, &xx_image_description_creator_icc_v2_interface,
-			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_FD);
+	expect_protocol_error(client, &xx_image_description_creator_icc_v4_interface,
+			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V4_ERROR_BAD_FD);
 
 	close(icc_fd);
-	xx_image_description_creator_icc_v2_destroy(image_descr_creator_icc);
+	xx_image_description_creator_icc_v4_destroy(image_descr_creator_icc);
 	color_manager_fini(&cm);
 	client_destroy(client);
 }
@@ -846,26 +852,26 @@ TEST(set_bad_icc_size_zero)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_icc_v2 *image_descr_creator_icc;
+	struct xx_image_description_creator_icc_v4 *image_descr_creator_icc;
 	int32_t icc_fd;
 
 	client = create_client_and_test_surface(100, 100, 100, 100);
 	color_manager_init(&cm, client);
 
 	image_descr_creator_icc =
-		xx_color_manager_v2_new_icc_creator(cm.manager);
+		xx_color_manager_v4_new_icc_creator(cm.manager);
 
 	icc_fd = open(srgb_icc_profile_path, O_RDONLY);
 	assert(icc_fd >= 0);
 
 	/* Try setting ICC file with a bad size, it should fail. */
-	xx_image_description_creator_icc_v2_set_icc_file(image_descr_creator_icc,
+	xx_image_description_creator_icc_v4_set_icc_file(image_descr_creator_icc,
 							 icc_fd, 0, 0);
-	expect_protocol_error(client, &xx_image_description_creator_icc_v2_interface,
-			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_SIZE);
+	expect_protocol_error(client, &xx_image_description_creator_icc_v4_interface,
+			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V4_ERROR_BAD_SIZE);
 
 	close(icc_fd);
-	xx_image_description_creator_icc_v2_destroy(image_descr_creator_icc);
+	xx_image_description_creator_icc_v4_destroy(image_descr_creator_icc);
 	color_manager_fini(&cm);
 	client_destroy(client);
 }
@@ -874,28 +880,28 @@ TEST(set_bad_icc_non_seekable)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_icc_v2 *image_descr_creator_icc;
+	struct xx_image_description_creator_icc_v4 *image_descr_creator_icc;
 	int32_t fds[2];
 
 	client = create_client_and_test_surface(100, 100, 100, 100);
 	color_manager_init(&cm, client);
 
 	image_descr_creator_icc =
-		xx_color_manager_v2_new_icc_creator(cm.manager);
+		xx_color_manager_v4_new_icc_creator(cm.manager);
 
 	/* We need a non-seekable file, and pipes are non-seekable. */
 	assert(pipe(fds) >= 0);
 
 	/* Pretend that it has a valid size of 1024 bytes. That still should
 	 * fail because the fd is non-seekable. */
-	xx_image_description_creator_icc_v2_set_icc_file(image_descr_creator_icc,
+	xx_image_description_creator_icc_v4_set_icc_file(image_descr_creator_icc,
 							 fds[0], 0, 1024);
-	expect_protocol_error(client, &xx_image_description_creator_icc_v2_interface,
-			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_BAD_FD);
+	expect_protocol_error(client, &xx_image_description_creator_icc_v4_interface,
+			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V4_ERROR_BAD_FD);
 
 	close(fds[0]);
 	close(fds[1]);
-	xx_image_description_creator_icc_v2_destroy(image_descr_creator_icc);
+	xx_image_description_creator_icc_v4_destroy(image_descr_creator_icc);
 	color_manager_fini(&cm);
 	client_destroy(client);
 }
@@ -904,7 +910,7 @@ TEST(set_icc_twice)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_icc_v2 *image_descr_creator_icc;
+	struct xx_image_description_creator_icc_v4 *image_descr_creator_icc;
 	int32_t icc_fd;
 	struct stat st;
 
@@ -912,24 +918,24 @@ TEST(set_icc_twice)
 	color_manager_init(&cm, client);
 
 	image_descr_creator_icc =
-		xx_color_manager_v2_new_icc_creator(cm.manager);
+		xx_color_manager_v4_new_icc_creator(cm.manager);
 
 	icc_fd = open(srgb_icc_profile_path, O_RDONLY);
 	assert(icc_fd >= 0);
 	assert(fstat(icc_fd, &st) == 0);
 
-	xx_image_description_creator_icc_v2_set_icc_file(image_descr_creator_icc,
+	xx_image_description_creator_icc_v4_set_icc_file(image_descr_creator_icc,
 							 icc_fd, 0, st.st_size);
 	client_roundtrip(client);
 
 	/* Set the ICC again, what should fail. */
-	xx_image_description_creator_icc_v2_set_icc_file(image_descr_creator_icc,
+	xx_image_description_creator_icc_v4_set_icc_file(image_descr_creator_icc,
 							 icc_fd, 0, st.st_size);
-	expect_protocol_error(client, &xx_image_description_creator_icc_v2_interface,
-			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V2_ERROR_ALREADY_SET);
+	expect_protocol_error(client, &xx_image_description_creator_icc_v4_interface,
+			      XX_IMAGE_DESCRIPTION_CREATOR_ICC_V4_ERROR_ALREADY_SET);
 
 	close(icc_fd);
-	xx_image_description_creator_icc_v2_destroy(image_descr_creator_icc);
+	xx_image_description_creator_icc_v4_destroy(image_descr_creator_icc);
 	color_manager_fini(&cm);
 	client_destroy(client);
 }
@@ -938,7 +944,7 @@ TEST(create_icc_image_description_no_info)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_icc_v2 *image_descr_creator_icc;
+	struct xx_image_description_creator_icc_v4 *image_descr_creator_icc;
 	struct image_description *image_descr;
 	struct image_description_info *image_descr_info;
 
@@ -946,7 +952,7 @@ TEST(create_icc_image_description_no_info)
 	color_manager_init(&cm, client);
 
 	image_descr_creator_icc =
-		xx_color_manager_v2_new_icc_creator(cm.manager);
+		xx_color_manager_v4_new_icc_creator(cm.manager);
 
 	/* Create image description based on ICC profile */
 	image_descr = create_icc_based_image_description(&cm, image_descr_creator_icc,
@@ -956,8 +962,8 @@ TEST(create_icc_image_description_no_info)
 	/* Get image description information, and that should fail. Images
 	 * descriptions that we create do not accept this request. */
 	image_descr_info = image_descr_get_information(image_descr);
-	expect_protocol_error(client, &xx_image_description_v2_interface,
-			      XX_IMAGE_DESCRIPTION_V2_ERROR_NO_INFORMATION);
+	expect_protocol_error(client, &xx_image_description_v4_interface,
+			      XX_IMAGE_DESCRIPTION_V4_ERROR_NO_INFORMATION);
 
 	image_descr_info_destroy(image_descr_info);
 	color_manager_fini(&cm);
@@ -968,14 +974,14 @@ TEST(set_surface_image_description)
 {
 	struct client *client;
 	struct color_manager cm;
-	struct xx_image_description_creator_icc_v2 *image_descr_creator_icc;
+	struct xx_image_description_creator_icc_v4 *image_descr_creator_icc;
 	struct image_description *image_descr;
 
 	client = create_client_and_test_surface(100, 100, 100, 100);
 	color_manager_init(&cm, client);
 
 	image_descr_creator_icc =
-		xx_color_manager_v2_new_icc_creator(cm.manager);
+		xx_color_manager_v4_new_icc_creator(cm.manager);
 
 	/* Create image description based on ICC profile */
 	image_descr = create_icc_based_image_description(&cm, image_descr_creator_icc,
@@ -983,9 +989,9 @@ TEST(set_surface_image_description)
 	wait_until_image_description_ready(client, image_descr);
 
 	/* Set surface image description */
-	xx_color_management_surface_v2_set_image_description(cm.surface,
+	xx_color_management_surface_v4_set_image_description(cm.surface,
 							     image_descr->xx_image_descr,
-							     XX_COLOR_MANAGER_V2_RENDER_INTENT_PERCEPTUAL);
+							     XX_COLOR_MANAGER_V4_RENDER_INTENT_PERCEPTUAL);
 	client_roundtrip(client);
 
 	color_manager_fini(&cm);
