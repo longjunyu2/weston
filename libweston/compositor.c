@@ -2568,10 +2568,18 @@ weston_compositor_repick(struct weston_compositor *compositor)
 		weston_seat_repick(seat);
 }
 
+static void
+weston_view_destroy_paint_nodes(struct weston_view *view)
+{
+	struct weston_paint_node *pnode, *pntmp;
+
+	wl_list_for_each_safe(pnode, pntmp, &view->paint_node_list, view_link)
+		weston_paint_node_destroy(pnode);
+}
+
 WL_EXPORT void
 weston_view_unmap(struct weston_view *view)
 {
-	struct weston_paint_node *pnode, *pntmp;
 	struct weston_seat *seat;
 	struct weston_view *child;
 
@@ -2618,8 +2626,7 @@ weston_view_unmap(struct weston_view *view)
 		}
 	}
 
-	wl_list_for_each_safe(pnode, pntmp, &view->paint_node_list, view_link)
-		weston_paint_node_destroy(pnode);
+	weston_view_destroy_paint_nodes(view);
 
 	wl_signal_emit_mutable(&view->unmap_signal, view);
 	view->surface->compositor->view_list_needs_rebuild = true;
@@ -4149,7 +4156,15 @@ weston_view_move_to_layer(struct weston_view *view,
 
 	/* Damage the view's old region, and remove it from the layer. */
 	if (weston_view_is_mapped(view)) {
-		weston_view_damage_below(view);
+		/* Remove all paint nodes because we have no idea what a layer
+		 * change does to view visibility on any output.
+		 *
+		 * For example, minimizing a window might move the view to a
+		 * layer that's not part of the scene graph, and we'll no
+		 * longer see that node in the paint node update loop, so
+		 * won't know to damage its previously visible region.
+		 */
+		weston_view_destroy_paint_nodes(view);
 		weston_view_geometry_dirty_internal(view);
 	}
 
