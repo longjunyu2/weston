@@ -4148,6 +4148,15 @@ weston_view_set_alpha(struct weston_view *view, float alpha)
 	weston_view_update_transform(view);
 }
 
+static bool
+layer_is_visible(struct weston_layer_entry *layer_entry)
+{
+	if (wl_list_empty(&layer_entry->layer->link))
+		return false;
+
+	return true;
+}
+
 /** Move a weston_view to a layer
  *
  * This moves a view to a given point within a layer, identified by a
@@ -4161,6 +4170,7 @@ weston_view_move_to_layer(struct weston_view *view,
 			  struct weston_layer_entry *layer)
 {
 	bool was_mapped = view->is_mapped;
+	bool visible = layer && layer_is_visible(layer);
 
 	if (layer == &view->layer_link)
 		return;
@@ -4168,31 +4178,25 @@ weston_view_move_to_layer(struct weston_view *view,
 	view->surface->compositor->view_list_needs_rebuild = true;
 
 	/* Damage the view's old region, and remove it from the layer. */
-	if (weston_view_is_mapped(view)) {
-		/* Remove all paint nodes because we have no idea what a layer
-		 * change does to view visibility on any output.
-		 *
-		 * For example, minimizing a window might move the view to a
-		 * layer that's not part of the scene graph, and we'll no
-		 * longer see that node in the paint node update loop, so
-		 * won't know to damage its previously visible region.
-		 */
-		weston_view_destroy_paint_nodes(view);
+	if (weston_view_is_mapped(view))
 		weston_view_geometry_dirty_internal(view);
-	}
 
 	wl_list_remove(&view->layer_link.link);
 	wl_list_init(&view->layer_link.link);
 	view->layer_link.layer = NULL;
 
-	if (!layer) {
+	if (!visible)
 		weston_view_unmap(view);
+
+	if (!layer)
 		return;
-	}
 
 	/* Add the view to the new layer and damage its new region. */
 	wl_list_insert(&layer->link, &view->layer_link.link);
 	view->layer_link.layer = layer->layer;
+
+	if (!visible)
+		return;
 
 	view->is_mapped = true;
 	weston_view_geometry_dirty_internal(view);
