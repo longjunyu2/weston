@@ -2165,7 +2165,7 @@ desktop_surface_removed(struct weston_desktop_surface *desktop_surface,
 	weston_desktop_surface_set_user_data(shsurf->desktop_surface, NULL);
 	shsurf->desktop_surface = NULL;
 
-	if (weston_surface_is_mapped(surface) &&
+	if (weston_view_is_mapped(shsurf->view) &&
 	    shsurf->shell->win_close_animation_type == ANIMATION_FADE) {
 
 		if (shsurf->shell->compositor->state == WESTON_COMPOSITOR_ACTIVE &&
