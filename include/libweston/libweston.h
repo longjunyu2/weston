@@ -624,6 +624,15 @@ struct weston_output {
 	struct weston_mode *native_mode;
 	struct weston_mode *current_mode;
 	struct weston_mode *original_mode;
+	/* FIXME: keep a local copy for native_mode */
+	struct {
+		uint32_t flags;
+		enum weston_mode_aspect_ratio aspect_ratio;
+		int32_t width;
+		int32_t height;
+		uint32_t refresh;
+	} native_mode_copy;
+
 	struct wl_list mode_list;
 
 	struct wl_list head_list; /**< List of driven weston_heads */

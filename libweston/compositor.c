@@ -555,6 +555,12 @@ weston_output_mode_set_native(struct weston_output *output,
 	output->native_mode = mode;
 	output->native_scale = scale;
 
+	output->native_mode_copy.width = mode->width;
+	output->native_mode_copy.height = mode->height;
+	output->native_mode_copy.flags = mode->flags;
+	output->native_mode_copy.aspect_ratio = mode->aspect_ratio;
+	output->native_mode_copy.refresh = mode->refresh;
+
 	weston_mode_switch_finish(output, mode_changed, scale_changed);
 
 	if (mode_changed || scale_changed) {
