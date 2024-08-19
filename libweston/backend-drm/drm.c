@@ -2859,7 +2859,7 @@ drm_output_create(struct weston_backend *backend, const char *name)
 	output->destroy_pending = false;
 	output->disable_pending = false;
 
-	output->state_cur = drm_output_state_alloc(output, NULL);
+	output->state_cur = drm_output_state_alloc(output);
 
 	weston_compositor_add_pending_output(&output->base, b->compositor);
 

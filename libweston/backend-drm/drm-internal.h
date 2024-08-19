@@ -822,8 +822,8 @@ enum drm_output_state_duplicate_mode {
 };
 
 struct drm_output_state *
-drm_output_state_alloc(struct drm_output *output,
-		       struct drm_pending_state *pending_state);
+drm_output_state_alloc(struct drm_output *output);
+
 struct drm_output_state *
 drm_output_state_duplicate(struct drm_output_state *src,
 			   struct drm_pending_state *pending_state,
