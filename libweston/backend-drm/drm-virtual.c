@@ -343,6 +343,13 @@ drm_virtual_output_disable(struct weston_output *base)
 	return 0;
 }
 
+static void
+drm_virtual_prepare_repaint(struct weston_output *base)
+{
+       struct drm_output *output = to_drm_output(base);
+       output->device->will_repaint = true;
+}
+
 static struct weston_output *
 drm_virtual_output_create(struct weston_compositor *c, char *name,
 			  void (*destroy_func)(struct weston_output *))
@@ -372,6 +379,7 @@ drm_virtual_output_create(struct weston_compositor *c, char *name,
 	output->base.enable = drm_virtual_output_enable;
 	output->base.destroy = drm_virtual_output_destroy;
 	output->base.disable = drm_virtual_output_disable;
+	output->base.prepare_repaint = drm_virtual_prepare_repaint;
 	output->base.attach_head = NULL;
 
 	output->backend = b;
