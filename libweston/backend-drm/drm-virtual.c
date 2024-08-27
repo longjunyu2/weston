@@ -383,6 +383,7 @@ drm_virtual_output_create(struct weston_compositor *c, char *name,
 	output->base.attach_head = NULL;
 
 	output->backend = b;
+	output->base.backend = &b->base;
 	output->state_cur = drm_output_state_alloc(output);
 
 	weston_compositor_add_pending_output(&output->base, c);
