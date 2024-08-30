@@ -525,6 +525,36 @@ static void
 weston_compositor_reflow_outputs(struct weston_compositor *compositor,
 				struct weston_output *resized_output, int delta_width);
 
+/** Set up the native mode for an output
+ *
+ * \param output     The weston_output object
+ * \param mode       The new native mode
+ *
+ * Our mode setting code does some ugly tricks, and will
+ * sometimes save pointers to ephemeral structures for
+ * comparison later.
+ *
+ * To work around this fragility, we copy the contents of
+ * the native mode at set time.
+ *
+ * This function will be removed when we fix the mode set
+ * code.
+ *
+ * \ingroup output
+ * \internal
+ */
+WL_EXPORT void
+weston_output_copy_native_mode(struct weston_output *output,
+			       struct weston_mode *mode)
+{
+	output->native_mode = mode;
+	output->native_mode_copy.width = mode->width;
+	output->native_mode_copy.height = mode->height;
+	output->native_mode_copy.flags = mode->flags;
+	output->native_mode_copy.aspect_ratio = mode->aspect_ratio;
+	output->native_mode_copy.refresh = mode->refresh;
+}
+
 /**
  * \ingroup output
  */
@@ -552,14 +582,8 @@ weston_output_mode_set_native(struct weston_output *output,
 	}
 
 	old_width = output->width;
-	output->native_mode = mode;
+	weston_output_copy_native_mode(output, mode);
 	output->native_scale = scale;
-
-	output->native_mode_copy.width = mode->width;
-	output->native_mode_copy.height = mode->height;
-	output->native_mode_copy.flags = mode->flags;
-	output->native_mode_copy.aspect_ratio = mode->aspect_ratio;
-	output->native_mode_copy.refresh = mode->refresh;
 
 	weston_mode_switch_finish(output, mode_changed, scale_changed);
 
@@ -8053,7 +8077,7 @@ weston_output_set_single_mode(struct weston_output *output,
 	wl_list_insert(&output->mode_list, &mode->link);
 out:
 	output->current_mode = mode;
-	output->native_mode = mode;
+	weston_output_copy_native_mode(output, mode);
 
 	if (local) {
 		wl_list_remove(&local->link);

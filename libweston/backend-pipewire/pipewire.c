@@ -1129,7 +1129,8 @@ pipewire_switch_mode(struct weston_output *base, struct weston_mode *target_mode
 
 	base->current_mode->flags &= ~WL_OUTPUT_MODE_CURRENT;
 
-	base->current_mode = base->native_mode = local_mode;
+	base->current_mode = local_mode;
+	weston_output_copy_native_mode(base, local_mode);
 	base->current_mode->flags |= WL_OUTPUT_MODE_CURRENT;
 
 	fb_size.width = target_mode->width;
@@ -1172,8 +1173,8 @@ pipewire_output_set_size(struct weston_output *base, int width, int height)
 	current_mode = pipewire_ensure_matching_mode(&output->base, &init_mode);
 	current_mode->flags = WL_OUTPUT_MODE_CURRENT | WL_OUTPUT_MODE_PREFERRED;
 
-	output->base.current_mode = output->base.native_mode = current_mode;
-
+	output->base.current_mode = current_mode;
+	weston_output_copy_native_mode(base, current_mode);
 	output->base.start_repaint_loop = pipewire_output_start_repaint_loop;
 	output->base.repaint = pipewire_output_repaint;
 	output->base.assign_planes = NULL;

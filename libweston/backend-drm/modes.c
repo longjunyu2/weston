@@ -912,7 +912,7 @@ drm_output_set_mode(struct weston_output *base,
 	output->base.current_mode->flags |= WL_OUTPUT_MODE_CURRENT;
 
 	/* Set native_ fields, so weston_output_mode_switch_to_native() works */
-	output->base.native_mode = output->base.current_mode;
+	weston_output_copy_native_mode(&output->base, output->base.current_mode);
 	output->base.native_scale = output->base.current_scale;
 
 	return 0;

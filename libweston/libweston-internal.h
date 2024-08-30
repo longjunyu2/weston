@@ -656,4 +656,8 @@ convert_size_by_transform_scale(int32_t *width_out, int32_t *height_out,
 bool
 weston_authenticate_user(const char *username, const char *password);
 
+void
+weston_output_copy_native_mode(struct weston_output *output,
+			       struct weston_mode *mode);
+
 #endif

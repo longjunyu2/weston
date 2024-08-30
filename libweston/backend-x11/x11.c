@@ -1182,7 +1182,7 @@ x11_output_set_size(struct weston_output *base, int width, int height)
 	wl_list_insert(&output->base.mode_list, &output->mode.link);
 
 	output->base.current_mode = &output->mode;
-	output->base.native_mode = &output->native;
+	weston_output_copy_native_mode(&output->base, &output->mode);
 	output->base.native_scale = output->base.current_scale;
 
 	return 0;

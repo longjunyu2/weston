@@ -2540,6 +2540,9 @@ wet_output_compute_output_from_mirror(struct weston_output *output,
 				      struct weston_mode *mode,
 				      int *scale)
 {
+	assert(output->native_mode_copy.width);
+	assert(output->native_mode_copy.height);
+
 	mode->width = output->native_mode_copy.width /
 			mirror->current_scale;
 
