@@ -45,9 +45,11 @@ abort_oom_if_null(void *p)
 	if (p)
 		return p;
 
+#ifndef __ANDROID__
 	written = write(STDERR_FILENO, program_invocation_short_name,
 		        strlen(program_invocation_short_name));
 	written = write(STDERR_FILENO, oommsg, strlen(oommsg));
+#endif
 
 	abort();
 }

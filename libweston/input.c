@@ -34,7 +34,11 @@
 #include <sys/mman.h>
 #include <assert.h>
 #include <unistd.h>
+#ifdef __ANDROID__
+#include <limits.h>
+#else
 #include <values.h>
+#endif
 #include <fcntl.h>
 #include <limits.h>
 #include <errno.h>

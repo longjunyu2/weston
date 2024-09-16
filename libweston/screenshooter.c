@@ -265,7 +265,7 @@ output_run(uint32_t *p, uint32_t delta, int run)
 #if defined(HAVE_BUILTIN_CLZ)
 		i = 24 - __builtin_clz(run);
 #else
-		for (i = 0, tmp = u >> 8; tmp; i++, tmp >>= 1);
+		for (i = 0, tmp = run >> 8; tmp; i++, tmp >>= 1);
 #endif
 		*p++ = delta | ((i + 0xe0) << 24);
 		run -= 1 << (7 + i);

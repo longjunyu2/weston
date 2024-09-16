@@ -28,7 +28,11 @@
 #ifndef WESTON_DRM_FOURCC_H
 #define WESTON_DRM_FOURCC_H
 
+#ifdef __ANDROID__
+#include <drm/drm_fourcc.h>
+#else
 #include <drm_fourcc.h>
+#endif
 
 /* The kernel header drm_fourcc.h defines the DRM formats below.  We duplicate
  * some of the definitions here so that building Weston won't require

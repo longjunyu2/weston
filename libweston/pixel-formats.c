@@ -35,7 +35,9 @@
 #include <stdlib.h>
 #include <wayland-client-protocol.h>
 
+#ifndef __ANDROID__
 #include <xf86drm.h>
+#endif
 
 #include "shared/helpers.h"
 #include "shared/string-helpers.h"
@@ -774,8 +776,13 @@ pixel_format_get_modifier(uint64_t modifier)
 	char *vendor_name;
 	char *mod_str;
 
+#ifdef __ANDROID__
+    modifier_name = NULL;
+    vendor_name = NULL;
+#else
 	modifier_name = drmGetFormatModifierName(modifier);
 	vendor_name = drmGetFormatModifierVendor(modifier);
+#endif
 
 	if (!modifier_name) {
 		if (vendor_name)

@@ -52,7 +52,11 @@
 #include <time.h>
 #include <errno.h>
 #include <inttypes.h>
+#ifdef __ANDROID__
+#include <drm/drm_fourcc.h>
+#else
 #include <drm_fourcc.h>
+#endif
 
 #include "timeline.h"
 
@@ -10485,7 +10489,7 @@ weston_output_finish_frame_from_timer(struct weston_output *output)
 }
 
 /** Retrieve the backend type of as described in enum
- * weston_compositor_backend. 
+ * weston_compositor_backend.
  *
  * Note that the backend must be loaded, with weston_compositor_load_backend
  *
