@@ -1,6 +1,5 @@
 /*
- * Copyright © 2008 Kristian Høgsberg
- * Copyright 2022 Collabora, Ltd.
+ * Copyright 2024 Junyu Long
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,46 +23,33 @@
  * SOFTWARE.
  */
 
-#ifndef WESTON_XALLOC_H
-#define WESTON_XALLOC_H
+#ifndef WESTON_COMPOSITOR_ANDROID_H
+#define WESTON_COMPOSITOR_ANDROID_H
 
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
-#include <errno.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
+#include <stdint.h>
 
-static inline void *
-abort_oom_if_null(void *p)
-{
-	static const char oommsg[] = ": out of memory\n";
-	size_t written __attribute__((unused));
+#include <libweston/libweston.h>
 
-	if (p)
-		return p;
+#define WESTON_ANDROID_BACKEND_CONFIG_VERSION 1
 
-#ifdef __ANDROID__
-    const char* program_invocation_short_name = getprogname();
-#endif
+struct weston_android_backend_config {
+    struct weston_backend_config base;
 
-	written = write(STDERR_FILENO, program_invocation_short_name,
-		        strlen(program_invocation_short_name));
-	written = write(STDERR_FILENO, oommsg, strlen(oommsg));
+    /** Select the renderer to use */
+    enum weston_renderer_type renderer;
 
-	abort();
-}
-
-#define xmalloc(s) (abort_oom_if_null(malloc(s)))
-#define xzalloc(s) (abort_oom_if_null(calloc(1, s)))
-#define xcalloc(n, s) (abort_oom_if_null(calloc(n, s)))
-#define xstrdup(s) (abort_oom_if_null(strdup(s)))
-#define xrealloc(p, s) (abort_oom_if_null(realloc(p, s)))
+    /** Output repaint refresh rate (in mHz). Supported values range from 0
+     * mHz to 1,000,000 mHz. 0 is a special value that triggers repaints
+     * only on capture requests, not on damages. */
+    int refresh;
+};
 
 #ifdef  __cplusplus
 }
 #endif
 
-#endif /* WESTON_XALLOC_H */
+#endif /* WESTON_COMPOSITOR_ANDROID_H */

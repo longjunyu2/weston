@@ -26,6 +26,10 @@
 #ifndef WESTON_WINDOWED_OUTPUT_API_H
 #define WESTON_WINDOWED_OUTPUT_API_H
 
+#ifndef ARRAY_LENGTH
+#define ARRAY_LENGTH(a) (sizeof (a) / sizeof (a)[0])
+#endif
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -38,6 +42,7 @@ struct weston_output;
 #define WESTON_WINDOWED_OUTPUT_API_NAME_X11 "weston_windowed_output_api_x11_v2"
 #define WESTON_WINDOWED_OUTPUT_API_NAME_WAYLAND "weston_windowed_output_api_wayland_v2"
 #define WESTON_WINDOWED_OUTPUT_API_NAME_HEADLESS "weston_windowed_output_api_headless_v2"
+#define WESTON_WINDOWED_OUTPUT_API_NAME_ANDROID "weston_windowed_output_api_headless_v2"
 
 enum weston_windowed_output_type {
 	WESTON_WINDOWED_OUTPUT_X11 = 0,
@@ -94,6 +99,7 @@ weston_windowed_output_get_api(struct weston_compositor *compositor,
 		WESTON_WINDOWED_OUTPUT_API_NAME_X11,
 		WESTON_WINDOWED_OUTPUT_API_NAME_WAYLAND,
 		WESTON_WINDOWED_OUTPUT_API_NAME_HEADLESS,
+        WESTON_WINDOWED_OUTPUT_API_NAME_ANDROID,
 	};
 
 	if (type >= ARRAY_LENGTH(api_names))
