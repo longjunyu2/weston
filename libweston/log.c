@@ -74,11 +74,7 @@ static log_func_t log_continue_handler = default_log_handler;
 static int
 default_log_handler(const char *fmt, va_list ap)
 {
-#ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_ERROR, "weston", "%s", fmt);
-#else
 	fprintf(stderr, "weston_log_set_handler() must be called before using of weston_log().\n");
-#endif
 	abort();
 }
 
