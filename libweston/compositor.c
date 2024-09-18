@@ -10000,6 +10000,14 @@ weston_load_module(const char *name, const char *entrypoint,
 	if (name == NULL)
 		return NULL;
 
+#ifdef __ANDROID__
+    len = strlen(name);
+    if (len > PATH_MAX) {
+        weston_log("Module name [%zu] is larger then PATH_MAX [%d]\n", len, PATH_MAX);
+        return NULL;
+    }
+    strncpy(path, name, len);
+#else
 	if (name[0] != '/') {
 		len = weston_module_path_from_env(name, path, sizeof path);
 		if (len == 0)
@@ -10014,6 +10022,7 @@ weston_load_module(const char *name, const char *entrypoint,
 	 * our buffer is an error here. */
 	if (len >= sizeof path)
 		return NULL;
+#endif
 
 	module = dlopen(path, RTLD_NOW | RTLD_NOLOAD);
 	if (module) {
@@ -10176,6 +10185,7 @@ weston_compositor_get_user_data(struct weston_compositor *compositor)
 static const char * const backend_map[] = {
 	[WESTON_BACKEND_DRM] =		"drm-backend.so",
 	[WESTON_BACKEND_HEADLESS] =	"headless-backend.so",
+    [WESTON_BACKEND_ANDROID] =  "libweston-backend-android.so",
 	[WESTON_BACKEND_PIPEWIRE] =	"pipewire-backend.so",
 	[WESTON_BACKEND_RDP] =		"rdp-backend.so",
 	[WESTON_BACKEND_VNC] =		"vnc-backend.so",
