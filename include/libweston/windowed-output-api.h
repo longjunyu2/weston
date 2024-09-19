@@ -42,12 +42,13 @@ struct weston_output;
 #define WESTON_WINDOWED_OUTPUT_API_NAME_X11 "weston_windowed_output_api_x11_v2"
 #define WESTON_WINDOWED_OUTPUT_API_NAME_WAYLAND "weston_windowed_output_api_wayland_v2"
 #define WESTON_WINDOWED_OUTPUT_API_NAME_HEADLESS "weston_windowed_output_api_headless_v2"
-#define WESTON_WINDOWED_OUTPUT_API_NAME_ANDROID "weston_windowed_output_api_headless_v2"
+#define WESTON_WINDOWED_OUTPUT_API_NAME_ANDROID "weston_windowed_output_api_android_v2"
 
 enum weston_windowed_output_type {
 	WESTON_WINDOWED_OUTPUT_X11 = 0,
 	WESTON_WINDOWED_OUTPUT_WAYLAND,
 	WESTON_WINDOWED_OUTPUT_HEADLESS,
+    WESTON_WINDOWED_OUTPUT_ANDROID,
 };
 
 struct weston_windowed_output_api {
