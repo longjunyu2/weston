@@ -969,6 +969,8 @@ wet_shell_init(struct weston_compositor *compositor,
 			 &zwp_fullscreen_shell_v1_interface, 1, shell,
 			 bind_fullscreen_shell);
 
+#ifndef __ANDROID__
 	screenshooter_create(compositor);
+#endif
 	return 0;
 }
