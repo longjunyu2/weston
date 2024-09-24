@@ -25,28 +25,16 @@
 
 #include "config.h"
 
-#include <assert.h>
-#include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
-#include <stdbool.h>
-
-#include <libweston/libweston.h>
 #include <libweston/backend-android.h>
-#include <weston-wrapper.h>
 #include <libweston/windowed-output-api.h>
-
-#include "shared/helpers.h"
-#include "linux-explicit-synchronization.h"
-#include "pixel-formats.h"
-#include "pixman-renderer.h"
-#include "shared/weston-drm-fourcc.h"
-#include "shared/xalloc.h"
-#include "shared/timespec-util.h"
-#include "linux-dmabuf.h"
-#include "output-capture.h"
-#include "presentation-time-server-protocol.h"
+#include <weston-wrapper.h>
+#include <linux-explicit-synchronization.h>
+#include <pixel-formats.h>
+#include <pixman-renderer.h>
+#include <shared/weston-drm-fourcc.h>
+#include <shared/timespec-util.h>
+#include <gl-borders.h>
 
 #define DEFAULT_OUTPUT_REPAINT_REFRESH 60000 /* In mHz. */
 
@@ -62,8 +50,6 @@ struct android_backend {
     struct weston_compositor *compositor;
 
     struct weston_seat android_seat;
-
-    struct theme *theme;
 
     const struct pixel_format_info **formats;
     unsigned int formats_count;
@@ -446,9 +432,6 @@ android_destroy(struct weston_backend *backend)
             android_head_destroy(base);
     }
 
-//    if (b->theme)
-//        theme_destroy(b->theme);
-
     free(b->formats);
     free(b);
 
@@ -543,9 +526,6 @@ android_backend_create(struct weston_compositor *compositor,
     return b;
 
 err_input:
-//    if (b->theme)
-//        theme_destroy(b->theme);
-err_free:
     wl_list_remove(&b->base.link);
     free(b);
     return NULL;
