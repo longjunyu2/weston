@@ -50,6 +50,7 @@ struct android_backend {
     struct weston_compositor *compositor;
 
     struct weston_seat android_seat;
+    struct weston_touch_device* android_touch_device;
 
     const struct pixel_format_info **formats;
     unsigned int formats_count;
@@ -418,6 +419,80 @@ android_head_destroy(struct weston_head *base)
     free(head);
 }
 
+static void func_touch (struct weston_backend* base, int touchId, int touchType, float x, float y) {
+    struct android_backend* b = to_android_backend(base);
+    static struct timespec ts;
+    static struct weston_coord_global pos;
+    static struct weston_coord_global* pos_p;
+
+    pos.c.x = x;
+    pos.c.y = y;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    if (touchType == WL_TOUCH_UP) {
+        pos_p = NULL;
+    } else
+        pos_p = &pos;
+
+    notify_touch(b->android_touch_device, &ts, touchId, pos_p, touchType);
+}
+
+static int
+android_input_create(struct android_backend* b) {
+    struct xkb_keymap *keymap = NULL;
+    struct xkb_rule_names rules = {0};
+
+    weston_seat_init(&b->android_seat, b->compositor, "android");
+
+//    rules.layout = "us";
+//    if (!(keymap = xkb_keymap_new_from_names(
+//            b->compositor->xkb_context,
+//            &rules,
+//            XKB_KEYMAP_COMPILE_NO_FLAGS))) {
+//        weston_log("Failed to get keymap.\n");
+//        goto error;
+//    }
+//    xkb_keymap_unref(keymap);
+//
+//    if (weston_seat_init_keyboard(&b->android_seat, keymap)) {
+//        weston_log("Failed to init keyboard for android seat\n");
+//        goto error;
+//    }
+
+    // init pointer
+    if (weston_seat_init_pointer(&b->android_seat)) {
+        weston_log("Failed to init pointer for android seat\n");
+        goto error;
+    }
+
+    // init touch
+    if (weston_seat_init_touch(&b->android_seat)) {
+        weston_log("Failed to init touch for android seat\n");
+        goto error;
+    }
+
+    if (!(b->android_touch_device = weston_touch_create_touch_device(
+            b->android_seat.touch_state,
+            "android-touch",NULL, NULL))) {
+        weston_log("Failed to create touch device\n");
+        goto error;
+    }
+
+    wrapper_func_touch(func_touch);
+
+    return 0;
+
+error:
+    weston_seat_release(&b->android_seat);
+    return -1;
+}
+
+static void
+android_input_destroy(struct android_backend* b) {
+    weston_touch_device_destroy(b->android_touch_device);
+    weston_seat_release(&b->android_seat);
+}
+
 static void
 android_destroy(struct weston_backend *backend)
 {
@@ -436,6 +511,7 @@ android_destroy(struct weston_backend *backend)
     free(b);
 
     wrapper_notify_android_destroy();
+    android_input_destroy(b);
 
     /* XXX: cleaning up after cairo/fontconfig here might seem suitable,
      * but fontconfig will create additional threads which we can't wait
@@ -541,14 +617,14 @@ WL_EXPORT int
 weston_backend_init(struct weston_compositor *compositor,
                     struct weston_backend_config *config_base)
 {
-    struct android_backend *b;
+    struct android_backend *b = NULL;
     struct weston_android_backend_config config = {{ 0, }};
 
     if (config_base == NULL ||
         config_base->struct_version != WESTON_ANDROID_BACKEND_CONFIG_VERSION ||
         config_base->struct_size > sizeof(struct weston_android_backend_config)) {
         weston_log("android backend config structure is invalid\n");
-        return -1;
+        goto error;
     }
 
     config_init_to_defaults(&config);
@@ -556,7 +632,19 @@ weston_backend_init(struct weston_compositor *compositor,
 
     b = android_backend_create(compositor, &config);
     if (b == NULL)
-        return -1;
+        goto error;
+
+    if (android_input_create(b)) {
+        weston_log("Failed to create Android input\n");
+        goto error;
+    }
 
     return 0;
+
+error:
+    if (b) {
+        wl_list_remove(&b->base.link);
+        free(b);
+    }
+    return -1;
 }
