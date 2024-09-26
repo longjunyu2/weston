@@ -445,7 +445,7 @@ static void func_key(struct weston_backend* base, int key, int keyState) {
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
 
-    notify_key(&b->android_seat, &ts, key, keyType, STATE_UPDATE_AUTOMATIC);
+    notify_key(&b->android_seat, &ts, key, keyState, STATE_UPDATE_AUTOMATIC);
 }
 
 static int
