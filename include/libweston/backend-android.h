@@ -31,7 +31,6 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-
 #include <libweston/libweston.h>
 
 #define WESTON_ANDROID_BACKEND_CONFIG_VERSION 1

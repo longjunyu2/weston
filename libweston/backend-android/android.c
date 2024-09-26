@@ -421,7 +421,7 @@ android_head_destroy(struct weston_head *base)
     free(head);
 }
 
-static void func_touch (struct weston_backend* base, int touchId, int touchType, float x, float y) {
+static void func_touch(struct weston_backend* base, int touchId, int touchType, float x, float y) {
     struct android_backend* b = to_android_backend(base);
     static struct timespec ts;
     static struct weston_coord_global pos;
@@ -439,27 +439,38 @@ static void func_touch (struct weston_backend* base, int touchId, int touchType,
     notify_touch(b->android_touch_device, &ts, touchId, pos_p, touchType);
 }
 
+static void func_key(struct weston_backend* base, int key, int keyState) {
+    struct android_backend* b = to_android_backend(base);
+    static struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    notify_key(&b->android_seat, &ts, key, keyType, STATE_UPDATE_AUTOMATIC);
+}
+
 static int
 android_input_create(struct android_backend* b) {
     struct xkb_keymap *keymap = NULL;
-    struct xkb_rule_names rules = {0};
+    struct xkb_rule_names rules = {"evdev", "pc105", "us", "", ""};
 
     weston_seat_init(&b->android_seat, b->compositor, "android");
 
-//    rules.layout = "us";
-//    if (!(keymap = xkb_keymap_new_from_names(
-//            b->compositor->xkb_context,
-//            &rules,
-//            XKB_KEYMAP_COMPILE_NO_FLAGS))) {
-//        weston_log("Failed to get keymap.\n");
-//        goto error;
-//    }
-//    xkb_keymap_unref(keymap);
-//
-//    if (weston_seat_init_keyboard(&b->android_seat, keymap)) {
-//        weston_log("Failed to init keyboard for android seat\n");
-//        goto error;
-//    }
+    if (!(keymap = xkb_keymap_new_from_names(
+            b->compositor->xkb_context,
+            &rules,
+            XKB_KEYMAP_COMPILE_NO_FLAGS))) {
+        weston_log("Failed to get keymap.\n");
+        goto error;
+    }
+
+    if (weston_seat_init_keyboard(&b->android_seat, keymap)) {
+        weston_log("Failed to init keyboard for android seat\n");
+        goto error;
+    }
+
+    xkb_keymap_unref(keymap);
+
+    wrapper_func_key(b->jni, func_key);
 
     // init pointer
     if (weston_seat_init_pointer(&b->android_seat)) {
@@ -509,10 +520,11 @@ android_destroy(struct weston_backend *backend)
             android_head_destroy(base);
     }
 
+    wrapper_notify_android_destroy(b->jni);
+
     free(b->formats);
     free(b);
 
-    wrapper_notify_android_destroy(b->jni);
     android_input_destroy(b);
 
     /* XXX: cleaning up after cairo/fontconfig here might seem suitable,
