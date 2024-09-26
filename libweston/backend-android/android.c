@@ -57,6 +57,8 @@ struct android_backend {
 
     int refresh;
     bool repaint_only_on_capture;
+
+    void* jni;
 };
 
 struct android_head {
@@ -153,7 +155,7 @@ android_output_repaint(struct weston_output *output_base)
 
     if (b->compositor->renderer->type == WESTON_RENDERER_PIXMAN) {
         pixman_buffer = container_of(output->renderbuffer, struct pixman_renderbuffer, base);
-        wrapper_notify_android_repaint_output_pixman(pixman_buffer->image);
+        wrapper_notify_android_repaint_output_pixman(b->jni, pixman_buffer->image);
     }
 
     delay_msec = millihz_to_nsec(output->mode.refresh) / 1000000;
@@ -213,7 +215,7 @@ android_output_destroy(struct weston_output *base)
 
     android_output_disable(&output->base);
     weston_output_release(&output->base);
-    wrapper_notify_android_output_destroy();
+    wrapper_notify_android_output_destroy(output->backend->jni);
 
     assert(!output->frame);
 	free(output);
@@ -338,7 +340,7 @@ android_output_set_size(struct weston_output *base,
     output->base.set_dpms = NULL;
     output->base.switch_mode = NULL;
 
-    wrapper_notify_android_output_set_size(width, height);
+    wrapper_notify_android_output_set_size(output->backend->jni, width, height);
 
     return 0;
 }
@@ -369,7 +371,7 @@ android_output_create(struct weston_backend *backed, const char* name)
 
     weston_compositor_add_pending_output(&output->base, compositor);
 
-    wrapper_notify_android_output_create();
+    wrapper_notify_android_output_create(b->jni);
 
 	return &output->base;
 }
@@ -478,7 +480,7 @@ android_input_create(struct android_backend* b) {
         goto error;
     }
 
-    wrapper_func_touch(func_touch);
+    wrapper_func_touch(b->jni, func_touch);
 
     return 0;
 
@@ -510,7 +512,7 @@ android_destroy(struct weston_backend *backend)
     free(b->formats);
     free(b);
 
-    wrapper_notify_android_destroy();
+    wrapper_notify_android_destroy(b->jni);
     android_input_destroy(b);
 
     /* XXX: cleaning up after cairo/fontconfig here might seem suitable,
@@ -546,6 +548,8 @@ android_backend_create(struct weston_compositor *compositor,
 
     b->formats_count = ARRAY_LENGTH(android_formats);
     b->formats = pixel_format_get_array(android_formats, b->formats_count);
+
+    b->jni = config->jni;
 
     /* Wayland event source's timeout has a granularity of the order of
      * milliseconds so the highest supported rate is 1 kHz. 0 is a special

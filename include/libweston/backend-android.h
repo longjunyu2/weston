@@ -46,6 +46,8 @@ struct weston_android_backend_config {
      * mHz to 1,000,000 mHz. 0 is a special value that triggers repaints
      * only on capture requests, not on damages. */
     int refresh;
+
+    void* jni;
 };
 
 #ifdef  __cplusplus
