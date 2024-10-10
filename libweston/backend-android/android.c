@@ -437,6 +437,7 @@ static void func_touch(struct weston_backend* base, int touchId, int touchType, 
         pos_p = &pos;
 
     notify_touch(b->android_touch_device, &ts, touchId, pos_p, touchType);
+    notify_touch_frame(b->android_touch_device);
 }
 
 static void func_key(struct weston_backend* base, int key, int keyState) {
@@ -451,9 +452,16 @@ static void func_key(struct weston_backend* base, int key, int keyState) {
 static int
 android_input_create(struct android_backend* b) {
     struct xkb_keymap *keymap = NULL;
-    struct xkb_rule_names rules = {"evdev", "pc105", "us", "", ""};
+    struct xkb_rule_names rules;
 
     weston_seat_init(&b->android_seat, b->compositor, "android");
+
+    if (!update_xkb_rules(b->jni, &rules.rules, &rules.model, &rules.layout)) {
+        weston_log("Failed to update xkb rules.\n");
+        goto error;
+    }
+    rules.options = NULL;
+    rules.variant = NULL;
 
     if (!(keymap = xkb_keymap_new_from_names(
             b->compositor->xkb_context,
