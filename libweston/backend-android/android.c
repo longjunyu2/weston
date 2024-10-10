@@ -429,7 +429,7 @@ static void func_touch(struct weston_backend* base, int touchId, int touchType, 
 
     pos.c.x = x;
     pos.c.y = y;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    weston_compositor_get_time(&ts);
 
     if (touchType == WL_TOUCH_UP) {
         pos_p = NULL;
@@ -444,9 +444,56 @@ static void func_key(struct weston_backend* base, int key, int keyState) {
     struct android_backend* b = to_android_backend(base);
     static struct timespec ts;
 
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    weston_compositor_get_time(&ts);
 
     notify_key(&b->android_seat, &ts, key, keyState, STATE_UPDATE_AUTOMATIC);
+}
+
+static void func_pointer(struct weston_backend* base, int pointerType, float x, float y) {
+    struct android_backend* b = to_android_backend(base);
+    static struct weston_coord_global pos;
+    static struct timespec ts;
+    static struct weston_pointer_motion_event motionEvent = {0};
+
+    pos.c.x = x;
+    pos.c.y = y;
+    weston_compositor_get_time(&ts);
+
+    if (pointerType == ABSOLUTE_POS) {
+        motionEvent.mask = WESTON_POINTER_MOTION_ABS;
+        motionEvent.abs = pos;
+    } else if (pointerType == RELATIVE_POS) {
+        motionEvent.mask = WESTON_POINTER_MOTION_REL;
+        motionEvent.rel = pos.c;
+    }
+
+    notify_motion(&b->android_seat, &ts, &motionEvent);
+    notify_pointer_frame(&b->android_seat);
+}
+
+static void func_button(struct weston_backend* base, int button, int buttonState) {
+    struct android_backend* b = to_android_backend(base);
+    static struct timespec ts;
+
+    weston_compositor_get_time(&ts);
+
+    notify_button(&b->android_seat, &ts, button, buttonState);
+}
+
+static void func_axis(struct weston_backend* base, int axisType, float value, bool hasDiscrete, int discrete) {
+    struct android_backend* b = to_android_backend(base);
+    static struct weston_pointer_axis_event axisEvent= {0};
+    static struct timespec ts;
+
+    weston_compositor_get_time(&ts);
+
+    axisEvent.axis = axisType;
+    axisEvent.value = value;
+    axisEvent.has_discrete = hasDiscrete;
+    axisEvent.discrete = discrete;
+
+    notify_axis(&b->android_seat, &ts, &axisEvent);
+    notify_pointer_frame(&b->android_seat);
 }
 
 static int
@@ -485,6 +532,10 @@ android_input_create(struct android_backend* b) {
         weston_log("Failed to init pointer for android seat\n");
         goto error;
     }
+
+    wrapper_func_button(b->jni, func_button);
+    wrapper_func_pointer(b->jni, func_pointer);
+    wrapper_func_axis(b->jni, func_axis);
 
     // init touch
     if (weston_seat_init_touch(&b->android_seat)) {
